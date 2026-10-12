@@ -168,7 +168,8 @@ src/
 
 - **`Could not find a package configuration file provided by "OpenCV"`** : installer `libopencv-dev`. Pour une installation d'OpenCV compilée à la main, ajouter `-DOpenCV_DIR=<prefix>/lib/cmake/opencv4` à la commande `cmake`.
 - **« Aucune webcam détectée »** : vérifier `ls /dev/video*` et que l'utilisateur appartient au groupe `video` (`groups`).
-- **Messages « Corrupt JPEG data » dans la console** : ils viennent du flux MJPEG de certaines webcams. Ils sont sans conséquence.
+- **Messages dans la console** : par défaut, l'application masque deux types de messages sans gravité, la version de FFmpeg utilisée par Qt Multimedia (`qt.multimedia.ffmpeg`) et les « Corrupt JPEG data » (`qt.gui.imageio.jpeg`) que produisent certaines webcams en MJPEG. Pour les réafficher, mettre `hideLibraryMessages=false` dans la section `[logging]` de `~/.config/RobotDetectionByWebcam/settings.ini`. La variable d'environnement `QT_LOGGING_RULES` reste prioritaire, par exemple `QT_LOGGING_RULES="qt.gui.imageio.jpeg.warning=true" ./build/RobotDetectionByWebcam`.
+- **`Failed to open VDPAU backend libvdpau_va_gl.so`** : FFmpeg cherche une accélération matérielle du décodage vidéo et ne trouve pas le pilote VDPAU des cartes Intel. Ce message est sans conséquence. Il est écrit directement par la bibliothèque système, donc l'application ne peut pas le masquer. Pour le supprimer : `sudo apt install libvdpau-va-gl1`.
 - **Détection instable** : éclairer la scène de façon homogène, cliquer à nouveau sur le carré pour recaler la couleur, et utiliser « Afficher le masque » pour régler les seuils.
 - **Le carré n'est pas détecté quand il est loin** : baisser « Surface min ».
 - **Un marqueur ArUco n'est pas détecté** : vérifier que le bon dictionnaire est sélectionné, que la marge blanche est présente, que le marqueur est net et assez grand dans l'image (au moins 30 px de côté environ), et qu'il n'y a pas de reflet.

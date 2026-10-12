@@ -32,6 +32,9 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
+    // Fichier des réglages de l'application (format INI).
+    static QString settingsPath();
+
 protected:
     void closeEvent(QCloseEvent *event) override;
 
@@ -59,7 +62,6 @@ private:
     QString resolutionSettingsKey() const;
     void updateCalibrationStatus();
     QString calibrationPath() const;
-    QString settingsPath() const;
     void loadSettings();
     void saveSettings() const;
 

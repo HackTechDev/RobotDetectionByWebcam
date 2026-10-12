@@ -410,6 +410,8 @@ L'application retrouve au lancement les réglages de la fois précédente :
 - **Calibration** : dimensions du damier et taille des cases ;
 - **Fenêtre** : taille, position et onglet ouvert.
 
+Le fichier contient aussi une option sans équivalent dans l'interface : `hideLibraryMessages`, dans la section `[logging]`. Elle vaut `true` par défaut et masque des messages techniques sans gravité dans le terminal (par exemple « Corrupt JPEG data »). Mettez-la à `false` pour les réafficher, par exemple pour signaler un problème. Ce réglage est pris en compte au lancement suivant.
+
 La résolution est enregistrée dès qu'on la choisit. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
 
 Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique** et les captures du damier en cours.

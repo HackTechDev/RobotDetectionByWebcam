@@ -336,7 +336,7 @@ void MainWindow::populateResolutions()
     }
 }
 
-QString MainWindow::settingsPath() const
+QString MainWindow::settingsPath()
 {
     return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
            + QStringLiteral("/settings.ini");
