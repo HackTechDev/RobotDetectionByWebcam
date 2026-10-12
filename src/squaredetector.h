@@ -13,6 +13,11 @@ struct DetectedSquare
     double side = 0.0;   // côté moyen en pixels
     double angle = 0.0;  // orientation en degrés, dans [0, 90[
     double area = 0.0;   // surface du blob en pixels
+
+    // Position sur le sol, disponible seulement si le repère du sol est défini.
+    bool hasFloor = false;
+    QPointF floorPosition;    // en mm dans le repère du sol
+    double floorHeading = 0;  // en degrés dans [0, 90[ (un carré est symétrique)
 };
 
 // Détecte des carrés d'une couleur donnée avec OpenCV : seuillage HSV,

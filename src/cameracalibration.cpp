@@ -100,9 +100,11 @@ bool CameraCalibration::calibrate(QString *error)
     cv::Mat cameraMatrix, distCoeffs;
     std::vector<cv::Mat> rvecs, tvecs;
     try {
+        // k3 bloqué à 0 : libre, il compense k2 dans la zone couverte par le damier et fait
+        // diverger la correction de distorsion près des bords de l'image (sur-ajustement).
         m_rms = cv::calibrateCamera(objectPoints, m_imagePoints,
                                     cv::Size(m_captureSize.width(), m_captureSize.height()),
-                                    cameraMatrix, distCoeffs, rvecs, tvecs);
+                                    cameraMatrix, distCoeffs, rvecs, tvecs, cv::CALIB_FIX_K3);
     } catch (const cv::Exception &e) {
         if (error)
             *error = QString::fromStdString(e.what());

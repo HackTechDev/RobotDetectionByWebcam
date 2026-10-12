@@ -23,12 +23,21 @@ def describe(msg):
     if squares is not None:
         if squares:
             s = squares[0]
-            parts.append(f"carré ({s['center'][0]:.0f}, {s['center'][1]:.0f}) px {s['angle']:.0f}°")
+            text = f"carré ({s['center'][0]:.0f}, {s['center'][1]:.0f}) px {s['angle']:.0f}°"
+            floor = s.get("floor")
+            if floor:
+                x, y = floor["position_mm"]
+                text += f" | sol X {x:.0f} Y {y:.0f} mm"
+            parts.append(text)
         else:
             parts.append("pas de carré")
 
     for m in msg.get("markers", []):
         text = f"ArUco {m['id']} ({m['center'][0]:.0f}, {m['center'][1]:.0f}) px {m['angle']:.0f}°"
+        floor = m.get("floor")
+        if floor:
+            x, y = floor["position_mm"]
+            text += f" | sol X {x:.0f} Y {y:.0f} mm cap {floor['heading_deg']:.0f}°"
         pose = m.get("pose")
         if pose:
             x, y, z = pose["position_mm"]

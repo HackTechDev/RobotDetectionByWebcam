@@ -41,7 +41,7 @@ Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchée
 
 Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution. Ce basculement est mémorisé avec la résolution.
 
-Les réglages sont répartis en quatre onglets : **Carré coloré**, **ArUco**, **Calibration** et **Envoi UDP**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
+Les réglages sont répartis en cinq onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol** et **Envoi UDP**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
 
 ### Carré coloré
 
@@ -116,11 +116,17 @@ Avec calibration, chaque marqueur a aussi :
 - **distance** : la distance caméra–marqueur en mm ;
 - **rotation X, Y, Z** : ses angles d'Euler en degrés. (0, 0, 0) correspond à un marqueur droit, face à la caméra. Z est la rotation dans le plan du marqueur ; X et Y sont ses inclinaisons.
 
+### Positions sur le sol
+
+L'onglet « Sol » définit un repère sur le sol : on saisit les dimensions d'un rectangle tracé au sol (ruban adhésif, coins d'une table...), puis on clique ses 4 coins dans l'image, dans l'ordre : origine, coin sur l'axe X, coin opposé, coin sur l'axe Y. L'application donne alors la position de chaque carré et de chaque marqueur **en mm sur le sol**, avec le cap des marqueurs (direction de leur bord supérieur, de l'axe X vers l'axe Y). Ces valeurs s'affichent dans le panneau « Résultat » et sont envoyées en UDP (champ `floor`).
+
+Le repère fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus. Il est enregistré dans `settings.ini` et reste valable pour toute résolution du même format d'image. La caméra ne doit plus bouger une fois le repère défini. Le repère est défini au niveau du sol, donc un marqueur placé en hauteur sur le robot est légèrement décalé. Le guide utilisateur détaille ce point.
+
 ### Envoi des positions en UDP
 
 L'onglet « Envoi UDP » envoie les résultats à un autre programme, par exemple celui qui pilote le robot : un message JSON par image traitée, en UDP, vers l'adresse et le port choisis (`127.0.0.1:5005` par défaut). Cocher « Envoyer les positions » pour l'activer.
 
-Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins et, si la caméra est calibrée, la pose 3D (`pose`). Une liste est absente si la détection correspondante est désactivée. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#83-format-des-messages).
+Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#93-format-des-messages).
 
 Pour tester la réception :
 
@@ -163,13 +169,24 @@ Le code se trouve dans `src/markerdetector.cpp` et utilise `cv::aruco::ArucoDete
 
 Sur une image de synthèse, la position est retrouvée à environ 1 mm près à 40 cm. L'inclinaison (rotations X et Y) est moins précise, de l'ordre de 1 à 2°, car elle se déduit de la faible déformation perspective d'un seul marqueur.
 
+### Repère du sol
+
+Le code se trouve dans `src/floormapper.cpp`.
+
+1. Les 4 points cliqués sont associés aux coins du rectangle en mm : (0, 0), (X, 0), (X, Y), (0, Y).
+2. Si la caméra est calibrée pour ce format d'image, les points sont d'abord corrigés de la distorsion (`cv::undistortPoints`).
+3. `cv::getPerspectiveTransform` calcule l'homographie entre l'image et le plan du sol.
+4. Le centre de chaque carré ou marqueur est projeté sur le sol (`cv::perspectiveTransform`). Le cap est la direction, sur le sol, du centre vers le milieu du bord supérieur.
+
+Sur une image de synthèse (caméra inclinée filmant un sol de 1000 × 700 mm), les positions sont retrouvées à 1 à 2 mm près et les caps à moins d'1° près.
+
 ### Calibration
 
 Le code se trouve dans `src/cameracalibration.cpp`.
 
 1. `cv::findChessboardCorners` cherche le damier sur une image réduite à 640 px de large (option `FAST_CHECK` pour rester fluide quand aucun damier n'est visible).
 2. À la capture, les coins sont affinés au sous-pixel sur l'image pleine résolution (`cv::cornerSubPix`).
-3. `cv::calibrateCamera` calcule la matrice intrinsèque (fx, fy, cx, cy) et les coefficients de distorsion.
+3. `cv::calibrateCamera` calcule la matrice intrinsèque (fx, fy, cx, cy) et les coefficients de distorsion. Le coefficient radial k3 est bloqué à 0 (`CALIB_FIX_K3`). Laissé libre, il compense k2 dans la zone couverte par le damier, et la correction de distorsion diverge près des bords de l'image.
 4. Le résultat est enregistré au format YAML d'OpenCV (`cv::FileStorage`). Si la résolution de la caméra change, la matrice est mise à l'échelle.
 
 ## Structure du projet
@@ -183,7 +200,8 @@ src/
 ├── squaredetector.h/.cpp  détection du carré coloré (OpenCV)
 ├── markerdetector.h/.cpp  détection, génération et pose 3D des marqueurs ArUco (OpenCV)
 ├── cameracalibration.h/.cpp  calibration de la caméra avec un damier (OpenCV)
-└── positionsender.h/.cpp  envoi des positions en JSON sur UDP
+├── positionsender.h/.cpp  envoi des positions en JSON sur UDP
+└── floormapper.h/.cpp   conversion des positions de l'image en mm sur le sol
 tools/
 └── udp_receiver.py      récepteur de test des positions UDP
 ```

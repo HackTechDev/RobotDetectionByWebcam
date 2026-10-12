@@ -75,10 +75,16 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
     if (squares) {
         QJsonArray list;
         for (const DetectedSquare &s : *squares) {
-            list.append(QJsonObject{{QStringLiteral("center"), point(s.center)},
-                                    {QStringLiteral("side"), round1(s.side)},
-                                    {QStringLiteral("angle"), round1(s.angle)},
-                                    {QStringLiteral("corners"), polygon(s.corners)}});
+            QJsonObject o{{QStringLiteral("center"), point(s.center)},
+                          {QStringLiteral("side"), round1(s.side)},
+                          {QStringLiteral("angle"), round1(s.angle)},
+                          {QStringLiteral("corners"), polygon(s.corners)}};
+            if (s.hasFloor) {
+                o.insert(QStringLiteral("floor"),
+                         QJsonObject{{QStringLiteral("position_mm"), point(s.floorPosition)},
+                                     {QStringLiteral("angle_deg"), round1(s.floorHeading)}});
+            }
+            list.append(o);
         }
         msg.insert(QStringLiteral("squares"), list);
     }
@@ -91,6 +97,11 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
                           {QStringLiteral("side"), round1(m.side)},
                           {QStringLiteral("angle"), round1(m.angle)},
                           {QStringLiteral("corners"), polygon(m.corners)}};
+            if (m.hasFloor) {
+                o.insert(QStringLiteral("floor"),
+                         QJsonObject{{QStringLiteral("position_mm"), point(m.floorPosition)},
+                                     {QStringLiteral("heading_deg"), round1(m.floorHeading)}});
+            }
             if (m.hasPose) {
                 o.insert(QStringLiteral("pose"),
                          QJsonObject{{QStringLiteral("position_mm"), vector3(m.position)},

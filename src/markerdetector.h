@@ -30,6 +30,11 @@ struct DetectedMarker
     QVector3D rotation;     // angles d'Euler (X, Y, Z) en degrés ; (0, 0, 0) = marqueur droit face à la caméra
     double distance = 0.0;  // distance caméra -> marqueur en mm
     QPointF axes[4];        // projection de l'origine, des axes X et Y du marqueur et de sa normale
+
+    // Position sur le sol, disponible seulement si le repère du sol est défini.
+    bool hasFloor = false;
+    QPointF floorPosition;    // en mm dans le repère du sol
+    double floorHeading = 0;  // cap en degrés dans ]-180, 180], de l'axe X vers l'axe Y
 };
 
 // Détecte des marqueurs ArUco avec le module objdetect d'OpenCV.

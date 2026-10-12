@@ -22,6 +22,8 @@ add_executable(RobotDetectionByWebcam
     src/cameracalibration.cpp
     src/positionsender.h
     src/positionsender.cpp
+    src/floormapper.h
+    src/floormapper.cpp
 )
 
 target_link_libraries(RobotDetectionByWebcam PRIVATE Qt6::Widgets Qt6::Multimedia Qt6::Network ${OpenCV_LIBS})

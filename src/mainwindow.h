@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cameracalibration.h"
+#include "floormapper.h"
 #include "markerdetector.h"
 #include "positionsender.h"
 #include "squaredetector.h"
@@ -54,6 +55,9 @@ private slots:
     void calibrate();
     void generateBoard();
     void applyUdpTarget();
+    void toggleFloorPicking();
+    void clearFloor();
+    void onFloorSizeChanged();
 
 private:
     QSlider *addSlider(QFormLayout *form, const QString &label, int min, int max, int value);
@@ -68,6 +72,8 @@ private:
     void updateCalibrationStatus();
     QString calibrationPath() const;
     void loadSettings();
+    void saveFloorSettings() const;
+    void updateFloorStatus();
     void saveSettings() const;
 
     QMediaCaptureSession *m_session = nullptr;
@@ -107,12 +113,22 @@ private:
     QLineEdit *m_udpHostEdit = nullptr;
     QSpinBox *m_udpPortSpin = nullptr;
     QLabel *m_udpStatusLabel = nullptr;
+
+    QDoubleSpinBox *m_floorSizeXSpin = nullptr;
+    QDoubleSpinBox *m_floorSizeYSpin = nullptr;
+    QPushButton *m_floorPickButton = nullptr;
+    QCheckBox *m_floorShowCheck = nullptr;
+    QLabel *m_floorLabel = nullptr;
     QLabel *m_statusLabel = nullptr;
 
     SquareDetector m_detector;
     MarkerDetector m_markerDetector;
     CameraCalibration m_calibration;
     PositionSender m_sender;
+    FloorMapper m_floor;
+    bool m_floorPicking = false;
+    std::vector<QPointF> m_floorPicked;  // points cliqués, dans l'image réelle de la caméra
+    QSize m_lastFrameSizeAtPick;
     QElapsedTimer m_lastCapture;
     bool m_captureRequested = false;
     QColor m_targetColor;

@@ -43,6 +43,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setWindowTitle(tr("Détection de carré coloré et de marqueurs ArUco"));
     m_markerDetector.setCalibration(&m_calibration);
+    m_floor.setCalibration(&m_calibration);
 
     auto *central = new QWidget(this);
     auto *layout = new QHBoxLayout(central);
@@ -161,6 +162,45 @@ MainWindow::MainWindow(QWidget *parent)
     calibLayout->addStretch();
     tabs->addTab(calibTab, tr("Calibration"));
 
+    // Onglet sol : repère défini par 4 points cliqués aux coins d'un rectangle connu.
+    auto *floorTab = new QWidget(tabs);
+    auto *floorLayout = new QVBoxLayout(floorTab);
+    auto *floorBox = new QGroupBox(tr("Rectangle de référence"), floorTab);
+    auto *floorForm = new QFormLayout(floorBox);
+    auto makeSizeSpin = [floorBox](double value) {
+        auto *spin = new QDoubleSpinBox(floorBox);
+        spin->setRange(10, 100000);
+        spin->setDecimals(0);
+        spin->setSuffix(QStringLiteral(" mm"));
+        spin->setValue(value);
+        return spin;
+    };
+    m_floorSizeXSpin = makeSizeSpin(m_floor.size().width());
+    m_floorSizeYSpin = makeSizeSpin(m_floor.size().height());
+    floorForm->addRow(tr("Longueur X (point 1 → 2)"), m_floorSizeXSpin);
+    floorForm->addRow(tr("Longueur Y (point 1 → 4)"), m_floorSizeYSpin);
+    m_floorPickButton = new QPushButton(floorBox);
+    floorForm->addRow(m_floorPickButton);
+    auto *floorClearButton = new QPushButton(tr("Effacer le repère"), floorBox);
+    floorForm->addRow(floorClearButton);
+    m_floorShowCheck = new QCheckBox(tr("Afficher la zone sur l'image"), floorBox);
+    m_floorShowCheck->setChecked(true);
+    floorForm->addRow(m_floorShowCheck);
+    floorLayout->addWidget(floorBox);
+    m_floorLabel = new QLabel(floorTab);
+    m_floorLabel->setWordWrap(true);
+    m_floorLabel->setTextFormat(Qt::RichText);
+    floorLayout->addWidget(m_floorLabel);
+    auto *floorHelp = new QLabel(tr("<i>Marquez au sol les 4 coins d'un rectangle (ruban adhésif, coins "
+                                    "d'une table...), puis cliquez-les dans l'ordre : 1 origine, 2 sur "
+                                    "l'axe X, 3 coin opposé, 4 sur l'axe Y. La caméra ne doit plus "
+                                    "bouger ensuite.</i>"),
+                                 floorTab);
+    floorHelp->setWordWrap(true);
+    floorLayout->addWidget(floorHelp);
+    floorLayout->addStretch();
+    tabs->addTab(floorTab, tr("Sol"));
+
     // Onglet envoi UDP : un message JSON par image traitée.
     auto *udpTab = new QWidget(tabs);
     auto *udpLayout = new QVBoxLayout(udpTab);
@@ -229,10 +269,15 @@ MainWindow::MainWindow(QWidget *parent)
         updateCalibrationStatus();
     });
     connect(m_calibrateButton, &QPushButton::clicked, this, &MainWindow::calibrate);
+    connect(m_floorPickButton, &QPushButton::clicked, this, &MainWindow::toggleFloorPicking);
+    connect(floorClearButton, &QPushButton::clicked, this, &MainWindow::clearFloor);
+    connect(m_floorSizeXSpin, &QDoubleSpinBox::valueChanged, this, &MainWindow::onFloorSizeChanged);
+    connect(m_floorSizeYSpin, &QDoubleSpinBox::valueChanged, this, &MainWindow::onFloorSizeChanged);
     connect(m_udpHostEdit, &QLineEdit::editingFinished, this, &MainWindow::applyUdpTarget);
     connect(m_udpPortSpin, &QSpinBox::valueChanged, this, &MainWindow::applyUdpTarget);
 
     applyUdpTarget();
+    updateFloorStatus();
     m_calibration.load(calibrationPath());
     m_lastCapture.start();
     updateCalibrationStatus();
@@ -423,6 +468,23 @@ void MainWindow::loadSettings()
     m_markerLengthSpin->setValue(
         s.value(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value()).toDouble());
 
+    {
+        // Sans signaux : onFloorSizeChanged() réenregistrerait le repère avant le chargement des points.
+        const QSignalBlocker bx(m_floorSizeXSpin), by(m_floorSizeYSpin);
+        m_floorSizeXSpin->setValue(s.value(QStringLiteral("floor/sizeX"), m_floorSizeXSpin->value()).toDouble());
+        m_floorSizeYSpin->setValue(s.value(QStringLiteral("floor/sizeY"), m_floorSizeYSpin->value()).toDouble());
+        m_floor.setSize(QSizeF(m_floorSizeXSpin->value(), m_floorSizeYSpin->value()));
+    }
+    m_floorShowCheck->setChecked(s.value(QStringLiteral("floor/show"), true).toBool());
+    const QVariantList floorPoints = s.value(QStringLiteral("floor/points")).toList();
+    if (floorPoints.size() == 8) {
+        std::vector<QPointF> pts;
+        for (int i = 0; i < 8; i += 2)
+            pts.emplace_back(floorPoints[i].toDouble(), floorPoints[i + 1].toDouble());
+        m_floor.setPoints(pts, s.value(QStringLiteral("floor/imageSize")).toSize());
+    }
+    updateFloorStatus();
+
     m_udpHostEdit->setText(s.value(QStringLiteral("udp/host"), m_udpHostEdit->text()).toString());
     m_udpPortSpin->setValue(s.value(QStringLiteral("udp/port"), m_udpPortSpin->value()).toInt());
     applyUdpTarget();
@@ -460,6 +522,7 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("aruco/dictionary"), m_dictCombo->currentText());
     s.setValue(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value());
 
+    s.setValue(QStringLiteral("floor/show"), m_floorShowCheck->isChecked());
     s.setValue(QStringLiteral("udp/enabled"), m_udpBox->isChecked());
     s.setValue(QStringLiteral("udp/host"), m_udpHostEdit->text());
     s.setValue(QStringLiteral("udp/port"), m_udpPortSpin->value());
@@ -559,6 +622,19 @@ void MainWindow::onImageClicked(const QPoint &displayPos)
     const QPoint pos = m_mirrorCheck->isChecked()
                            ? QPoint(m_lastFrame.width() - 1 - displayPos.x(), displayPos.y())
                            : displayPos;
+
+    // Définition du repère du sol : le clic place un point au lieu de choisir une couleur.
+    if (m_floorPicking) {
+        m_floorPicked.push_back(QPointF(pos));
+        if (m_floorPicked.size() == 4) {
+            m_floor.setPoints(m_floorPicked, m_lastFrame.size());
+            m_floorPicking = false;
+            m_floorPicked.clear();
+            saveFloorSettings();
+        }
+        updateFloorStatus();
+        return;
+    }
     // Moyenne sur une zone 7x7 autour du clic pour limiter le bruit.
     int r = 0, g = 0, b = 0, n = 0;
     for (int dy = -3; dy <= 3; ++dy) {
@@ -731,6 +807,81 @@ void MainWindow::applyUdpTarget()
         m_udpStatusLabel->setText(tr("<b style='color:#c00'>%1</b>").arg(m_sender.lastError().toHtmlEscaped()));
 }
 
+void MainWindow::toggleFloorPicking()
+{
+    m_floorPicking = !m_floorPicking;
+    m_floorPicked.clear();
+    updateFloorStatus();
+}
+
+void MainWindow::clearFloor()
+{
+    m_floorPicking = false;
+    m_floorPicked.clear();
+    m_floor.clearPoints();
+    saveFloorSettings();
+    updateFloorStatus();
+}
+
+void MainWindow::onFloorSizeChanged()
+{
+    m_floor.setSize(QSizeF(m_floorSizeXSpin->value(), m_floorSizeYSpin->value()));
+    saveFloorSettings();
+    updateFloorStatus();
+}
+
+namespace {
+
+QString floorPointName(int index, const QSizeF &size)
+{
+    const QString w = QString::number(size.width(), 'f', 0);
+    const QString h = QString::number(size.height(), 'f', 0);
+    switch (index) {
+    case 0: return QObject::tr("origine (0, 0)");
+    case 1: return QObject::tr("sur l'axe X (%1, 0)").arg(w);
+    case 2: return QObject::tr("coin opposé (%1, %2)").arg(w, h);
+    default: return QObject::tr("sur l'axe Y (0, %1)").arg(h);
+    }
+}
+
+} // namespace
+
+void MainWindow::updateFloorStatus()
+{
+    m_floorPickButton->setText(m_floorPicking ? tr("Annuler") : tr("Définir les 4 points"));
+    if (m_floorPicking) {
+        const int n = int(m_floorPicked.size());
+        m_floorLabel->setText(tr("<b style='color:#c60'>Cliquez sur le point %1/4</b> : %2")
+                                  .arg(n + 1)
+                                  .arg(floorPointName(n, m_floor.size())));
+        return;
+    }
+    if (!m_floor.isDefined()) {
+        m_floorLabel->setText(tr("<b style='color:#c00'>Repère du sol non défini</b> : pas de position "
+                                 "au sol."));
+        return;
+    }
+    const QSize s = m_floor.pointsImageSize();
+    QString text = tr("<b style='color:#080'>Repère du sol défini</b> (points pris en %1 x %2)")
+                       .arg(s.width())
+                       .arg(s.height());
+    if (!m_lastFrame.isNull() && m_calibration.isValidFor(m_lastFrame.size()))
+        text += tr("<br>Distorsion de l'objectif corrigée par la calibration.");
+    m_floorLabel->setText(text);
+}
+
+void MainWindow::saveFloorSettings() const
+{
+    QSettings s(settingsPath(), QSettings::IniFormat);
+    QVariantList points;
+    for (const QPointF &p : m_floor.points())
+        points << p.x() << p.y();
+    s.setValue(QStringLiteral("floor/points"), points);
+    s.setValue(QStringLiteral("floor/imageSize"), m_floor.pointsImageSize());
+    s.setValue(QStringLiteral("floor/sizeX"), m_floor.size().width());
+    s.setValue(QStringLiteral("floor/sizeY"), m_floor.size().height());
+}
+
 void MainWindow::onFrame(const QVideoFrame &frame)
 {
     QImage image = frame.toImage();
@@ -774,10 +925,17 @@ void MainWindow::onFrame(const QVideoFrame &frame)
 
     const bool squaresOn = m_squareBox->isChecked();
     const bool markersOn = m_arucoBox->isChecked();
-    const std::vector<DetectedSquare> squares =
+    std::vector<DetectedSquare> squares =
         squaresOn ? m_detector.detect(image) : std::vector<DetectedSquare>();
-    const std::vector<DetectedMarker> markers =
+    std::vector<DetectedMarker> markers =
         markersOn ? m_markerDetector.detect(image) : std::vector<DetectedMarker>();
+    if (m_floor.prepare(image.size()))
+        m_floor.apply(squares, markers);
+    if (m_floorPicking && !m_floorPicked.empty() && image.size() != m_lastFrameSizeAtPick) {
+        m_floorPicked.clear();  // la résolution a changé pendant la saisie : on recommence
+        updateFloorStatus();
+    }
+    m_lastFrameSizeAtPick = image.size();
 
     // Mode calibration : recherche du damier et capture manuelle ou automatique.
     const bool calibOn = m_captureBox->isChecked();
@@ -879,6 +1037,44 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                                     : tr("Damier non détecté"));
     }
 
+    // Repère du sol : contour de la zone et noms des axes, ou points en cours de saisie.
+    const QColor floorColor(255, 140, 0);
+    if (m_floor.isDefined() && m_floorShowCheck->isChecked() && !m_floorPicking) {
+        const std::vector<QPointF> pts = m_floor.pointsFor(image.size());
+        if (pts.size() == 4) {
+            QPolygonF zone;
+            for (const QPointF &p : pts)
+                zone << toDisplay(p);
+            painter.setPen(QPen(floorColor, penWidth, Qt::DashLine));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawPolygon(zone);
+            painter.setPen(QPen(Qt::red, penWidth * 1.5));
+            painter.drawLine(zone[0], zone[1]);
+            painter.setPen(QPen(Qt::green, penWidth * 1.5));
+            painter.drawLine(zone[0], zone[3]);
+            painter.setPen(floorColor);
+            const QPointF offset(penWidth * 2, -penWidth * 2);
+            painter.drawText(zone[0] + offset, tr("O"));
+            painter.drawText(zone[1] + offset, tr("X"));
+            painter.drawText(zone[3] + offset, tr("Y"));
+        }
+    }
+    if (m_floorPicking) {
+        painter.setBrush(floorColor);
+        for (size_t i = 0; i < m_floorPicked.size(); ++i) {
+            const QPointF p = toDisplay(m_floorPicked[i]);
+            painter.setPen(Qt::NoPen);
+            painter.drawEllipse(p, penWidth * 2.5, penWidth * 2.5);
+            painter.setPen(floorColor);
+            painter.drawText(p + QPointF(penWidth * 3, -penWidth * 3), QString::number(i + 1));
+        }
+        painter.setPen(floorColor);
+        painter.drawText(QPointF(penWidth * 4, display.height() - font.pixelSize()),
+                         tr("Sol : cliquez sur le point %1/4 — %2")
+                             .arg(m_floorPicked.size() + 1)
+                             .arg(floorPointName(int(m_floorPicked.size()), m_floor.size())));
+    }
+
     // Marqueurs ArUco : contour, coin d'origine en rouge, flèche vers le bord supérieur.
     for (const DetectedMarker &m : markers) {
         const QColor color(255, 0, 255);
@@ -926,6 +1122,12 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                       .arg(sq.center.y(), 0, 'f', 0)
                       .arg(sq.side, 0, 'f', 0)
                       .arg(sq.angle, 0, 'f', 1);
+        if (sq.hasFloor) {
+            status += tr("<br>Sol : X %1  Y %2 mm, angle %3°")
+                          .arg(sq.floorPosition.x(), 0, 'f', 0)
+                          .arg(sq.floorPosition.y(), 0, 'f', 0)
+                          .arg(sq.floorHeading, 0, 'f', 1);
+        }
     }
 
     status += QStringLiteral("<br><br>");
@@ -942,6 +1144,12 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                           .arg(m.center.y(), 0, 'f', 0)
                           .arg(m.side, 0, 'f', 0)
                           .arg(m.angle, 0, 'f', 1);
+            if (m.hasFloor) {
+                status += tr("<br>&nbsp;&nbsp;sol X %1  Y %2 mm, cap %3°")
+                              .arg(m.floorPosition.x(), 0, 'f', 0)
+                              .arg(m.floorPosition.y(), 0, 'f', 0)
+                              .arg(m.floorHeading, 0, 'f', 1);
+            }
             if (m.hasPose) {
                 status += tr("<br>&nbsp;&nbsp;X %1  Y %2  Z %3 mm (distance %4 mm)"
                              "<br>&nbsp;&nbsp;rotation X %5°  Y %6°  Z %7°")
@@ -954,6 +1162,15 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                               .arg(m.rotation.z(), 0, 'f', 1);
             }
         }
+    }
+    if (m_floor.isDefined() && !m_floor.isValidFor(image.size())) {
+        const QSize z = m_floor.pointsImageSize();
+        status += tr("<br><b style='color:#c60'>Pas de position au sol :</b> repère défini en %1 x %2 (%3), "
+                     "image en %4. Choisissez une résolution au format %3 ou redéfinissez le repère.")
+                      .arg(z.width())
+                      .arg(z.height())
+                      .arg(aspectName(z))
+                      .arg(aspectName(image.size()));
     }
     if (markersOn && m_calibration.isCalibrated() && !m_calibration.isValidFor(image.size())) {
         const QSize c = m_calibration.imageSize();
