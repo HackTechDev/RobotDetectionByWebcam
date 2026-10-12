@@ -22,10 +22,19 @@ class SquareDetector
 public:
     struct Params
     {
+        // Mode « couleur » : sélection par teinte.
         int hue = 0;            // teinte cible [0, 359]
         int hueTolerance = 15;  // tolérance en degrés
         int satMin = 90;        // saturation minimale [0, 255]
         int valMin = 60;        // valeur minimale [0, 255]
+
+        // Mode « blanc, gris ou noir » : pas de teinte, sélection des pixels peu saturés
+        // dont la luminosité est proche de la cible.
+        bool achromatic = false;
+        int value = 255;          // luminosité cible [0, 255]
+        int valueTolerance = 50;  // écart de luminosité accepté
+        int satMax = 60;          // saturation maximale [0, 255]
+
         int minArea = 120;      // surface minimale (pixels de l'image de travail)
         double minAspect = 0.75;  // rapport petit côté / grand côté
         double minFill = 0.82;    // surface blob / surface du rectangle orienté

@@ -45,6 +45,7 @@ private slots:
     void onImageClicked(const QPoint &displayPos);
     void chooseColor();
     void updateParams();
+    void onColorModeChanged();
     void onDictionaryChanged(int index);
     void generateMarker();
     void onBoardChanged();
@@ -54,6 +55,7 @@ private slots:
 private:
     QSlider *addSlider(QFormLayout *form, const QString &label, int min, int max, int value);
     void setTargetColor(const QColor &color);
+    void selectColorModeFor(const QColor &color);
     void populateCameras();
     void populateResolutions();
     void applyResolution(int index);
@@ -73,6 +75,10 @@ private:
     QComboBox *m_cameraCombo = nullptr;
     QComboBox *m_resolutionCombo = nullptr;
     QPushButton *m_colorButton = nullptr;
+    QFormLayout *m_squareForm = nullptr;
+    QComboBox *m_colorModeCombo = nullptr;  // 0 = couleur vive (teinte), 1 = blanc, gris ou noir
+    QSlider *m_valTolSlider = nullptr;
+    QSlider *m_satMaxSlider = nullptr;
     QSlider *m_hueTolSlider = nullptr;
     QSlider *m_satSlider = nullptr;
     QSlider *m_valSlider = nullptr;

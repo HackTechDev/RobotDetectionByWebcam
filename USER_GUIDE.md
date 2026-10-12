@@ -25,7 +25,7 @@ L'application filme la scène avec une webcam et repère le robot de deux façon
 
 | Méthode | Ce qu'il faut sur le robot | Ce qu'on obtient | Points forts | Limites |
 |---|---|---|---|---|
-| **Carré coloré** | Un carré d'une couleur vive (papier, gommette, pièce peinte) | Position et taille en pixels, angle de 0 à 90° | Très simple à mettre en place | Sensible à l'éclairage et aux objets de même couleur ; un seul robot facile à distinguer ; angle connu à 90° près |
+| **Carré coloré** | Un carré d'une couleur vive, ou blanc, gris ou noir (papier, gommette, pièce peinte) | Position et taille en pixels, angle de 0 à 90° | Très simple à mettre en place | Sensible à l'éclairage et aux objets de même couleur ; un seul robot facile à distinguer ; angle connu à 90° près |
 | **Marqueur ArUco** | Un marqueur noir et blanc imprimé | Identifiant, position et angle complet (−180° à 180°) ; **position 3D en mm** si la caméra est calibrée | Fiable, plusieurs robots distingués par leur identifiant | Le marqueur doit être assez grand et bien visible |
 
 En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, ou pour plusieurs robots, utilisez les marqueurs ArUco.
@@ -104,8 +104,8 @@ Certaines webcams n'envoient pas la résolution demandée dans leur format rapid
 
 ### 4.1 Préparer le carré
 
-- Choisissez une **couleur vive et franche** : rouge, vert, bleu, jaune, orange, magenta...
-- Évitez le blanc, le noir et le gris : ils n'ont pas de « teinte » et ne peuvent pas être détectés.
+- De préférence, choisissez une **couleur vive et franche** : rouge, vert, bleu, jaune, orange, magenta... C'est le cas le plus fiable.
+- Un carré **blanc, gris ou noir** fonctionne aussi (voir [4.3](#43-les-réglages)), mais il faut qu'il **contraste avec le fond** : un carré blanc sur un mur ou un sol clair ne peut pas être distingué. Le blanc est aussi très courant dans une scène (feuilles, murs, reflets), d'où plus de risques de confusion.
 - Choisissez une couleur **absente du reste de la scène** (sol, murs, meubles, vêtements).
 - Préférez une surface **mate** : les reflets apparaissent blancs et « trouent » le carré.
 - Le carré doit être **plein**, sans motif ni inscription.
@@ -114,19 +114,41 @@ Certaines webcams n'envoient pas la résolution demandée dans leur format rapid
 
 1. Ouvrez l'onglet **Carré coloré** et vérifiez que **Activer la détection** est coché.
 2. **Choisissez la couleur** :
-   - **le plus simple : cliquez sur le carré dans l'image**. L'application prend la couleur moyenne autour du clic, puis règle automatiquement la saturation et la luminosité minimales ;
+   - **le plus simple : cliquez sur le carré dans l'image**. L'application prend la couleur moyenne autour du clic, choisit le **Type** adapté (voir ci-dessous) et règle automatiquement les seuils ;
    - ou cliquez sur le bouton **Couleur** (il affiche la couleur actuelle) pour la choisir dans une palette.
+
+   Le **Type** indique comment la couleur est reconnue :
+   - **Couleur vive (teinte)** : par sa teinte (rouge, vert, bleu...) ;
+   - **Blanc, gris ou noir** : ces couleurs n'ont pas de teinte. Elles sont reconnues par leur **luminosité** et leur **faible saturation**.
+
+   L'application choisit le type automatiquement quand vous choisissez une couleur : « Blanc, gris ou noir » si la couleur est peu saturée. Vous pouvez le changer à la main dans la liste **Type**.
 3. Cochez **Afficher le masque** : l'image devient noir et blanc. **En blanc** apparaissent les pixels reconnus comme étant de la bonne couleur.
    - Le but : le carré doit être **blanc et plein**, et le reste de l'image **noir**.
 4. Ajustez les curseurs si besoin (voir le tableau ci-dessous), puis décochez **Afficher le masque**.
 
 ### 4.3 Les réglages
 
+Les curseurs affichés dépendent du **Type** choisi.
+
+**Type « Couleur vive (teinte) »**
+
 | Réglage | Valeur par défaut | À quoi il sert | Quand le modifier |
 |---|---|---|---|
 | **Tolérance teinte** | 15 | Écart de couleur accepté autour de la couleur choisie | **Augmenter** si le carré est incomplet dans le masque (ombre, éclairage inégal). **Diminuer** si d'autres objets de couleur proche apparaissent en blanc. |
 | **Saturation min** | 90 | Écarte les couleurs ternes ou grisâtres | **Diminuer** si le carré est pâle ou trop éclairé. **Augmenter** si des zones grises ou beiges apparaissent en blanc. |
 | **Luminosité min** | 60 | Écarte les zones sombres | **Diminuer** si le carré est dans l'ombre. **Augmenter** si des zones sombres parasites apparaissent. |
+
+**Type « Blanc, gris ou noir »**
+
+| Réglage | Valeur par défaut | À quoi il sert | Quand le modifier |
+|---|---|---|---|
+| **Tolérance luminosité** | 50 | Écart de luminosité accepté autour de la couleur choisie | **Augmenter** si le carré est incomplet (zones d'ombre sur un carré blanc). **Diminuer** si des zones plus sombres ou plus claires que le carré apparaissent. |
+| **Saturation max** | 60 (réglée au clic) | Écarte les zones colorées | **Augmenter** si l'éclairage teinte le carré (lumière chaude qui rend le blanc orangé). **Diminuer** si des objets pâles mais colorés (beige, bois clair) apparaissent. |
+
+**Réglages communs**
+
+| Réglage | Valeur par défaut | À quoi il sert | Quand le modifier |
+|---|---|---|---|
 | **Surface min** | 120 | Taille minimale d'un carré | **Diminuer** si le carré est loin et petit dans l'image. **Augmenter** pour ignorer les petites taches. |
 | **Remplissage min (%)** | 82 | Exige une forme bien carrée et pleine | **Diminuer** (vers 75) si le carré est abîmé ou partiellement masqué. **Augmenter** (vers 90) si des formes rondes sont prises pour des carrés. |
 
@@ -354,8 +376,13 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 **Le carré n'est jamais détecté**
 1. Cliquez à nouveau sur le carré dans l'image pour reprendre sa couleur.
 2. Cochez **Afficher le masque** :
-   - **carré noir ou incomplet** → augmentez **Tolérance teinte**, diminuez **Saturation min** et **Luminosité min** ;
+   - **carré noir ou incomplet** → en type « Couleur vive », augmentez **Tolérance teinte**, diminuez **Saturation min** et **Luminosité min** ; en type « Blanc, gris ou noir », augmentez **Tolérance luminosité** et **Saturation max** ;
    - **carré blanc et plein, mais pas de contour vert** → diminuez **Surface min** (carré trop petit) ou **Remplissage min** (forme imparfaite).
+
+**Un carré blanc, gris ou noir n'est pas détecté**
+- Vérifiez que le **Type** est « Blanc, gris ou noir ». Cliquer sur le carré le choisit automatiquement.
+- Le carré doit contraster avec ce qui le touche : un carré blanc posé sur une surface claire forme une seule zone avec elle, et n'est donc plus un carré. Posez-le sur un fond sombre, ou ajoutez-lui un bord noir.
+- Sous une lumière chaude, le blanc paraît orangé : augmentez **Saturation max**.
 
 **D'autres objets sont détectés comme des carrés**
 - Diminuez **Tolérance teinte**, augmentez **Saturation min** ou **Surface min**.

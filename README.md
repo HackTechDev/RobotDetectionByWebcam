@@ -46,15 +46,21 @@ Les réglages sont répartis en trois onglets : **Carré coloré**, **ArUco** et
 ### Carré coloré
 
 1. **Choisir la couleur du carré** :
-   - le plus simple : **cliquer sur le carré dans l'image**. La couleur est prise sur une zone de 7×7 pixels et les seuils de saturation et de luminosité sont ajustés automatiquement ;
+   - le plus simple : **cliquer sur le carré dans l'image**. La couleur est prise sur une zone de 7×7 pixels, le type de couleur est choisi et les seuils sont ajustés automatiquement ;
    - ou cliquer sur le bouton « Couleur » pour ouvrir un sélecteur.
+
+   Le **Type** de couleur est choisi automatiquement d'après la saturation de la couleur, et peut être changé à la main :
+   - **Couleur vive (teinte)** : sélection par la teinte ;
+   - **Blanc, gris ou noir** : ces couleurs n'ont pas de teinte. Elles sont sélectionnées par leur luminosité et leur faible saturation. Le carré doit contraster avec le fond.
 2. **Ajuster les réglages** si besoin, en cochant « Afficher le masque » pour voir les pixels retenus (en blanc).
 
 | Réglage | Rôle |
 |---|---|
-| Tolérance teinte | Écart de teinte accepté autour de la couleur cible (en degrés) |
-| Saturation min | Écarte les zones grises ou délavées |
-| Luminosité min | Écarte les zones trop sombres |
+| Tolérance teinte | *Couleur vive* : écart de teinte accepté autour de la couleur cible (en degrés) |
+| Saturation min | *Couleur vive* : écarte les zones grises ou délavées |
+| Luminosité min | *Couleur vive* : écarte les zones trop sombres |
+| Tolérance luminosité | *Blanc, gris ou noir* : écart de luminosité accepté autour de la couleur cible |
+| Saturation max | *Blanc, gris ou noir* : écarte les zones colorées ; à augmenter sous une lumière chaude qui teinte le blanc |
 | Surface min | Taille minimale d'un carré (en pixels de l'image de travail, 320 px de large) |
 | Remplissage min (%) | Part du rectangle orienté que la zone doit remplir ; à augmenter pour mieux écarter les cercles |
 
@@ -118,7 +124,9 @@ Le code se trouve dans `src/squaredetector.cpp` et utilise OpenCV.
 
 1. L'image Qt est convertie en `cv::Mat` sans copie, puis réduite à 320 px de large (`cv::resize`) pour accélérer le traitement.
 2. Un léger flou gaussien est appliqué, puis l'image est convertie en HSV (`cv::cvtColor`).
-3. Les pixels de la bonne couleur sont sélectionnés avec `cv::inRange`. La teinte est circulaire, donc le rouge autour de 0°/360° est traité en deux plages. OpenCV code la teinte sur 0–179, d'où la division par 2 des degrés.
+3. Les pixels de la bonne couleur sont sélectionnés avec `cv::inRange` :
+   - **couleur vive** : par la teinte, avec une saturation et une luminosité minimales. La teinte est circulaire, donc le rouge autour de 0°/360° est traité en deux plages. OpenCV code la teinte sur 0–179, d'où la division par 2 des degrés ;
+   - **blanc, gris ou noir** : toutes teintes confondues, saturation inférieure à « Saturation max » et luminosité dans « Tolérance luminosité » autour de la cible. Une couleur est classée ainsi quand sa saturation est inférieure à 64 sur 255.
 4. Une ouverture puis une fermeture morphologiques 3×3 (`cv::morphologyEx`) suppriment le bruit et bouchent les petits trous.
 5. Les contours extérieurs sont extraits (`cv::findContours`), puis le **rectangle orienté de surface minimale** est calculé pour chacun (`cv::minAreaRect`).
 6. Un contour est accepté comme carré si :

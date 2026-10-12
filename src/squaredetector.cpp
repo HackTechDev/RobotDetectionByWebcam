@@ -10,6 +10,13 @@ namespace {
 // Seuillage HSV avec gestion de la teinte circulaire (rouge ~ 0/180 dans OpenCV).
 cv::Mat thresholdHsv(const cv::Mat &hsv, const SquareDetector::Params &p)
 {
+    if (p.achromatic) {
+        cv::Mat mask;
+        cv::inRange(hsv, cv::Scalar(0, 0, std::max(0, p.value - p.valueTolerance)),
+                    cv::Scalar(179, p.satMax, std::min(255, p.value + p.valueTolerance)), mask);
+        return mask;
+    }
+
     // OpenCV code la teinte sur [0, 180[ : on divise les degrés par 2.
     const int h = p.hue / 2;
     const int tol = std::max(1, p.hueTolerance / 2);

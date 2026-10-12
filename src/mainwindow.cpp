@@ -32,6 +32,8 @@
 #include <QVideoFrameFormat>
 #include <QVideoSink>
 
+#include <algorithm>
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_session(new QMediaCaptureSession(this))
@@ -70,9 +72,15 @@ MainWindow::MainWindow(QWidget *parent)
     detBox->setChecked(true);
     m_squareBox = detBox;
     auto *detForm = new QFormLayout(detBox);
+    m_squareForm = detForm;
     m_colorButton = new QPushButton(detBox);
     m_colorButton->setMinimumHeight(28);
     detForm->addRow(tr("Couleur"), m_colorButton);
+    m_colorModeCombo = new QComboBox(detBox);
+    m_colorModeCombo->addItems({tr("Couleur vive (teinte)"), tr("Blanc, gris ou noir")});
+    m_colorModeCombo->setToolTip(tr("Le blanc, le gris et le noir n'ont pas de teinte : ils sont\n"
+                                    "détectés par leur luminosité et leur faible saturation."));
+    detForm->addRow(tr("Type"), m_colorModeCombo);
     auto *hint = new QLabel(tr("<i>Astuce : cliquez sur l'image pour<br>choisir la couleur du carré.</i>"), detBox);
     detForm->addRow(hint);
 
@@ -80,6 +88,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_hueTolSlider = addSlider(detForm, tr("Tolérance teinte"), 1, 90, defaults.hueTolerance);
     m_satSlider = addSlider(detForm, tr("Saturation min"), 0, 255, defaults.satMin);
     m_valSlider = addSlider(detForm, tr("Luminosité min"), 0, 255, defaults.valMin);
+    m_valTolSlider = addSlider(detForm, tr("Tolérance luminosité"), 5, 128, defaults.valueTolerance);
+    m_satMaxSlider = addSlider(detForm, tr("Saturation max"), 0, 255, defaults.satMax);
     m_areaSlider = addSlider(detForm, tr("Surface min"), 10, 5000, defaults.minArea);
     m_fillSlider = addSlider(detForm, tr("Remplissage min (%)"), 50, 100, int(defaults.minFill * 100));
     m_maskCheck = new QCheckBox(tr("Afficher le masque"), detBox);
@@ -167,6 +177,7 @@ MainWindow::MainWindow(QWidget *parent)
     resize(1100, 650);
 
     connect(m_colorButton, &QPushButton::clicked, this, &MainWindow::chooseColor);
+    connect(m_colorModeCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onColorModeChanged);
     connect(m_video, &VideoWidget::imageClicked, this, &MainWindow::onImageClicked);
     connect(m_sink, &QVideoSink::videoFrameChanged, this, &MainWindow::onFrame);
     connect(m_cameraCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onCameraChanged);
@@ -191,6 +202,7 @@ MainWindow::MainWindow(QWidget *parent)
     updateCalibrationStatus();
 
     setTargetColor(QColor(220, 30, 30));
+    onColorModeChanged();
     loadSettings();
     m_session->setVideoSink(m_sink);
     m_fpsTimer.start();
@@ -361,6 +373,10 @@ void MainWindow::loadSettings()
     restoreSlider(m_hueTolSlider, "hueTolerance");
     restoreSlider(m_satSlider, "satMin");
     restoreSlider(m_valSlider, "valMin");
+    restoreSlider(m_valTolSlider, "valueTolerance");
+    restoreSlider(m_satMaxSlider, "satMax");
+    m_colorModeCombo->setCurrentIndex(
+        s.value(QStringLiteral("square/mode")).toString() == QLatin1String("achromatic") ? 1 : 0);
     restoreSlider(m_areaSlider, "minArea");
     restoreSlider(m_fillSlider, "minFill");
 
@@ -391,6 +407,11 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("square/hueTolerance"), m_hueTolSlider->value());
     s.setValue(QStringLiteral("square/satMin"), m_satSlider->value());
     s.setValue(QStringLiteral("square/valMin"), m_valSlider->value());
+    s.setValue(QStringLiteral("square/valueTolerance"), m_valTolSlider->value());
+    s.setValue(QStringLiteral("square/satMax"), m_satMaxSlider->value());
+    s.setValue(QStringLiteral("square/mode"), m_colorModeCombo->currentIndex() == 1
+                                                  ? QStringLiteral("achromatic")
+                                                  : QStringLiteral("color"));
     s.setValue(QStringLiteral("square/minArea"), m_areaSlider->value());
     s.setValue(QStringLiteral("square/minFill"), m_fillSlider->value());
 
@@ -479,8 +500,10 @@ void MainWindow::setTargetColor(const QColor &color)
 void MainWindow::chooseColor()
 {
     const QColor c = QColorDialog::getColor(m_targetColor, this, tr("Couleur du carré"));
-    if (c.isValid())
+    if (c.isValid()) {
         setTargetColor(c);
+        selectColorModeFor(c);
+    }
 }
 
 void MainWindow::onImageClicked(const QPoint &displayPos)
@@ -509,21 +532,50 @@ void MainWindow::onImageClicked(const QPoint &displayPos)
         return;
     const QColor c(r / n, g / n, b / n);
     setTargetColor(c);
+    selectColorModeFor(c);
 
-    // Ajuste les seuils de saturation/luminosité sous la couleur cliquée.
-    m_satSlider->setValue(std::max(30, c.hsvSaturation() * 6 / 10));
-    m_valSlider->setValue(std::max(30, c.value() * 5 / 10));
+    // Ajuste les seuils autour de la couleur cliquée.
+    if (m_colorModeCombo->currentIndex() == 0) {
+        m_satSlider->setValue(std::max(30, c.hsvSaturation() * 6 / 10));
+        m_valSlider->setValue(std::max(30, c.value() * 5 / 10));
+    } else {
+        // Marge au-dessus de la saturation mesurée : un blanc sous éclairage chaud est
+        // légèrement coloré.
+        m_satMaxSlider->setValue(std::clamp(c.hsvSaturation() + 40, 40, 255));
+    }
+}
+
+void MainWindow::selectColorModeFor(const QColor &color)
+{
+    // En dessous de ce seuil de saturation, la teinte n'est pas fiable (blanc, gris, noir).
+    constexpr int kAchromaticSaturation = 64;
+    m_colorModeCombo->setCurrentIndex(color.hsvSaturation() < kAchromaticSaturation ? 1 : 0);
+}
+
+void MainWindow::onColorModeChanged()
+{
+    const bool achromatic = m_colorModeCombo->currentIndex() == 1;
+    m_squareForm->setRowVisible(m_hueTolSlider->parentWidget(), !achromatic);
+    m_squareForm->setRowVisible(m_satSlider->parentWidget(), !achromatic);
+    m_squareForm->setRowVisible(m_valSlider->parentWidget(), !achromatic);
+    m_squareForm->setRowVisible(m_valTolSlider->parentWidget(), achromatic);
+    m_squareForm->setRowVisible(m_satMaxSlider->parentWidget(), achromatic);
+    updateParams();
 }
 
 void MainWindow::updateParams()
 {
-    if (!m_hueTolSlider || !m_fillSlider)
+    if (!m_hueTolSlider || !m_fillSlider || !m_satMaxSlider)
         return;
     SquareDetector::Params p = m_detector.params();
     p.hue = std::max(0, m_targetColor.hsvHue());
     p.hueTolerance = m_hueTolSlider->value();
     p.satMin = m_satSlider->value();
     p.valMin = m_valSlider->value();
+    p.achromatic = m_colorModeCombo->currentIndex() == 1;
+    p.value = m_targetColor.value();
+    p.valueTolerance = m_valTolSlider->value();
+    p.satMax = m_satMaxSlider->value();
     p.minArea = m_areaSlider->value();
     p.minFill = m_fillSlider->value() / 100.0;
     m_detector.setParams(p);
