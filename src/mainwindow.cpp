@@ -6,6 +6,7 @@
 #include <QCameraDevice>
 #include <QCameraFormat>
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QColorDialog>
 #include <QFileDialog>
 #include <QInputDialog>
@@ -61,6 +62,7 @@ MainWindow::MainWindow(QWidget *parent)
     panel->addWidget(camBox);
 
     auto *tabs = new QTabWidget(central);
+    m_tabs = tabs;
     panel->addWidget(tabs);
 
     auto *detBox = new QGroupBox(tr("Activer la détection"), tabs);
@@ -184,6 +186,7 @@ MainWindow::MainWindow(QWidget *parent)
     updateCalibrationStatus();
 
     setTargetColor(QColor(220, 30, 30));
+    loadSettings();
     m_session->setVideoSink(m_sink);
     m_fpsTimer.start();
     populateCameras();
@@ -216,13 +219,22 @@ void MainWindow::populateCameras()
         m_statusLabel->setText(tr("<b style='color:red'>Aucune webcam détectée.</b>"));
         return;
     }
+    // Caméra mémorisée si elle est branchée, sinon la caméra par défaut du système.
+    const QString saved = QSettings(settingsPath(), QSettings::IniFormat)
+                              .value(QStringLiteral("camera/device"))
+                              .toString();
     const QCameraDevice def = QMediaDevices::defaultVideoInput();
     int defIndex = 0;
+    int savedIndex = -1;
     for (int i = 0; i < cameras.size(); ++i) {
         m_cameraCombo->addItem(cameras[i].description(), QVariant::fromValue(cameras[i]));
         if (cameras[i] == def)
             defIndex = i;
+        if (savedIndex < 0 && cameras[i].description() == saved)
+            savedIndex = i;
     }
+    if (savedIndex >= 0)
+        defIndex = savedIndex;
     m_cameraCombo->setCurrentIndex(defIndex);
     onCameraChanged(defIndex);
 }
@@ -323,6 +335,73 @@ QString MainWindow::settingsPath() const
 {
     return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
            + QStringLiteral("/settings.ini");
+}
+
+void MainWindow::loadSettings()
+{
+    // Les widgets sont déjà connectés : chaque valeur restaurée se propage aux détecteurs.
+    const QSettings s(settingsPath(), QSettings::IniFormat);
+
+    restoreGeometry(s.value(QStringLiteral("window/geometry")).toByteArray());
+    m_tabs->setCurrentIndex(s.value(QStringLiteral("window/tab"), 0).toInt());
+    m_mirrorCheck->setChecked(s.value(QStringLiteral("camera/mirror"), false).toBool());
+
+    m_squareBox->setChecked(s.value(QStringLiteral("square/enabled"), true).toBool());
+    const QColor color(s.value(QStringLiteral("square/color")).toString());
+    if (color.isValid())
+        setTargetColor(color);
+    auto restoreSlider = [&s](QSlider *slider, const char *key) {
+        slider->setValue(s.value(QStringLiteral("square/") + QLatin1String(key), slider->value()).toInt());
+    };
+    restoreSlider(m_hueTolSlider, "hueTolerance");
+    restoreSlider(m_satSlider, "satMin");
+    restoreSlider(m_valSlider, "valMin");
+    restoreSlider(m_areaSlider, "minArea");
+    restoreSlider(m_fillSlider, "minFill");
+
+    m_arucoBox->setChecked(s.value(QStringLiteral("aruco/enabled"), true).toBool());
+    const int dict = m_dictCombo->findText(s.value(QStringLiteral("aruco/dictionary")).toString());
+    if (dict >= 0)
+        m_dictCombo->setCurrentIndex(dict);
+    m_markerLengthSpin->setValue(
+        s.value(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value()).toDouble());
+
+    m_boardColsSpin->setValue(s.value(QStringLiteral("board/cols"), m_boardColsSpin->value()).toInt());
+    m_boardRowsSpin->setValue(s.value(QStringLiteral("board/rows"), m_boardRowsSpin->value()).toInt());
+    m_squareSizeSpin->setValue(
+        s.value(QStringLiteral("board/squareSize"), m_squareSizeSpin->value()).toDouble());
+}
+
+void MainWindow::saveSettings() const
+{
+    QSettings s(settingsPath(), QSettings::IniFormat);
+    s.setValue(QStringLiteral("window/geometry"), saveGeometry());
+    s.setValue(QStringLiteral("window/tab"), m_tabs->currentIndex());
+    if (m_camera)
+        s.setValue(QStringLiteral("camera/device"), m_camera->cameraDevice().description());
+    s.setValue(QStringLiteral("camera/mirror"), m_mirrorCheck->isChecked());
+
+    s.setValue(QStringLiteral("square/enabled"), m_squareBox->isChecked());
+    s.setValue(QStringLiteral("square/color"), m_targetColor.name());
+    s.setValue(QStringLiteral("square/hueTolerance"), m_hueTolSlider->value());
+    s.setValue(QStringLiteral("square/satMin"), m_satSlider->value());
+    s.setValue(QStringLiteral("square/valMin"), m_valSlider->value());
+    s.setValue(QStringLiteral("square/minArea"), m_areaSlider->value());
+    s.setValue(QStringLiteral("square/minFill"), m_fillSlider->value());
+
+    s.setValue(QStringLiteral("aruco/enabled"), m_arucoBox->isChecked());
+    s.setValue(QStringLiteral("aruco/dictionary"), m_dictCombo->currentText());
+    s.setValue(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value());
+
+    s.setValue(QStringLiteral("board/cols"), m_boardColsSpin->value());
+    s.setValue(QStringLiteral("board/rows"), m_boardRowsSpin->value());
+    s.setValue(QStringLiteral("board/squareSize"), m_squareSizeSpin->value());
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    saveSettings();
+    QMainWindow::closeEvent(event);
 }
 
 QString MainWindow::resolutionSettingsKey() const

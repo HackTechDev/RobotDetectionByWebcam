@@ -37,7 +37,7 @@ cmake --build build -j
 
 ## Utilisation
 
-Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchées, puis sa **résolution**. La liste indique pour chaque résolution son format d'image (4:3, 16:9...) et le nombre maximal d'images par seconde. La résolution choisie est mémorisée pour chaque modèle de caméra dans `~/.config/RobotDetectionByWebcam/settings.ini` et réappliquée au lancement suivant. Au premier lancement, la caméra garde son format par défaut et la liste se cale dessus. Une résolution plus basse accélère la détection ; une résolution plus haute permet de détecter les marqueurs de plus loin.
+Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchées, puis sa **résolution**. La liste indique pour chaque résolution son format d'image (4:3, 16:9...) et le nombre maximal d'images par seconde. La résolution choisie est mémorisée pour chaque modèle de caméra et réappliquée au lancement suivant. Au premier lancement, la caméra garde son format par défaut et la liste se cale dessus. Une résolution plus basse accélère la détection ; une résolution plus haute permet de détecter les marqueurs de plus loin.
 
 Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution. Ce basculement est mémorisé avec la résolution.
 
@@ -57,6 +57,8 @@ Les réglages sont répartis en trois onglets : **Carré coloré**, **ArUco** et
 | Luminosité min | Écarte les zones trop sombres |
 | Surface min | Taille minimale d'un carré (en pixels de l'image de travail, 320 px de large) |
 | Remplissage min (%) | Part du rectangle orienté que la zone doit remplir ; à augmenter pour mieux écarter les cercles |
+
+Les réglages (caméra, résolution, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de la fenêtre. Supprimer ce fichier rétablit les réglages par défaut.
 
 L'option « Effet miroir » retourne seulement l'image affichée. Les détections se font toujours sur l'image réelle de la caméra : les marqueurs ArUco et le damier restent reconnus, et toutes les mesures (coordonnées, angles, pose 3D) restent dans le repère réel de la caméra, que le miroir soit activé ou non.
 

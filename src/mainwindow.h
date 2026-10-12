@@ -19,6 +19,7 @@ class QMediaCaptureSession;
 class QPushButton;
 class QSlider;
 class QSpinBox;
+class QTabWidget;
 class QVideoFrame;
 class QVideoSink;
 class VideoWidget;
@@ -30,6 +31,9 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void onFrame(const QVideoFrame &frame);
@@ -56,6 +60,8 @@ private:
     void updateCalibrationStatus();
     QString calibrationPath() const;
     QString settingsPath() const;
+    void loadSettings();
+    void saveSettings() const;
 
     QMediaCaptureSession *m_session = nullptr;
     QCamera *m_camera = nullptr;
@@ -72,6 +78,7 @@ private:
     QSlider *m_fillSlider = nullptr;
     QCheckBox *m_maskCheck = nullptr;
     QCheckBox *m_mirrorCheck = nullptr;
+    QTabWidget *m_tabs = nullptr;
     QGroupBox *m_squareBox = nullptr;
     QGroupBox *m_arucoBox = nullptr;
     QComboBox *m_dictCombo = nullptr;

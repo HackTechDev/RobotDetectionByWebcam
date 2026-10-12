@@ -392,11 +392,23 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 
 | Fichier | Contenu |
 |---|---|
-| `~/.config/RobotDetectionByWebcam/settings.ini` | Résolution choisie pour chaque modèle de caméra |
+| `~/.config/RobotDetectionByWebcam/settings.ini` | Réglages de l'application (voir ci-dessous) |
 | `~/.config/RobotDetectionByWebcam/calibration.yml` | Calibration de la caméra (créé par **Calibrer**, relu à chaque lancement). Peut être copié sur une autre machine utilisant la même webcam. |
 | `aruco_<dictionnaire>_<id>.png` | Marqueurs générés, à l'emplacement choisi |
 | `damier_<largeur>x<hauteur>.png` | Damiers générés, à l'emplacement choisi |
 
-Seules la résolution et la calibration sont mémorisées. Les autres réglages (caméra choisie, couleur, curseurs, dictionnaire, taille du marqueur, effet miroir) reprennent leurs valeurs par défaut à chaque lancement.
+### Réglages mémorisés
 
-Pour revenir à la résolution par défaut de la caméra, supprimez le fichier `settings.ini`.
+L'application retrouve au lancement les réglages de la fois précédente :
+
+- **Webcam** : caméra choisie (si elle est branchée), résolution (pour chaque modèle de caméra) et effet miroir ;
+- **Carré coloré** : activation, couleur et tous les curseurs ;
+- **ArUco** : activation, dictionnaire et taille du marqueur ;
+- **Calibration** : dimensions du damier et taille des cases ;
+- **Fenêtre** : taille, position et onglet ouvert.
+
+La résolution est enregistrée dès qu'on la choisit. Les autres réglages sont enregistrés **à la fermeture de la fenêtre**. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
+
+Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique** et les captures du damier en cours.
+
+Pour revenir aux réglages par défaut, fermez l'application et supprimez le fichier `settings.ini`. La calibration, enregistrée à part dans `calibration.yml`, est conservée.
