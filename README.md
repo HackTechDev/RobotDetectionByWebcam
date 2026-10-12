@@ -37,9 +37,9 @@ cmake --build build -j
 
 ## Utilisation
 
-Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchées, puis sa **résolution**. La liste indique pour chaque résolution son format d'image (4:3, 16:9...) et le nombre maximal d'images par seconde. Au lancement, la caméra garde son format par défaut et la liste se cale dessus. Une résolution plus basse accélère la détection ; une résolution plus haute permet de détecter les marqueurs de plus loin.
+Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchées, puis sa **résolution**. La liste indique pour chaque résolution son format d'image (4:3, 16:9...) et le nombre maximal d'images par seconde. La résolution choisie est mémorisée pour chaque modèle de caméra dans `~/.config/RobotDetectionByWebcam/settings.ini` et réappliquée au lancement suivant. Au premier lancement, la caméra garde son format par défaut et la liste se cale dessus. Une résolution plus basse accélère la détection ; une résolution plus haute permet de détecter les marqueurs de plus loin.
 
-Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution.
+Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution. Ce basculement est mémorisé avec la résolution.
 
 Les réglages sont répartis en trois onglets : **Carré coloré**, **ArUco** et **Calibration**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
 

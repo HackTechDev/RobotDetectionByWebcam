@@ -51,8 +51,11 @@ private:
     void populateResolutions();
     void applyResolution(int index);
     QString resolutionLabel(int index) const;
+    void saveResolution(int index) const;
+    QString resolutionSettingsKey() const;
     void updateCalibrationStatus();
     QString calibrationPath() const;
+    QString settingsPath() const;
 
     QMediaCaptureSession *m_session = nullptr;
     QCamera *m_camera = nullptr;

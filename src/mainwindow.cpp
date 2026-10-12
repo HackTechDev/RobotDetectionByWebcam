@@ -20,6 +20,7 @@
 #include <QMediaDevices>
 #include <QPainter>
 #include <QPushButton>
+#include <QSettings>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStandardPaths>
@@ -299,6 +300,46 @@ void MainWindow::populateResolutions()
     m_resolutionCombo->setCurrentIndex(-1);
     m_resolutionSynced = false;
     m_pendingResolution = -1;
+
+    // Résolution mémorisée pour ce modèle de caméra, appliquée avant le démarrage.
+    const QSettings settings(settingsPath(), QSettings::IniFormat);
+    const QString key = resolutionSettingsKey();
+    const QSize saved = settings.value(key + QStringLiteral("/size")).toSize();
+    for (int i = 0; i < m_resolutions.size(); ++i) {
+        if (m_resolutions[i].fast.resolution() != saved)
+            continue;
+        ResolutionChoice &choice = m_resolutions[i];
+        choice.useRaw = settings.value(key + QStringLiteral("/uncompressed")).toBool() && !choice.raw.isNull();
+        m_resolutionCombo->setItemText(i, resolutionLabel(i));
+        m_resolutionCombo->setCurrentIndex(i);
+        m_resolutionSynced = true;
+        m_pendingResolution = i;
+        m_camera->setCameraFormat(choice.current());
+        break;
+    }
+}
+
+QString MainWindow::settingsPath() const
+{
+    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+           + QStringLiteral("/settings.ini");
+}
+
+QString MainWindow::resolutionSettingsKey() const
+{
+    // Une entrée par modèle de caméra ; « / » sépare les groupes dans QSettings.
+    QString name = m_camera->cameraDevice().description();
+    name.replace(QLatin1Char('/'), QLatin1Char('_')).replace(QLatin1Char('\\'), QLatin1Char('_'));
+    return QStringLiteral("cameras/") + name;
+}
+
+void MainWindow::saveResolution(int index) const
+{
+    const ResolutionChoice &choice = m_resolutions[index];
+    QSettings settings(settingsPath(), QSettings::IniFormat);
+    const QString key = resolutionSettingsKey();
+    settings.setValue(key + QStringLiteral("/size"), choice.fast.resolution());
+    settings.setValue(key + QStringLiteral("/uncompressed"), choice.useRaw);
 }
 
 QString MainWindow::resolutionLabel(int index) const
@@ -317,6 +358,7 @@ void MainWindow::onResolutionChanged(int index)
     if (!m_camera || index < 0 || index >= m_resolutions.size())
         return;
     m_resolutionSynced = true;
+    saveResolution(index);
     applyResolution(index);
 }
 
@@ -521,6 +563,7 @@ void MainWindow::onFrame(const QVideoFrame &frame)
             if (image.size() != wanted && !choice.useRaw && !choice.raw.isNull()) {
                 choice.useRaw = true;
                 m_resolutionCombo->setItemText(index, resolutionLabel(index));
+                saveResolution(index);
                 QTimer::singleShot(0, this, [this, index] { applyResolution(index); });
                 return;
             }

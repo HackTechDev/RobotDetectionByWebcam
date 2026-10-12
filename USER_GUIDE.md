@@ -81,7 +81,7 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 
 ### Choisir la résolution
 
-Au lancement, la caméra démarre dans son format par défaut, et la liste **Résolution** se cale sur la taille des images reçues.
+La résolution choisie est **mémorisée** pour chaque modèle de caméra et réappliquée au lancement suivant. Au tout premier lancement avec une caméra, celle-ci démarre dans son format par défaut, et la liste **Résolution** se cale sur la taille des images reçues.
 
 | Résolution | Avantages | Inconvénients |
 |---|---|---|
@@ -392,8 +392,11 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 
 | Fichier | Contenu |
 |---|---|
+| `~/.config/RobotDetectionByWebcam/settings.ini` | Résolution choisie pour chaque modèle de caméra |
 | `~/.config/RobotDetectionByWebcam/calibration.yml` | Calibration de la caméra (créé par **Calibrer**, relu à chaque lancement). Peut être copié sur une autre machine utilisant la même webcam. |
 | `aruco_<dictionnaire>_<id>.png` | Marqueurs générés, à l'emplacement choisi |
 | `damier_<largeur>x<hauteur>.png` | Damiers générés, à l'emplacement choisi |
 
-Les réglages de détection (couleur, curseurs, dictionnaire, taille du marqueur) **ne sont pas enregistrés** : ils reprennent leurs valeurs par défaut à chaque lancement.
+Seules la résolution et la calibration sont mémorisées. Les autres réglages (caméra choisie, couleur, curseurs, dictionnaire, taille du marqueur, effet miroir) reprennent leurs valeurs par défaut à chaque lancement.
+
+Pour revenir à la résolution par défaut de la caméra, supprimez le fichier `settings.ini`.
