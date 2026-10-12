@@ -66,7 +66,9 @@ Les réglages sont répartis en cinq onglets : **Carré coloré**, **ArUco**, **
 
 Le bouton « Quitter », en bas à droite, ferme l'application après une confirmation. La même confirmation s'affiche avec la croix de la fenêtre.
 
-Les réglages (caméra, résolution, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
+Le bouton « Réglages de l'image... » ouvre une fenêtre pour régler l'**exposition** (automatique ou temps de pose manuel) et la **balance des blancs** (automatique ou température manuelle). Une pose courte donne plus d'images par seconde et moins de flou de mouvement dans une pièce peu éclairée, au prix d'une image plus sombre. Une balance des blancs manuelle empêche les couleurs de dériver. Ces réglages sont mémorisés pour chaque modèle de caméra et réappliqués au démarrage de la caméra. À la fermeture normale, l'application remet la webcam en automatique, car ces réglages sont stockés dans la webcam elle-même. Pour l'exposition automatique, l'application écrit directement le contrôle V4L2 (`V4L2_CID_EXPOSURE_AUTO`) : sur les webcams qui n'acceptent que le mode « priorité ouverture » (comme la Logitech C270), Qt ne parvient pas à rétablir l'automatique.
+
+Les réglages (caméra, résolution, exposition, balance des blancs, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
 
 L'option « Effet miroir » retourne seulement l'image affichée. Les détections se font toujours sur l'image réelle de la caméra : les marqueurs ArUco et le damier restent reconnus, et toutes les mesures (coordonnées, angles, pose 3D) restent dans le repère réel de la caméra, que le miroir soit activé ou non.
 
@@ -201,12 +203,15 @@ src/
 ├── markerdetector.h/.cpp  détection, génération et pose 3D des marqueurs ArUco (OpenCV)
 ├── cameracalibration.h/.cpp  calibration de la caméra avec un damier (OpenCV)
 ├── positionsender.h/.cpp  envoi des positions en JSON sur UDP
-└── floormapper.h/.cpp   conversion des positions de l'image en mm sur le sol
+├── floormapper.h/.cpp   conversion des positions de l'image en mm sur le sol
+└── camerasettingsdialog.h/.cpp  réglages de l'image : exposition et balance des blancs
 tools/
 └── udp_receiver.py      récepteur de test des positions UDP
 ```
 
 ## Dépannage
+
+- **Une autre application trouve la webcam très sombre ou très claire** : l'application a été arrêtée brutalement avec une exposition manuelle, réglage que la webcam garde en mémoire. La relancer puis la quitter normalement remet la webcam en automatique.
 
 - **`Could not find a package configuration file provided by "OpenCV"`** : installer `libopencv-dev`. Pour une installation d'OpenCV compilée à la main, ajouter `-DOpenCV_DIR=<prefix>/lib/cmake/opencv4` à la commande `cmake`.
 - **« Aucune webcam détectée »** : vérifier `ls /dev/video*` et que l'utilisateur appartient au groupe `video` (`groups`).

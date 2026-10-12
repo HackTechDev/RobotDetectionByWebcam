@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cameracalibration.h"
+#include "camerasettingsdialog.h"
 #include "floormapper.h"
 #include "markerdetector.h"
 #include "positionsender.h"
@@ -68,6 +69,8 @@ private:
     void applyResolution(int index);
     QString resolutionLabel(int index) const;
     void saveResolution(int index) const;
+    void saveCameraSettings() const;
+    void loadCameraSettings();
     QString resolutionSettingsKey() const;
     void updateCalibrationStatus();
     QString calibrationPath() const;
@@ -95,6 +98,7 @@ private:
     QSlider *m_fillSlider = nullptr;
     QCheckBox *m_maskCheck = nullptr;
     QCheckBox *m_mirrorCheck = nullptr;
+    CameraSettingsDialog *m_cameraSettingsDialog = nullptr;
     QTabWidget *m_tabs = nullptr;
     QGroupBox *m_squareBox = nullptr;
     QGroupBox *m_arucoBox = nullptr;

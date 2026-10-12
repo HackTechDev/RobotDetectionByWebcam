@@ -63,7 +63,16 @@ MainWindow::MainWindow(QWidget *parent)
                                      "La calibration n'est valable que pour le même format (4:3, 16:9...)."));
     camForm->addRow(tr("Résolution"), m_resolutionCombo);
     m_mirrorCheck = new QCheckBox(tr("Effet miroir"), camBox);
-    camForm->addRow(m_mirrorCheck);
+    auto *imageSettingsButton = new QPushButton(tr("Réglages de l'image..."), camBox);
+    imageSettingsButton->setToolTip(tr("Exposition et balance des blancs"));
+    auto *camRow = new QWidget(camBox);
+    auto *camRowLayout = new QHBoxLayout(camRow);
+    camRowLayout->setContentsMargins(0, 0, 0, 0);
+    camRowLayout->addWidget(m_mirrorCheck);
+    camRowLayout->addStretch();
+    camRowLayout->addWidget(imageSettingsButton);
+    camForm->addRow(camRow);
+    m_cameraSettingsDialog = new CameraSettingsDialog(this);
     panel->addWidget(camBox);
 
     auto *tabs = new QTabWidget(central);
@@ -255,6 +264,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_sink, &QVideoSink::videoFrameChanged, this, &MainWindow::onFrame);
     connect(m_cameraCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onCameraChanged);
     connect(m_resolutionCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onResolutionChanged);
+    connect(imageSettingsButton, &QPushButton::clicked, this, [this] {
+        m_cameraSettingsDialog->show();
+        m_cameraSettingsDialog->raise();
+        m_cameraSettingsDialog->activateWindow();
+    });
+    connect(m_cameraSettingsDialog, &CameraSettingsDialog::settingsChanged, this,
+            &MainWindow::saveCameraSettings);
     connect(m_dictCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onDictionaryChanged);
     connect(generateButton, &QPushButton::clicked, this, &MainWindow::generateMarker);
     connect(m_markerLengthSpin, &QDoubleSpinBox::valueChanged, this,
@@ -350,8 +366,16 @@ void MainWindow::onCameraChanged(int index)
     connect(m_camera, &QCamera::errorOccurred, this, [this](QCamera::Error, const QString &msg) {
         m_statusLabel->setText(tr("<b style='color:red'>Erreur caméra :</b> %1").arg(msg.toHtmlEscaped()));
     });
+    // Exposition et balance des blancs : réappliquées à chaque démarrage de la caméra
+    // (lancement, changement de résolution).
+    connect(m_camera, &QCamera::activeChanged, this, [this](bool active) {
+        if (active)
+            CameraSettingsDialog::apply(m_camera, m_cameraSettingsDialog->settings());
+    });
     m_session->setCamera(m_camera);
     populateResolutions();
+    loadCameraSettings();
+    m_cameraSettingsDialog->setCamera(m_camera);
     m_camera->start();
 }
 
@@ -548,6 +572,9 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 
     saveSettings();
+    // Les réglages restent mémorisés dans la webcam : on la rend en automatique aux autres
+    // applications. Ils seront réappliqués au prochain lancement.
+    CameraSettingsDialog::apply(m_camera, CameraSettingsDialog::Settings());
     QMainWindow::closeEvent(event);
 }
 
@@ -557,6 +584,33 @@ QString MainWindow::resolutionSettingsKey() const
     QString name = m_camera->cameraDevice().description();
     name.replace(QLatin1Char('/'), QLatin1Char('_')).replace(QLatin1Char('\\'), QLatin1Char('_'));
     return QStringLiteral("cameras/") + name;
+}
+
+void MainWindow::loadCameraSettings()
+{
+    // Réglages mémorisés pour ce modèle de caméra (valeurs par défaut sinon).
+    const QSettings settings(settingsPath(), QSettings::IniFormat);
+    const QString key = resolutionSettingsKey();
+    CameraSettingsDialog::Settings s;
+    s.manualExposure = settings.value(key + QStringLiteral("/manualExposure"), s.manualExposure).toBool();
+    s.exposureMs = settings.value(key + QStringLiteral("/exposureMs"), s.exposureMs).toDouble();
+    s.manualWhiteBalance =
+        settings.value(key + QStringLiteral("/manualWhiteBalance"), s.manualWhiteBalance).toBool();
+    s.colorTemperature = settings.value(key + QStringLiteral("/colorTemperature"), s.colorTemperature).toInt();
+    m_cameraSettingsDialog->setSettings(s);
+}
+
+void MainWindow::saveCameraSettings() const
+{
+    if (!m_camera)
+        return;
+    const CameraSettingsDialog::Settings s = m_cameraSettingsDialog->settings();
+    QSettings settings(settingsPath(), QSettings::IniFormat);
+    const QString key = resolutionSettingsKey();
+    settings.setValue(key + QStringLiteral("/manualExposure"), s.manualExposure);
+    settings.setValue(key + QStringLiteral("/exposureMs"), s.exposureMs);
+    settings.setValue(key + QStringLiteral("/manualWhiteBalance"), s.manualWhiteBalance);
+    settings.setValue(key + QStringLiteral("/colorTemperature"), s.colorTemperature);
 }
 
 void MainWindow::saveResolution(int index) const

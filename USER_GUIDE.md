@@ -56,7 +56,7 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 │                                       │ Webcam                        │
 │                                       │   Caméra     [........... ▼]  │
 │                                       │   Résolution [........... ▼]  │
-│                                       │   [ ] Effet miroir            │
+│                                       │   [ ] Effet miroir [Réglages] │
 │          Image de la webcam           ├───────────────────────────────┤
 │      (avec les détections dessinées)  │ [Carré][ArUco][Cal.][Sol][UDP]│
 │                                       │                               │
@@ -76,6 +76,7 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 - **Webcam** :
   - **Caméra** : la webcam utilisée ;
   - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
+  - **Réglages de l'image...** : exposition et balance des blancs. Voir [Régler l'exposition et la balance des blancs](#régler-lexposition-et-la-balance-des-blancs) ;
   - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 8.1](#81-coordonnées-dans-limage-en-pixels)).
 - **Onglets** :
   - **Carré coloré** : couleur et réglages de la détection du carré ;
@@ -98,9 +99,35 @@ La résolution choisie est **mémorisée** pour chaque modèle de caméra et ré
 Conseils :
 - Commencez par **640 x 480** et montez si les marqueurs ne sont pas détectés d'assez loin.
 - Restez dans le **même format d'image que votre calibration** (indiqué entre parenthèses) : une calibration faite en 4:3 ne s'applique pas à une image 16:9. Voir [section 6.4](#64-quand-refaire-la-calibration-).
-- Le nombre d'images par seconde affiché dans la liste est le **maximum annoncé par la caméra**. Le nombre réel, affiché dans **Résultat**, peut être plus bas, en particulier dans une pièce sombre : la caméra allonge alors son temps de pose.
+- Le nombre d'images par seconde affiché dans la liste est le **maximum annoncé par la caméra**. Le nombre réel, affiché dans **Résultat**, peut être plus bas, en particulier dans une pièce sombre : la caméra allonge alors son temps de pose. Une **exposition manuelle** courte permet de retrouver le débit maximal (voir ci-dessous).
 
 Certaines webcams n'envoient pas la résolution demandée dans leur format rapide (MJPEG). L'application le détecte et passe automatiquement au format non compressé de la même résolution. Le nombre d'images par seconde indiqué dans la liste est alors mis à jour, et il est souvent plus bas.
+
+### Régler l'exposition et la balance des blancs
+
+Le bouton **Réglages de l'image...**, à droite de **Effet miroir**, ouvre une petite fenêtre. Elle peut rester ouverte pendant que l'application fonctionne.
+
+**Exposition** : le temps de pose de chaque image.
+- **Automatique** (par défaut) : la caméra s'adapte à la lumière. Dans une pièce peu éclairée, elle allonge son temps de pose, ce qui **ralentit** l'image (souvent 15 images par seconde au lieu de 30) et rend le robot **flou** quand il bouge.
+- **Manuelle** : vous fixez le **temps de pose** avec le curseur, de 0,5 à 250 ms. La caméra arrondit la valeur demandée : la valeur réellement **appliquée** s'affiche sous le curseur, avec le nombre maximal d'images par seconde correspondant.
+
+  | Temps de pose | Images par seconde (au plus) | Image |
+  |---|---|---|
+  | 10 à 20 ms | 30 (la limite de la plupart des webcams) | Nette, mais sombre si la pièce est peu éclairée |
+  | 33 ms | 30 | Compromis |
+  | 66 ms et plus | 15 et moins | Claire, mais floue si le robot bouge vite |
+
+  Une pose courte demande plus de lumière. Si l'image devient trop sombre, éclairez la scène, ou baissez **Luminosité min** (carré coloré).
+
+**Balance des blancs** : la correction des couleurs selon la lumière de la pièce.
+- **Automatique** (par défaut) : la caméra corrige les couleurs en permanence. Elles peuvent alors **dériver** quand la lumière change ou quand un objet coloré entre dans l'image, ce qui peut faire perdre la détection du carré coloré.
+- **Manuelle** : vous fixez la **température** de la lumière, de 2000 à 7500 K : basse pour une lumière chaude (ampoule), haute pour la lumière du jour. Les couleurs ne bougent plus. La caméra limite la plage selon son modèle (par exemple 2800 à 6500 K). Réglez la température pour que le blanc paraisse blanc, puis cliquez à nouveau sur le carré pour reprendre sa couleur.
+
+**Tout en automatique** remet les deux réglages en automatique. Les réglages qu'une caméra ne prend pas en charge sont grisés.
+
+Les réglages sont **mémorisés pour chaque modèle de caméra** et réappliqués au lancement, ainsi qu'après un changement de résolution.
+
+Ces réglages sont enregistrés **dans la webcam elle-même**. Quand vous quittez l'application normalement, elle remet la webcam en automatique, pour que les autres logiciels (visioconférence...) la retrouvent dans son état habituel. Si l'application est arrêtée brutalement (Ctrl+C, plantage), la webcam garde les réglages manuels : relancez l'application puis quittez-la normalement.
 
 ---
 
@@ -559,8 +586,14 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Le panneau **Résultat** affiche `Pas de pose 3D : calibration faite en ...` : la résolution choisie n'a pas le même format d'image que la calibration. Choisissez une résolution du format indiqué, ou recalibrez.
 
 **Le nombre d'images par seconde est faible**
-- Dans une pièce sombre, la webcam allonge son temps de pose et ralentit, quelle que soit la résolution : éclairez davantage la scène.
+- Dans une pièce sombre, la webcam allonge son temps de pose et ralentit, quelle que soit la résolution. Passez l'**exposition en manuel** avec un temps de pose de 33 ms ou moins (**Réglages de l'image...**), et éclairez davantage la scène si l'image devient trop sombre.
 - Choisissez une résolution plus basse, et désactivez les détections inutiles et le **Mode calibration**.
+
+**Les couleurs changent toutes seules et le carré coloré est perdu par moments**
+- La balance des blancs automatique corrige les couleurs en permanence. Passez-la en **manuel** (**Réglages de l'image...**), puis cliquez à nouveau sur le carré.
+
+**Une autre application trouve la webcam très sombre ou très claire**
+- RobotDetectionByWebcam a probablement été arrêtée brutalement alors que l'exposition était en manuel : la webcam a gardé ce réglage. Relancez l'application puis quittez-la normalement avec **Quitter** : elle remet la webcam en automatique.
 
 **Les distances sont fausses**
 - **Toujours trop grandes ou trop petites dans la même proportion** → la **Taille du marqueur** est mal saisie, ou le **Côté d'une case** était faux pendant la calibration (recalibrez dans ce cas).
@@ -607,7 +640,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 
 L'application retrouve au lancement les réglages de la fois précédente :
 
-- **Webcam** : caméra choisie (si elle est branchée), résolution (pour chaque modèle de caméra) et effet miroir ;
+- **Webcam** : caméra choisie (si elle est branchée), résolution, exposition et balance des blancs (pour chaque modèle de caméra) et effet miroir ;
 - **Carré coloré** : activation, couleur et tous les curseurs ;
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
