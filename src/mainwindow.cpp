@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QCamera>
 #include <QCameraDevice>
+#include <QCameraFormat>
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QFileDialog>
@@ -23,8 +24,10 @@
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QTabWidget>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QVideoFrame>
+#include <QVideoFrameFormat>
 #include <QVideoSink>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -48,6 +51,10 @@ MainWindow::MainWindow(QWidget *parent)
     auto *camForm = new QFormLayout(camBox);
     m_cameraCombo = new QComboBox(camBox);
     camForm->addRow(tr("Caméra"), m_cameraCombo);
+    m_resolutionCombo = new QComboBox(camBox);
+    m_resolutionCombo->setToolTip(tr("Une résolution plus basse accélère la détection.\n"
+                                     "La calibration n'est valable que pour le même format (4:3, 16:9...)."));
+    camForm->addRow(tr("Résolution"), m_resolutionCombo);
     m_mirrorCheck = new QCheckBox(tr("Effet miroir"), camBox);
     camForm->addRow(m_mirrorCheck);
     panel->addWidget(camBox);
@@ -155,6 +162,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_video, &VideoWidget::imageClicked, this, &MainWindow::onImageClicked);
     connect(m_sink, &QVideoSink::videoFrameChanged, this, &MainWindow::onFrame);
     connect(m_cameraCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onCameraChanged);
+    connect(m_resolutionCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onResolutionChanged);
     connect(m_dictCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onDictionaryChanged);
     connect(generateButton, &QPushButton::clicked, this, &MainWindow::generateMarker);
     connect(m_markerLengthSpin, &QDoubleSpinBox::valueChanged, this,
@@ -232,6 +240,91 @@ void MainWindow::onCameraChanged(int index)
         m_statusLabel->setText(tr("<b style='color:red'>Erreur caméra :</b> %1").arg(msg.toHtmlEscaped()));
     });
     m_session->setCamera(m_camera);
+    populateResolutions();
+    m_camera->start();
+}
+
+namespace {
+
+QString aspectName(const QSize &size)
+{
+    const double r = double(size.width()) / size.height();
+    const struct { double ratio; const char *name; } known[] = {
+        {4.0 / 3, "4:3"}, {16.0 / 9, "16:9"}, {16.0 / 10, "16:10"}, {5.0 / 4, "5:4"}, {11.0 / 9, "11:9"}};
+    for (const auto &k : known)
+        if (std::abs(r - k.ratio) / k.ratio < 0.01)
+            return QString::fromLatin1(k.name);
+    return QString::number(r, 'f', 2) + QStringLiteral(":1");
+}
+
+} // namespace
+
+void MainWindow::populateResolutions()
+{
+    // Pour chaque résolution : le format le plus rapide (à vitesse égale, non compressé pour
+    // éviter le décodage JPEG) et, en secours, le meilleur format non compressé.
+    QList<ResolutionChoice> choices;
+    for (const QCameraFormat &f : m_camera->cameraDevice().videoFormats()) {
+        auto it = std::find_if(choices.begin(), choices.end(), [&](const ResolutionChoice &c) {
+            return c.fast.resolution() == f.resolution();
+        });
+        const bool uncompressed = f.pixelFormat() != QVideoFrameFormat::Format_Jpeg;
+        if (it == choices.end()) {
+            ResolutionChoice c;
+            c.fast = f;
+            if (uncompressed)
+                c.raw = f;
+            choices.append(c);
+            continue;
+        }
+        const bool faster = f.maxFrameRate() > it->fast.maxFrameRate() + 0.1f;
+        const bool sameSpeed = std::abs(f.maxFrameRate() - it->fast.maxFrameRate()) <= 0.1f;
+        if (faster || (sameSpeed && uncompressed))
+            it->fast = f;
+        if (uncompressed && (it->raw.isNull() || f.maxFrameRate() > it->raw.maxFrameRate()))
+            it->raw = f;
+    }
+    std::sort(choices.begin(), choices.end(), [](const ResolutionChoice &a, const ResolutionChoice &b) {
+        const QSize ra = a.fast.resolution(), rb = b.fast.resolution();
+        return ra.width() * ra.height() > rb.width() * rb.height();
+    });
+
+    const QSignalBlocker blocker(m_resolutionCombo);
+    m_resolutionCombo->clear();
+    m_resolutions = choices;
+    for (int i = 0; i < m_resolutions.size(); ++i)
+        m_resolutionCombo->addItem(resolutionLabel(i));
+    // Sans choix explicite, la caméra garde son format par défaut ; la liste se cale
+    // sur la première image reçue.
+    m_resolutionCombo->setCurrentIndex(-1);
+    m_resolutionSynced = false;
+    m_pendingResolution = -1;
+}
+
+QString MainWindow::resolutionLabel(int index) const
+{
+    const QCameraFormat &f = m_resolutions[index].current();
+    const QSize r = f.resolution();
+    return tr("%1 x %2 (%3) — %4 i/s")
+        .arg(r.width())
+        .arg(r.height())
+        .arg(aspectName(r))
+        .arg(double(f.maxFrameRate()), 0, 'g', 3);
+}
+
+void MainWindow::onResolutionChanged(int index)
+{
+    if (!m_camera || index < 0 || index >= m_resolutions.size())
+        return;
+    m_resolutionSynced = true;
+    applyResolution(index);
+}
+
+void MainWindow::applyResolution(int index)
+{
+    m_pendingResolution = index;
+    m_camera->stop();
+    m_camera->setCameraFormat(m_resolutions[index].current());
     m_camera->start();
 }
 
@@ -405,6 +498,35 @@ void MainWindow::onFrame(const QVideoFrame &frame)
     image = image.convertToFormat(QImage::Format_RGB32);
     m_lastFrame = image;
 
+    if (!m_resolutionSynced) {
+        m_resolutionSynced = true;
+        for (int i = 0; i < m_resolutions.size(); ++i) {
+            if (m_resolutions[i].current().resolution() == image.size()) {
+                const QSignalBlocker blocker(m_resolutionCombo);
+                m_resolutionCombo->setCurrentIndex(i);
+                break;
+            }
+        }
+    }
+
+    // Certaines webcams envoient en MJPEG leur résolution maximale quelle que soit la
+    // résolution demandée (l'image annonce la bonne taille, mais le JPEG décodé non).
+    // Dans ce cas, on bascule sur le format non compressé de la même résolution.
+    if (m_pendingResolution >= 0 && m_pendingResolution < m_resolutions.size()) {
+        ResolutionChoice &choice = m_resolutions[m_pendingResolution];
+        const QSize wanted = choice.current().resolution();
+        if (frame.size() == wanted) {
+            const int index = m_pendingResolution;
+            m_pendingResolution = -1;
+            if (image.size() != wanted && !choice.useRaw && !choice.raw.isNull()) {
+                choice.useRaw = true;
+                m_resolutionCombo->setItemText(index, resolutionLabel(index));
+                QTimer::singleShot(0, this, [this, index] { applyResolution(index); });
+                return;
+            }
+        }
+    }
+
     const bool squaresOn = m_squareBox->isChecked();
     const bool markersOn = m_arucoBox->isChecked();
     const std::vector<DetectedSquare> squares =
@@ -576,6 +698,15 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                               .arg(m.rotation.z(), 0, 'f', 1);
             }
         }
+    }
+    if (markersOn && m_calibration.isCalibrated() && !m_calibration.isValidFor(image.size())) {
+        const QSize c = m_calibration.imageSize();
+        status += tr("<br><b style='color:#c60'>Pas de pose 3D :</b> calibration faite en %1 x %2 (%3), "
+                     "image en %4. Choisissez une résolution au format %3 ou recalibrez.")
+                      .arg(c.width())
+                      .arg(c.height())
+                      .arg(aspectName(c))
+                      .arg(aspectName(image.size()));
     }
     m_statusLabel->setText(status);
 }

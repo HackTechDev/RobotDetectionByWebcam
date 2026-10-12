@@ -37,7 +37,9 @@ cmake --build build -j
 
 ## Utilisation
 
-Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchées.
+Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchées, puis sa **résolution**. La liste indique pour chaque résolution son format d'image (4:3, 16:9...) et le nombre maximal d'images par seconde. Au lancement, la caméra garde son format par défaut et la liste se cale dessus. Une résolution plus basse accélère la détection ; une résolution plus haute permet de détecter les marqueurs de plus loin.
+
+Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution.
 
 Les réglages sont répartis en trois onglets : **Carré coloré**, **ArUco** et **Calibration**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
 
@@ -85,7 +87,7 @@ La calibration mesure les caractéristiques optiques de la webcam (focale, centr
    - garder le damier immobile au moment de la capture pour éviter le flou.
 6. Cliquer sur **« Calibrer »**. L'erreur RMS s'affiche : en dessous de 0,5 px, c'est très bon ; au-dessus de 1 px, il vaut mieux recommencer.
 
-La calibration est enregistrée dans `~/.config/RobotDetectionByWebcam/calibration.yml` et rechargée automatiquement au démarrage. Elle reste valable si l'on change de résolution, tant que le format d'image (4:3, 16:9...) ne change pas. Il faut la refaire si l'on change de caméra ou si l'on modifie le zoom ou la mise au point.
+La calibration est enregistrée dans `~/.config/RobotDetectionByWebcam/calibration.yml` et rechargée automatiquement au démarrage. Elle reste valable si l'on change de résolution, tant que le format d'image (4:3, 16:9...) ne change pas. Si la résolution choisie a un autre format que la calibration, la pose 3D est désactivée et un message l'indique dans le panneau « Résultat ». Il faut la refaire si l'on change de caméra ou si l'on modifie le zoom ou la mise au point.
 
 Changer les dimensions du damier efface les captures en cours.
 

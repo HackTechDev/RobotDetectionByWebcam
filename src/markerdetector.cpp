@@ -86,7 +86,8 @@ std::vector<DetectedMarker> MarkerDetector::detect(const QImage &image)
     m_detector->detectMarkers(mat, corners, ids);
 
     // Pose 3D : coins du marqueur dans son repère (ordre imposé par SOLVEPNP_IPPE_SQUARE).
-    const bool withPose = m_calibration && m_calibration->isCalibrated() && m_markerLength > 0;
+    const bool withPose =
+        m_calibration && m_calibration->isValidFor(image.size()) && m_markerLength > 0;
     cv::Mat cameraMatrix, distCoeffs;
     std::vector<cv::Point3f> objectPoints;
     std::vector<cv::Point3f> axisPoints;

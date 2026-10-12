@@ -52,11 +52,12 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 ```
 ┌───────────────────────────────────────┬───────────────────────────────┐
 │                                       │ Webcam                        │
-│                                       │   Caméra [............... ▼]  │
+│                                       │   Caméra     [........... ▼]  │
+│                                       │   Résolution [........... ▼]  │
 │                                       │   [ ] Effet miroir            │
-│                                       ├───────────────────────────────┤
-│          Image de la webcam           │ [Carré coloré][ArUco][Calibr.]│
-│      (avec les détections dessinées)  │                               │
+│          Image de la webcam           ├───────────────────────────────┤
+│      (avec les détections dessinées)  │ [Carré coloré][ArUco][Calibr.]│
+│                                       │                               │
 │                                       │   Réglages de l'onglet        │
 │    Cliquer sur l'image = choisir      │   sélectionné                 │
 │    la couleur du carré                │                               │
@@ -70,12 +71,29 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 - **Zone d'image** (à gauche) : l'image de la caméra, avec les contours des carrés, des marqueurs et du damier détectés. Le curseur en croix rappelle qu'un clic sert à choisir une couleur.
 - **Webcam** :
   - **Caméra** : la webcam utilisée ;
+  - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
   - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 7.1](#71-coordonnées-dans-limage-en-pixels)).
 - **Onglets** :
   - **Carré coloré** : couleur et réglages de la détection du carré ;
   - **ArUco** : dictionnaire et taille des marqueurs ;
   - **Calibration** : damier et calibration de la caméra.
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
+
+### Choisir la résolution
+
+Au lancement, la caméra démarre dans son format par défaut, et la liste **Résolution** se cale sur la taille des images reçues.
+
+| Résolution | Avantages | Inconvénients |
+|---|---|---|
+| **Haute** (ex. 1280 x 960) | Détecte les marqueurs plus loin ; positions plus précises | Détection plus lente ; certaines caméras donnent moins d'images par seconde |
+| **Basse** (ex. 640 x 480) | Détection rapide, fluide | Les marqueurs doivent être plus grands ou plus proches |
+
+Conseils :
+- Commencez par **640 x 480** et montez si les marqueurs ne sont pas détectés d'assez loin.
+- Restez dans le **même format d'image que votre calibration** (indiqué entre parenthèses) : une calibration faite en 4:3 ne s'applique pas à une image 16:9. Voir [section 6.4](#64-quand-refaire-la-calibration-).
+- Le nombre d'images par seconde affiché dans la liste est le **maximum annoncé par la caméra**. Le nombre réel, affiché dans **Résultat**, peut être plus bas, en particulier dans une pièce sombre : la caméra allonge alors son temps de pose.
+
+Certaines webcams n'envoient pas la résolution demandée dans leur format rapide (MJPEG). L'application le détecte et passe automatiquement au format non compressé de la même résolution. Le nombre d'images par seconde indiqué dans la liste est alors mis à jour, et il est souvent plus bas.
 
 ---
 
@@ -231,7 +249,9 @@ Pour recommencer, cliquez sur **Effacer les captures** puis refaites une série.
 
 - Quand vous **changez de webcam**.
 - Si l'objectif a un **zoom** ou une **mise au point manuelle** et que vous les modifiez.
-- Si la caméra passe à un **format d'image différent** (de 4:3 à 16:9, par exemple). Un simple changement de résolution dans le même format ne demande pas de recalibrer.
+- Si vous choisissez une **résolution d'un autre format d'image** (de 4:3 à 16:9, par exemple). La pose 3D est alors désactivée et le panneau **Résultat** affiche `Pas de pose 3D : calibration faite en ...`. Revenez à une résolution du format de la calibration, ou recalibrez.
+
+Changer de résolution **dans le même format** (de 1280 x 960 à 640 x 480, par exemple) ne demande pas de recalibrer : la calibration est adaptée automatiquement. Pour la meilleure précision, calibrez de préférence dans la résolution que vous utiliserez le plus.
 
 ### 6.5 Vérifier la calibration
 
@@ -313,6 +333,7 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 
 **Performances**
 - Le nombre d'images par seconde (i/s) est affiché dans **Résultat**.
+- Choisissez une **résolution plus basse** (liste **Résolution**) : la détection est plus rapide.
 - Désactivez les détections inutiles (case **Activer la détection** de chaque onglet) et le **Mode calibration** pour gagner en vitesse.
 
 ---
@@ -344,6 +365,11 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 
 **Les positions 3D (X, Y, Z) ne s'affichent pas**
 - La caméra n'est pas calibrée : l'onglet **Calibration** indique `Caméra non calibrée`. Suivez la [section 6](#6-calibrer-la-caméra).
+- Le panneau **Résultat** affiche `Pas de pose 3D : calibration faite en ...` : la résolution choisie n'a pas le même format d'image que la calibration. Choisissez une résolution du format indiqué, ou recalibrez.
+
+**Le nombre d'images par seconde est faible**
+- Dans une pièce sombre, la webcam allonge son temps de pose et ralentit, quelle que soit la résolution : éclairez davantage la scène.
+- Choisissez une résolution plus basse, et désactivez les détections inutiles et le **Mode calibration**.
 
 **Les distances sont fausses**
 - **Toujours trop grandes ou trop petites dans la même proportion** → la **Taille du marqueur** est mal saisie, ou le **Côté d'une case** était faux pendant la calibration (recalibrez dans ce cas).

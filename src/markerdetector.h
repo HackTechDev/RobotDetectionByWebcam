@@ -51,7 +51,8 @@ public:
     void setMarkerLength(double mm) { m_markerLength = mm; }
     double markerLength() const { return m_markerLength; }
 
-    // Calibration utilisée pour la pose 3D (peut être nulle ou non calibrée).
+    // Calibration utilisée pour la pose 3D (peut être nulle ou non calibrée). La pose n'est
+    // calculée que si la calibration correspond au format de l'image.
     void setCalibration(const CameraCalibration *calibration) { m_calibration = calibration; }
 
     // Retourne les marqueurs trouvés, triés par identifiant.

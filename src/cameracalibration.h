@@ -42,6 +42,9 @@ public:
     double rmsError() const { return m_rms; }
     QSize imageSize() const { return m_imageSize; }
 
+    // Vrai si la calibration s'applique à cette résolution (même format d'image, à 1 % près).
+    bool isValidFor(const QSize &size) const;
+
     // Matrice intrinsèque mise à l'échelle pour une autre résolution (même format d'image).
     cv::Mat cameraMatrixFor(const QSize &size) const;
     const cv::Mat &distCoeffs() const { return m_distCoeffs; }

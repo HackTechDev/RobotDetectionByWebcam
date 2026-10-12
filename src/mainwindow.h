@@ -4,6 +4,7 @@
 #include "markerdetector.h"
 #include "squaredetector.h"
 
+#include <QCameraFormat>
 #include <QElapsedTimer>
 #include <QMainWindow>
 
@@ -33,6 +34,7 @@ public:
 private slots:
     void onFrame(const QVideoFrame &frame);
     void onCameraChanged(int index);
+    void onResolutionChanged(int index);
     void onImageClicked(const QPoint &displayPos);
     void chooseColor();
     void updateParams();
@@ -46,6 +48,9 @@ private:
     QSlider *addSlider(QFormLayout *form, const QString &label, int min, int max, int value);
     void setTargetColor(const QColor &color);
     void populateCameras();
+    void populateResolutions();
+    void applyResolution(int index);
+    QString resolutionLabel(int index) const;
     void updateCalibrationStatus();
     QString calibrationPath() const;
 
@@ -55,6 +60,7 @@ private:
 
     VideoWidget *m_video = nullptr;
     QComboBox *m_cameraCombo = nullptr;
+    QComboBox *m_resolutionCombo = nullptr;
     QPushButton *m_colorButton = nullptr;
     QSlider *m_hueTolSlider = nullptr;
     QSlider *m_satSlider = nullptr;
@@ -84,6 +90,17 @@ private:
     bool m_captureRequested = false;
     QColor m_targetColor;
     QImage m_lastFrame;
+    // Une entrée par résolution de m_resolutionCombo.
+    struct ResolutionChoice
+    {
+        QCameraFormat fast;     // format le plus rapide (souvent MJPEG)
+        QCameraFormat raw;      // meilleur format non compressé (peut être nul)
+        bool useRaw = false;    // le format rapide ne respecte pas la résolution
+        const QCameraFormat &current() const { return useRaw ? raw : fast; }
+    };
+    QList<ResolutionChoice> m_resolutions;
+    int m_pendingResolution = -1;  // résolution demandée, en attente de vérification
+    bool m_resolutionSynced = false;
     QElapsedTimer m_fpsTimer;
     int m_frameCount = 0;
     double m_fps = 0.0;

@@ -3,6 +3,8 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include <cmath>
+
 #include <QDir>
 #include <QFileInfo>
 #include <QObject>
@@ -111,6 +113,15 @@ bool CameraCalibration::calibrate(QString *error)
     m_distCoeffs = distCoeffs;
     m_imageSize = m_captureSize;
     return true;
+}
+
+bool CameraCalibration::isValidFor(const QSize &size) const
+{
+    if (!isCalibrated() || size.isEmpty() || m_imageSize.isEmpty())
+        return false;
+    const double calibRatio = double(m_imageSize.width()) / m_imageSize.height();
+    const double ratio = double(size.width()) / size.height();
+    return std::abs(ratio - calibRatio) / calibRatio < 0.01;
 }
 
 cv::Mat CameraCalibration::cameraMatrixFor(const QSize &size) const
