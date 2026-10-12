@@ -2,6 +2,7 @@
 
 #include "cameracalibration.h"
 #include "markerdetector.h"
+#include "positionsender.h"
 #include "squaredetector.h"
 
 #include <QCameraFormat>
@@ -15,6 +16,7 @@ class QDoubleSpinBox;
 class QFormLayout;
 class QGroupBox;
 class QLabel;
+class QLineEdit;
 class QMediaCaptureSession;
 class QPushButton;
 class QSlider;
@@ -51,6 +53,7 @@ private slots:
     void onBoardChanged();
     void calibrate();
     void generateBoard();
+    void applyUdpTarget();
 
 private:
     QSlider *addSlider(QFormLayout *form, const QString &label, int min, int max, int value);
@@ -99,11 +102,17 @@ private:
     QCheckBox *m_autoCaptureCheck = nullptr;
     QPushButton *m_calibrateButton = nullptr;
     QLabel *m_calibLabel = nullptr;
+
+    QGroupBox *m_udpBox = nullptr;
+    QLineEdit *m_udpHostEdit = nullptr;
+    QSpinBox *m_udpPortSpin = nullptr;
+    QLabel *m_udpStatusLabel = nullptr;
     QLabel *m_statusLabel = nullptr;
 
     SquareDetector m_detector;
     MarkerDetector m_markerDetector;
     CameraCalibration m_calibration;
+    PositionSender m_sender;
     QElapsedTimer m_lastCapture;
     bool m_captureRequested = false;
     QColor m_targetColor;

@@ -13,9 +13,10 @@ Pour l'installation et la compilation, voir le [README](README.md).
 5. [Suivre des marqueurs ArUco](#5-suivre-des-marqueurs-aruco)
 6. [Calibrer la caméra](#6-calibrer-la-caméra)
 7. [Lire les résultats](#7-lire-les-résultats)
-8. [Conseils pour une détection fiable](#8-conseils-pour-une-détection-fiable)
-9. [Questions fréquentes et dépannage](#9-questions-fréquentes-et-dépannage)
-10. [Fichiers utilisés par l'application](#10-fichiers-utilisés-par-lapplication)
+8. [Envoyer les positions à un autre programme](#8-envoyer-les-positions-à-un-autre-programme)
+9. [Conseils pour une détection fiable](#9-conseils-pour-une-détection-fiable)
+10. [Questions fréquentes et dépannage](#10-questions-fréquentes-et-dépannage)
+11. [Fichiers utilisés par l'application](#11-fichiers-utilisés-par-lapplication)
 
 ---
 
@@ -56,7 +57,7 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 │                                       │   Résolution [........... ▼]  │
 │                                       │   [ ] Effet miroir            │
 │          Image de la webcam           ├───────────────────────────────┤
-│      (avec les détections dessinées)  │ [Carré coloré][ArUco][Calibr.]│
+│      (avec les détections dessinées)  │ [Carré][ArUco][Calib.][UDP]   │
 │                                       │                               │
 │                                       │   Réglages de l'onglet        │
 │    Cliquer sur l'image = choisir      │   sélectionné                 │
@@ -78,7 +79,8 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 - **Onglets** :
   - **Carré coloré** : couleur et réglages de la détection du carré ;
   - **ArUco** : dictionnaire et taille des marqueurs ;
-  - **Calibration** : damier et calibration de la caméra.
+  - **Calibration** : damier et calibration de la caméra ;
+  - **Envoi UDP** : envoi des positions à un autre programme (voir [section 8](#8-envoyer-les-positions-à-un-autre-programme)).
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
 - **Quitter** : ferme l'application. Une fenêtre demande de confirmer : cliquez sur **Quitter** pour fermer, ou sur **Annuler** (ou appuyez sur Échap) pour continuer. La même confirmation s'affiche si vous fermez la fenêtre avec la croix de la barre de titre.
 
@@ -341,7 +343,99 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 
 ---
 
-## 8. Conseils pour une détection fiable
+## 8. Envoyer les positions à un autre programme
+
+L'application peut envoyer en temps réel tout ce qu'elle détecte (carrés, marqueurs, positions 3D) à un autre programme, sur le même ordinateur ou sur le réseau. Par exemple, au programme qui pilote votre robot. Les données sont envoyées en **JSON**, par le protocole réseau **UDP**.
+
+### 8.1 Activer l'envoi
+
+1. Ouvrez l'onglet **Envoi UDP**.
+2. Saisissez l'**Adresse** de la machine qui reçoit les données :
+   - `127.0.0.1` : le même ordinateur (valeur par défaut) ;
+   - l'adresse IP d'une autre machine du réseau (par exemple `192.168.1.42`) ou son nom ;
+   - `255.255.255.255` : toutes les machines du réseau local.
+3. Choisissez le **Port** (5005 par défaut). Le programme qui reçoit doit écouter ce même port.
+4. Cochez **Envoyer les positions**.
+
+Sous les réglages, le compteur **Messages envoyés** augmente à chaque image traitée. L'envoi continue quel que soit l'onglet affiché. L'adresse, le port et l'activation sont mémorisés.
+
+### 8.2 Tester la réception
+
+Un programme de test est fourni. Dans un second terminal, lancez :
+
+```bash
+python3 tools/udp_receiver.py
+```
+
+Il affiche une ligne par image reçue :
+
+```
+image 12 | carré (664, 484) px 0° | ArUco 7 (200, 200) px 0° | X -67 Y -33 Z 251 mm
+```
+
+Options : `--port 6000` pour écouter un autre port, `--raw` pour afficher le JSON brut.
+
+Ce programme sert aussi de point de départ pour écrire votre propre programme de pilotage : la fonction `handle()` reçoit chaque message déjà décodé.
+
+### 8.3 Format des messages
+
+Chaque image traitée produit **un message**, sur une seule ligne. Voici un exemple, mis en forme pour la lecture :
+
+```json
+{
+  "frame": 12,
+  "timestamp_ms": 1791830806877,
+  "image": {"width": 800, "height": 600},
+  "squares": [
+    {"center": [663.8, 483.8], "side": 87.5, "angle": 0,
+     "corners": [[620, 440], [707.5, 440], [707.5, 527.5], [620, 527.5]]}
+  ],
+  "markers": [
+    {"id": 7, "center": [199.5, 199.5], "side": 149.9, "angle": 0,
+     "corners": [[124.6, 124.6], [274.4, 124.6], [274.4, 274.4], [124.6, 274.4]],
+     "pose": {"position_mm": [-67, -33.3, 251.3], "rotation_deg": [-4.3, 5.2, -0.4],
+              "distance_mm": 262.3}}
+  ]
+}
+```
+
+| Champ | Contenu |
+|---|---|
+| `frame` | Numéro de l'image, augmenté de 1 à chaque message (repart de 0 au lancement). Un saut indique un message perdu. |
+| `timestamp_ms` | Heure de l'envoi, en millisecondes depuis le 1er janvier 1970 (UTC) |
+| `image` | Taille de l'image en pixels |
+| `squares` | Carrés détectés, **le plus grand en premier** (le carré principal, entouré en vert). Liste vide si aucun carré n'est détecté. **Absent** si la détection du carré est désactivée. |
+| `markers` | Marqueurs ArUco détectés, triés par identifiant. Liste vide si aucun marqueur n'est détecté. **Absent** si la détection ArUco est désactivée. |
+| `center` | Centre `[x, y]`, en pixels (voir [7.1](#71-coordonnées-dans-limage-en-pixels)) |
+| `side` | Côté moyen, en pixels |
+| `angle` | Angle en degrés : de 0 à 90 pour un carré, de −180 à 180 pour un marqueur |
+| `corners` | Les 4 coins `[x, y]`, en pixels. Pour un marqueur, le premier est le coin d'origine (point rouge à l'écran). |
+| `id` | Identifiant du marqueur |
+| `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [7.2](#72-position-3d-dun-marqueur-en-mm-après-calibration) et [7.3](#73-rotations-dun-marqueur-en-degrés-après-calibration)) |
+
+Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont celles de l'image réelle de la caméra, même avec l'effet miroir.
+
+### 8.4 Bon à savoir
+
+- **UDP ne garantit pas la livraison** : un message peut être perdu, surtout en Wi-Fi. Ce n'est pas gênant pour suivre un robot, car le message suivant arrive quelques dizaines de millisecondes plus tard. Utilisez `frame` pour repérer les pertes.
+- **Débit** : un message par image traitée, soit autant de messages par seconde que le nombre d'i/s affiché dans **Résultat**. Un message pèse moins d'1 Ko avec quelques marqueurs.
+- **Envoi vers une autre machine** : vérifiez que son pare-feu laisse passer le port UDP choisi.
+- **Exemple minimal en Python** pour recevoir les messages :
+
+  ```python
+  import json, socket
+
+  sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  sock.bind(("0.0.0.0", 5005))
+  while True:
+      msg = json.loads(sock.recv(65535))
+      for m in msg.get("markers", []):
+          print(m["id"], m["center"], m["angle"])
+  ```
+
+---
+
+## 9. Conseils pour une détection fiable
 
 **Éclairage**
 - Un éclairage **homogène et stable** est le facteur le plus important.
@@ -363,7 +457,7 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 
 ---
 
-## 9. Questions fréquentes et dépannage
+## 10. Questions fréquentes et dépannage
 
 **L'image reste noire avec « En attente de la webcam... »**
 - Vérifiez que la webcam est branchée et choisissez-la dans la liste **Caméra**.
@@ -413,12 +507,18 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 **Les captures ont disparu**
 - Changer les dimensions du damier (coins ou taille des cases) efface les captures en cours. Elles sont aussi effacées si la résolution de la caméra change pendant la série.
 
+**Le programme de réception ne reçoit rien**
+- Vérifiez que **Envoyer les positions** est coché et que le compteur **Messages envoyés** augmente.
+- Le **port** doit être le même des deux côtés.
+- Vers une autre machine : vérifiez l'**adresse** et le **pare-feu** de la machine qui reçoit. Testez d'abord avec `python3 tools/udp_receiver.py` sur cette machine.
+- Un seul programme peut écouter un port donné sur une machine : fermez les autres récepteurs.
+
 **Comment repartir de zéro pour la calibration ?**
 - Supprimez le fichier `~/.config/RobotDetectionByWebcam/calibration.yml`, puis relancez l'application.
 
 ---
 
-## 10. Fichiers utilisés par l'application
+## 11. Fichiers utilisés par l'application
 
 | Fichier | Contenu |
 |---|---|
@@ -435,6 +535,7 @@ L'application retrouve au lancement les réglages de la fois précédente :
 - **Carré coloré** : activation, couleur et tous les curseurs ;
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
+- **Envoi UDP** : activation, adresse et port ;
 - **Fenêtre** : taille, position et onglet ouvert.
 
 Le fichier contient aussi une option sans équivalent dans l'interface : `hideLibraryMessages`, dans la section `[logging]`. Elle vaut `true` par défaut et masque des messages techniques sans gravité dans le terminal (par exemple « Corrupt JPEG data »). Mettez-la à `false` pour les réafficher, par exemple pour signaler un problème. Ce réglage est pris en compte au lancement suivant.

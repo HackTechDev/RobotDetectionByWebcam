@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia Network)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc calib3d objdetect)
 
 add_executable(RobotDetectionByWebcam
@@ -20,6 +20,8 @@ add_executable(RobotDetectionByWebcam
     src/markerdetector.cpp
     src/cameracalibration.h
     src/cameracalibration.cpp
+    src/positionsender.h
+    src/positionsender.cpp
 )
 
-target_link_libraries(RobotDetectionByWebcam PRIVATE Qt6::Widgets Qt6::Multimedia ${OpenCV_LIBS})
+target_link_libraries(RobotDetectionByWebcam PRIVATE Qt6::Widgets Qt6::Multimedia Qt6::Network ${OpenCV_LIBS})

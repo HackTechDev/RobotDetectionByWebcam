@@ -13,7 +13,7 @@ Le mode d'emploi détaillé (réglages, calibration pas à pas, lecture des rés
 
 - Linux avec une webcam (`/dev/video*`)
 - CMake ≥ 3.16 et un compilateur C++17 (g++ ou clang)
-- Qt 6 : modules **Widgets** et **Multimedia** (capture et affichage)
+- Qt 6 : modules **Widgets**, **Multimedia** (capture et affichage) et **Network** (envoi UDP)
 - OpenCV ≥ 4.7 : modules **core**, **imgproc**, **calib3d** et **objdetect** (détection et calibration ; ArUco fait partie d'`objdetect` depuis la 4.7)
 
 Sur Debian/Ubuntu :
@@ -41,7 +41,7 @@ Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchée
 
 Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution. Ce basculement est mémorisé avec la résolution.
 
-Les réglages sont répartis en trois onglets : **Carré coloré**, **ArUco** et **Calibration**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
+Les réglages sont répartis en quatre onglets : **Carré coloré**, **ArUco**, **Calibration** et **Envoi UDP**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
 
 ### Carré coloré
 
@@ -116,6 +116,19 @@ Avec calibration, chaque marqueur a aussi :
 - **distance** : la distance caméra–marqueur en mm ;
 - **rotation X, Y, Z** : ses angles d'Euler en degrés. (0, 0, 0) correspond à un marqueur droit, face à la caméra. Z est la rotation dans le plan du marqueur ; X et Y sont ses inclinaisons.
 
+### Envoi des positions en UDP
+
+L'onglet « Envoi UDP » envoie les résultats à un autre programme, par exemple celui qui pilote le robot : un message JSON par image traitée, en UDP, vers l'adresse et le port choisis (`127.0.0.1:5005` par défaut). Cocher « Envoyer les positions » pour l'activer.
+
+Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins et, si la caméra est calibrée, la pose 3D (`pose`). Une liste est absente si la détection correspondante est désactivée. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#83-format-des-messages).
+
+Pour tester la réception :
+
+```bash
+python3 tools/udp_receiver.py          # résumé lisible, port 5005
+python3 tools/udp_receiver.py --raw    # JSON brut
+```
+
 ## Principe de la détection
 
 ### Carré coloré
@@ -169,7 +182,10 @@ src/
 ├── videowidget.h/.cpp   affichage de l'image en gardant ses proportions, clic pour choisir la couleur
 ├── squaredetector.h/.cpp  détection du carré coloré (OpenCV)
 ├── markerdetector.h/.cpp  détection, génération et pose 3D des marqueurs ArUco (OpenCV)
-└── cameracalibration.h/.cpp  calibration de la caméra avec un damier (OpenCV)
+├── cameracalibration.h/.cpp  calibration de la caméra avec un damier (OpenCV)
+└── positionsender.h/.cpp  envoi des positions en JSON sur UDP
+tools/
+└── udp_receiver.py      récepteur de test des positions UDP
 ```
 
 ## Dépannage

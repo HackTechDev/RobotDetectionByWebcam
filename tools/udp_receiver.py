@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Reçoit et affiche les positions envoyées en UDP par RobotDetectionByWebcam.
+
+Exemples :
+    python3 tools/udp_receiver.py              # écoute le port 5005
+    python3 tools/udp_receiver.py --port 6000
+    python3 tools/udp_receiver.py --raw        # affiche le JSON brut
+
+Sert aussi de point de départ pour un programme de pilotage : la fonction
+handle() reçoit chaque message déjà décodé.
+"""
+
+import argparse
+import json
+import socket
+
+
+def describe(msg):
+    """Résumé d'un message sur une ligne."""
+    parts = [f"image {msg['frame']}"]
+
+    squares = msg.get("squares")
+    if squares is not None:
+        if squares:
+            s = squares[0]
+            parts.append(f"carré ({s['center'][0]:.0f}, {s['center'][1]:.0f}) px {s['angle']:.0f}°")
+        else:
+            parts.append("pas de carré")
+
+    for m in msg.get("markers", []):
+        text = f"ArUco {m['id']} ({m['center'][0]:.0f}, {m['center'][1]:.0f}) px {m['angle']:.0f}°"
+        pose = m.get("pose")
+        if pose:
+            x, y, z = pose["position_mm"]
+            text += f" | X {x:.0f} Y {y:.0f} Z {z:.0f} mm"
+        parts.append(text)
+
+    return " | ".join(parts)
+
+
+def handle(msg):
+    """Appelée pour chaque message reçu : à adapter pour piloter un robot."""
+    print(describe(msg))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--port", type=int, default=5005, help="port UDP (défaut : 5005)")
+    parser.add_argument("--host", default="0.0.0.0",
+                        help="adresse d'écoute (défaut : toutes les interfaces)")
+    parser.add_argument("--raw", action="store_true", help="affiche le JSON brut")
+    args = parser.parse_args()
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind((args.host, args.port))
+    print(f"En écoute sur {args.host}:{args.port} (Ctrl+C pour arrêter)")
+
+    try:
+        while True:
+            data, sender = sock.recvfrom(65535)
+            if args.raw:
+                print(data.decode("utf-8"))
+                continue
+            try:
+                handle(json.loads(data))
+            except (ValueError, KeyError) as e:
+                print(f"Message invalide de {sender[0]} : {e}")
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    main()

@@ -17,6 +17,7 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMediaCaptureSession>
 #include <QMediaDevices>
 #include <QPainter>
@@ -25,6 +26,7 @@
 #include <QSlider>
 #include <QSpinBox>
 #include <QStandardPaths>
+#include <QTabBar>
 #include <QTabWidget>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -159,6 +161,37 @@ MainWindow::MainWindow(QWidget *parent)
     calibLayout->addStretch();
     tabs->addTab(calibTab, tr("Calibration"));
 
+    // Onglet envoi UDP : un message JSON par image traitée.
+    auto *udpTab = new QWidget(tabs);
+    auto *udpLayout = new QVBoxLayout(udpTab);
+    m_udpBox = new QGroupBox(tr("Envoyer les positions"), udpTab);
+    m_udpBox->setCheckable(true);
+    m_udpBox->setChecked(false);
+    auto *udpForm = new QFormLayout(m_udpBox);
+    m_udpHostEdit = new QLineEdit(QStringLiteral("127.0.0.1"), m_udpBox);
+    m_udpHostEdit->setToolTip(tr("Adresse IP ou nom de la machine qui reçoit les positions.\n"
+                                 "127.0.0.1 = cet ordinateur ; 255.255.255.255 = tout le réseau local."));
+    m_udpPortSpin = new QSpinBox(m_udpBox);
+    m_udpPortSpin->setRange(1, 65535);
+    m_udpPortSpin->setValue(5005);
+    udpForm->addRow(tr("Adresse"), m_udpHostEdit);
+    udpForm->addRow(tr("Port"), m_udpPortSpin);
+    udpLayout->addWidget(m_udpBox);
+    m_udpStatusLabel = new QLabel(udpTab);
+    m_udpStatusLabel->setWordWrap(true);
+    m_udpStatusLabel->setTextFormat(Qt::RichText);
+    udpLayout->addWidget(m_udpStatusLabel);
+    auto *udpHelp = new QLabel(tr("<i>Un message JSON est envoyé à chaque image : carrés et marqueurs "
+                                  "détectés, avec leur position. Format détaillé dans le guide "
+                                  "utilisateur. Pour tester : <tt>python3 tools/udp_receiver.py</tt></i>"),
+                               udpTab);
+    udpHelp->setWordWrap(true);
+    udpLayout->addWidget(udpHelp);
+    udpLayout->addStretch();
+    tabs->addTab(udpTab, tr("Envoi UDP"));
+    // Le panneau s'élargit pour que tous les titres d'onglets restent lisibles.
+    tabs->setMinimumWidth(tabs->tabBar()->sizeHint().width() + 8);
+
     auto *resBox = new QGroupBox(tr("Résultat"), central);
     auto *resLayout = new QVBoxLayout(resBox);
     m_statusLabel = new QLabel(resBox);
@@ -196,7 +229,10 @@ MainWindow::MainWindow(QWidget *parent)
         updateCalibrationStatus();
     });
     connect(m_calibrateButton, &QPushButton::clicked, this, &MainWindow::calibrate);
+    connect(m_udpHostEdit, &QLineEdit::editingFinished, this, &MainWindow::applyUdpTarget);
+    connect(m_udpPortSpin, &QSpinBox::valueChanged, this, &MainWindow::applyUdpTarget);
 
+    applyUdpTarget();
     m_calibration.load(calibrationPath());
     m_lastCapture.start();
     updateCalibrationStatus();
@@ -387,6 +423,11 @@ void MainWindow::loadSettings()
     m_markerLengthSpin->setValue(
         s.value(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value()).toDouble());
 
+    m_udpHostEdit->setText(s.value(QStringLiteral("udp/host"), m_udpHostEdit->text()).toString());
+    m_udpPortSpin->setValue(s.value(QStringLiteral("udp/port"), m_udpPortSpin->value()).toInt());
+    applyUdpTarget();
+    m_udpBox->setChecked(s.value(QStringLiteral("udp/enabled"), false).toBool());
+
     m_boardColsSpin->setValue(s.value(QStringLiteral("board/cols"), m_boardColsSpin->value()).toInt());
     m_boardRowsSpin->setValue(s.value(QStringLiteral("board/rows"), m_boardRowsSpin->value()).toInt());
     m_squareSizeSpin->setValue(
@@ -418,6 +459,10 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("aruco/enabled"), m_arucoBox->isChecked());
     s.setValue(QStringLiteral("aruco/dictionary"), m_dictCombo->currentText());
     s.setValue(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value());
+
+    s.setValue(QStringLiteral("udp/enabled"), m_udpBox->isChecked());
+    s.setValue(QStringLiteral("udp/host"), m_udpHostEdit->text());
+    s.setValue(QStringLiteral("udp/port"), m_udpPortSpin->value());
 
     s.setValue(QStringLiteral("board/cols"), m_boardColsSpin->value());
     s.setValue(QStringLiteral("board/rows"), m_boardRowsSpin->value());
@@ -678,6 +723,14 @@ void MainWindow::generateBoard()
         QMessageBox::warning(this, tr("Erreur"), tr("Impossible d'enregistrer %1").arg(path));
 }
 
+void MainWindow::applyUdpTarget()
+{
+    if (m_sender.setTarget(m_udpHostEdit->text(), quint16(m_udpPortSpin->value())))
+        m_udpStatusLabel->setText(tr("Destination : <b>%1</b>").arg(m_sender.targetDescription()));
+    else
+        m_udpStatusLabel->setText(tr("<b style='color:#c00'>%1</b>").arg(m_sender.lastError().toHtmlEscaped()));
+}
+
 void MainWindow::onFrame(const QVideoFrame &frame)
 {
     QImage image = frame.toImage();
@@ -742,6 +795,17 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         }
     }
     m_captureRequested = false;
+
+    if (m_udpBox->isChecked() && m_sender.hasTarget()) {
+        m_sender.send(image.size(), squaresOn ? &squares : nullptr, markersOn ? &markers : nullptr);
+        QString text = tr("Destination : <b>%1</b><br>Messages envoyés : %2 (dernier : %3 octets)")
+                           .arg(m_sender.targetDescription())
+                           .arg(m_sender.sentCount())
+                           .arg(m_sender.lastSize());
+        if (!m_sender.lastError().isEmpty())
+            text += tr("<br><b style='color:#c00'>Erreur :</b> %1").arg(m_sender.lastError().toHtmlEscaped());
+        m_udpStatusLabel->setText(text);
+    }
 
     ++m_frameCount;
     if (m_fpsTimer.elapsed() >= 1000) {
