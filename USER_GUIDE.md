@@ -65,6 +65,8 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 │                                       │ Résultat                      │
 │                                       │   Image, images/s, carré,     │
 │                                       │   marqueurs...                │
+│                                       │                               │
+│                                       │         [ Quitter ]           │
 └───────────────────────────────────────┴───────────────────────────────┘
 ```
 
@@ -78,6 +80,7 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
   - **ArUco** : dictionnaire et taille des marqueurs ;
   - **Calibration** : damier et calibration de la caméra.
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
+- **Quitter** : ferme l'application. Une fenêtre demande de confirmer : cliquez sur **Quitter** pour fermer, ou sur **Annuler** (ou appuyez sur Échap) pour continuer. La même confirmation s'affiche si vous fermez la fenêtre avec la croix de la barre de titre.
 
 ### Choisir la résolution
 
@@ -407,7 +410,7 @@ L'application retrouve au lancement les réglages de la fois précédente :
 - **Calibration** : dimensions du damier et taille des cases ;
 - **Fenêtre** : taille, position et onglet ouvert.
 
-La résolution est enregistrée dès qu'on la choisit. Les autres réglages sont enregistrés **à la fermeture de la fenêtre**. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
+La résolution est enregistrée dès qu'on la choisit. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
 
 Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique** et les captures du damier en cours.
 

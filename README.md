@@ -58,7 +58,9 @@ Les réglages sont répartis en trois onglets : **Carré coloré**, **ArUco** et
 | Surface min | Taille minimale d'un carré (en pixels de l'image de travail, 320 px de large) |
 | Remplissage min (%) | Part du rectangle orienté que la zone doit remplir ; à augmenter pour mieux écarter les cercles |
 
-Les réglages (caméra, résolution, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de la fenêtre. Supprimer ce fichier rétablit les réglages par défaut.
+Le bouton « Quitter », en bas à droite, ferme l'application après une confirmation. La même confirmation s'affiche avec la croix de la fenêtre.
+
+Les réglages (caméra, résolution, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
 
 L'option « Effet miroir » retourne seulement l'image affichée. Les détections se font toujours sur l'image réelle de la caméra : les marqueurs ArUco et le damier restent reconnus, et toutes les mesures (coordonnées, angles, pose 3D) restent dans le repère réel de la caméra, que le miroir soit activé ou non.
 

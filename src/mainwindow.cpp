@@ -158,6 +158,11 @@ MainWindow::MainWindow(QWidget *parent)
     panel->addWidget(resBox);
     panel->addStretch();
 
+    auto *quitButton = new QPushButton(tr("Quitter"), central);
+    quitButton->setMinimumHeight(32);
+    panel->addWidget(quitButton);
+    connect(quitButton, &QPushButton::clicked, this, &QWidget::close);
+
     setCentralWidget(central);
     resize(1100, 650);
 
@@ -400,6 +405,19 @@ void MainWindow::saveSettings() const
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    // Confirmation, que la fermeture vienne du bouton « Quitter » ou de la barre de titre.
+    QMessageBox box(QMessageBox::Question, tr("Quitter"),
+                    tr("Voulez-vous vraiment quitter l'application ?"), QMessageBox::NoButton, this);
+    QPushButton *quit = box.addButton(tr("Quitter"), QMessageBox::AcceptRole);
+    QPushButton *cancel = box.addButton(tr("Annuler"), QMessageBox::RejectRole);
+    box.setDefaultButton(cancel);
+    box.setEscapeButton(cancel);
+    box.exec();
+    if (box.clickedButton() != quit) {
+        event->ignore();
+        return;
+    }
+
     saveSettings();
     QMainWindow::closeEvent(event);
 }
