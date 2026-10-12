@@ -33,7 +33,7 @@ public:
 private slots:
     void onFrame(const QVideoFrame &frame);
     void onCameraChanged(int index);
-    void onImageClicked(const QPoint &pos);
+    void onImageClicked(const QPoint &displayPos);
     void chooseColor();
     void updateParams();
     void onDictionaryChanged(int index);

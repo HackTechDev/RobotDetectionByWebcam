@@ -251,10 +251,14 @@ void MainWindow::chooseColor()
         setTargetColor(c);
 }
 
-void MainWindow::onImageClicked(const QPoint &pos)
+void MainWindow::onImageClicked(const QPoint &displayPos)
 {
     if (m_lastFrame.isNull())
         return;
+    // Le clic est fait sur l'image affichée, éventuellement en miroir.
+    const QPoint pos = m_mirrorCheck->isChecked()
+                           ? QPoint(m_lastFrame.width() - 1 - displayPos.x(), displayPos.y())
+                           : displayPos;
     // Moyenne sur une zone 7x7 autour du clic pour limiter le bruit.
     int r = 0, g = 0, b = 0, n = 0;
     for (int dy = -3; dy <= 3; ++dy) {
@@ -395,9 +399,10 @@ void MainWindow::onFrame(const QVideoFrame &frame)
     QImage image = frame.toImage();
     if (image.isNull())
         return;
+    // Les détections se font toujours sur l'image réelle de la caméra : un marqueur
+    // ArUco ou un damier vu en miroir n'est pas reconnu, et les mesures doivent rester
+    // dans le repère de la caméra. Le miroir ne s'applique qu'à l'affichage.
     image = image.convertToFormat(QImage::Format_RGB32);
-    if (m_mirrorCheck->isChecked())
-        image = image.flipped(Qt::Horizontal);
     m_lastFrame = image;
 
     const bool squaresOn = m_squareBox->isChecked();
@@ -436,6 +441,20 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                                .convertToFormat(QImage::Format_RGB32)
                          : image;
 
+    const bool mirror = m_mirrorCheck->isChecked();
+    if (mirror)
+        display = display.flipped(Qt::Horizontal);
+    const double width = display.width();
+    auto toDisplay = [mirror, width](const QPointF &p) {
+        return mirror ? QPointF(width - p.x(), p.y()) : p;
+    };
+    auto polyToDisplay = [&toDisplay](const QPolygonF &poly) {
+        QPolygonF out;
+        for (const QPointF &p : poly)
+            out << toDisplay(p);
+        return out;
+    };
+
     QPainter painter(&display);
     painter.setRenderHint(QPainter::Antialiasing);
     const int penWidth = std::max(2, display.width() / 250);
@@ -444,9 +463,9 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         const bool best = (i == 0);
         painter.setPen(QPen(best ? QColor(0, 255, 0) : QColor(255, 200, 0), penWidth));
         painter.setBrush(Qt::NoBrush);
-        painter.drawPolygon(sq.corners);
+        painter.drawPolygon(polyToDisplay(sq.corners));
         painter.setBrush(best ? QColor(0, 255, 0) : QColor(255, 200, 0));
-        painter.drawEllipse(sq.center, penWidth * 2, penWidth * 2);
+        painter.drawEllipse(toDisplay(sq.center), penWidth * 2, penWidth * 2);
     }
     QFont font = painter.font();
     font.setPixelSize(std::max(14, display.height() / 30));
@@ -455,18 +474,20 @@ void MainWindow::onFrame(const QVideoFrame &frame)
     if (!squares.empty()) {
         const DetectedSquare &sq = squares.front();
         painter.setPen(QColor(0, 255, 0));
-        painter.drawText(sq.corners.boundingRect().topLeft() - QPointF(0, penWidth * 2),
-                         QStringLiteral("(%1, %2)").arg(int(sq.center.x())).arg(int(sq.center.y())));
+        painter.drawText(polyToDisplay(sq.corners).boundingRect().topLeft() - QPointF(0, penWidth * 2),
+                         QStringLiteral("(%1, %2)").arg(sq.center.x(), 0, 'f', 0).arg(sq.center.y(), 0, 'f', 0));
     }
 
     // Damier de calibration : coins reliés ligne par ligne, cadre blanc à chaque capture.
     if (calibOn) {
         if (boardFound) {
             painter.setPen(QPen(QColor(0, 200, 255), penWidth));
-            painter.drawPolyline(boardCorners.data(), int(boardCorners.size()));
+            const QPolygonF corners =
+                polyToDisplay(QPolygonF(QList<QPointF>(boardCorners.begin(), boardCorners.end())));
+            painter.drawPolyline(corners);
             painter.setPen(Qt::NoPen);
             painter.setBrush(QColor(0, 200, 255));
-            for (const QPointF &p : boardCorners)
+            for (const QPointF &p : corners)
                 painter.drawEllipse(p, penWidth * 1.5, penWidth * 1.5);
         }
         if (captured) {
@@ -485,25 +506,25 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         const QColor color(255, 0, 255);
         painter.setPen(QPen(color, penWidth));
         painter.setBrush(Qt::NoBrush);
-        painter.drawPolygon(m.corners);
+        painter.drawPolygon(polyToDisplay(m.corners));
 
         if (m.hasPose) {
             // Axes du marqueur : X rouge, Y vert, normale bleue.
             const QColor axisColors[3] = {Qt::red, Qt::green, QColor(0, 120, 255)};
             for (int k = 0; k < 3; ++k) {
                 painter.setPen(QPen(axisColors[k], penWidth));
-                painter.drawLine(m.axes[0], m.axes[k + 1]);
+                painter.drawLine(toDisplay(m.axes[0]), toDisplay(m.axes[k + 1]));
             }
         } else {
             const QPointF top = (m.corners[0] + m.corners[1]) / 2;
-            painter.drawLine(m.center, top);
+            painter.drawLine(toDisplay(m.center), toDisplay(top));
         }
         painter.setPen(Qt::NoPen);
         painter.setBrush(Qt::red);
-        painter.drawEllipse(m.corners[0], penWidth * 2, penWidth * 2);
+        painter.drawEllipse(toDisplay(m.corners[0]), penWidth * 2, penWidth * 2);
 
         painter.setPen(color);
-        painter.drawText(m.center + QPointF(penWidth * 3, -penWidth * 3), QString::number(m.id));
+        painter.drawText(toDisplay(m.center) + QPointF(penWidth * 3, -penWidth * 3), QString::number(m.id));
     }
     painter.end();
     m_video->setImage(display);

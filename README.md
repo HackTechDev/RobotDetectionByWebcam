@@ -56,7 +56,7 @@ Les réglages sont répartis en trois onglets : **Carré coloré**, **ArUco** et
 | Surface min | Taille minimale d'un carré (en pixels de l'image de travail, 320 px de large) |
 | Remplissage min (%) | Part du rectangle orienté que la zone doit remplir ; à augmenter pour mieux écarter les cercles |
 
-L'option « Effet miroir » retourne l'image horizontalement.
+L'option « Effet miroir » retourne seulement l'image affichée. Les détections se font toujours sur l'image réelle de la caméra : les marqueurs ArUco et le damier restent reconnus, et toutes les mesures (coordonnées, angles, pose 3D) restent dans le repère réel de la caméra, que le miroir soit activé ou non.
 
 ### Marqueurs ArUco
 

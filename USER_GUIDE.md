@@ -70,7 +70,7 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 - **Zone d'image** (à gauche) : l'image de la caméra, avec les contours des carrés, des marqueurs et du damier détectés. Le curseur en croix rappelle qu'un clic sert à choisir une couleur.
 - **Webcam** :
   - **Caméra** : la webcam utilisée ;
-  - **Effet miroir** : retourne l'image horizontalement, comme dans un miroir. ⚠️ À laisser **décoché** pour les marqueurs ArUco et la calibration : un marqueur vu en miroir n'est plus reconnu.
+  - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 7.1](#71-coordonnées-dans-limage-en-pixels)).
 - **Onglets** :
   - **Carré coloré** : couleur et réglages de la détection du carré ;
   - **ArUco** : dictionnaire et taille des marqueurs ;
@@ -193,15 +193,14 @@ Si vous avez déjà un damier, saisissez son nombre de coins intérieurs et la t
 
 ### 6.2 Faire les captures
 
-1. Décochez **Effet miroir**.
-2. Cochez **Mode calibration**.
-3. Montrez le damier à la caméra. Quand il est **entièrement visible**, ses coins s'affichent **en bleu clair** et le texte `Damier détecté` apparaît en haut de l'image. Sinon, le texte `Damier non détecté` s'affiche en rouge.
-4. Capturez des images :
+1. Cochez **Mode calibration**.
+2. Montrez le damier à la caméra. Quand il est **entièrement visible**, ses coins s'affichent **en bleu clair** et le texte `Damier détecté` apparaît en haut de l'image. Sinon, le texte `Damier non détecté` s'affiche en rouge.
+3. Capturez des images :
    - **manuellement**, avec le bouton **Capturer**, quand le damier est bien placé ;
    - ou **automatiquement**, en cochant **Capture automatique (toutes les 2 s)** : il suffit alors de déplacer lentement le damier.
 
    Un **cadre blanc** autour de l'image confirme chaque capture. Le compteur augmente sous les boutons.
-5. Faites **15 à 25 captures**, en variant les positions :
+4. Faites **15 à 25 captures**, en variant les positions :
 
    | À faire | Pourquoi |
    |---|---|
@@ -255,6 +254,7 @@ Posez un marqueur à une distance connue de la caméra, mesurée au mètre ruban
 
 - L'origine (0, 0) est le **coin haut-gauche** de l'image. **x** augmente vers la droite, **y** vers le bas.
 - Les valeurs sont données dans la **résolution réelle de la caméra**, affichée sur la première ligne du panneau Résultat (par exemple `Image : 1280 x 960`).
+- Les coordonnées et les angles sont toujours ceux de l'**image réelle de la caméra**, même si **Effet miroir** est coché. Avec le miroir, un objet affiché à gauche de l'écran a donc un **x élevé**, car il est à droite dans l'image réelle. De même, les angles affichés correspondent à l'image non retournée.
 - **Angle d'un marqueur** : 0° quand le marqueur est droit, positif quand il tourne **dans le sens des aiguilles d'une montre**, de −180° à 180°.
 - **Angle d'un carré** : de 0° à 90° seulement (voir [section 4.4](#44-ce-qui-saffiche)).
 
@@ -339,7 +339,6 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 
 **Un marqueur ArUco n'est pas détecté**
 - Vérifiez que le **dictionnaire** sélectionné est celui du marqueur imprimé.
-- Vérifiez que **Effet miroir** est décoché.
 - La **marge blanche** autour du marqueur doit être présente et visible.
 - Le marqueur doit être net, sans reflet, et mesurer au moins 30 pixels dans l'image : rapprochez-le ou imprimez-le plus grand.
 
