@@ -24,15 +24,21 @@ Pour l'installation et la compilation, voir le [README](README.md). Pour une dé
 
 ## 1. Présentation
 
-L'application filme la scène avec une webcam et repère le robot de deux façons, utilisables séparément ou ensemble.
+L'application filme la scène avec une webcam et repère le robot de trois façons, utilisables séparément ou ensemble.
 
 | Méthode | Ce qu'il faut sur le robot | Ce qu'on obtient | Points forts | Limites |
 |---|---|---|---|---|
 | **Carré coloré** | Un carré d'une couleur vive, ou blanc, gris ou noir (papier, gommette, pièce peinte) | Position et taille en pixels, angle de 0 à 90° | Très simple à mettre en place | Sensible à l'éclairage et aux objets de même couleur ; un seul robot facile à distinguer ; angle connu à 90° près |
-| **Objet encadré** | Rien : on encadre l'objet à la souris | Position, trajectoire, vitesse et direction du déplacement ; position et vitesse en mm sur le sol si le repère du sol est défini | Aucune préparation, fonctionne avec n'importe quel objet | Peut perdre l'objet ou glisser sur le fond ; pas d'orientation ; un seul objet à la fois |
+| **Objet encadré** | Rien : on désigne l'objet à la souris (d'un clic ou en l'encadrant) | Position, trajectoire, vitesse et direction du déplacement, débuts et fins de mouvement ; position et vitesse en mm sur le sol si le repère du sol est défini | Aucune préparation, fonctionne avec n'importe quel objet ; signale quand il ne le reconnaît plus et le retrouve tout seul quand il réapparaît | Moins fiable que les marqueurs (objet qui change d'aspect, qui ressemble au fond) ; pas d'orientation ; un seul objet à la fois |
 | **Marqueur ArUco** | Un marqueur noir et blanc imprimé | Identifiant, position et angle complet (−180° à 180°) ; **position 3D en mm** si la caméra est calibrée | Fiable, plusieurs robots distingués par leur identifiant | Le marqueur doit être assez grand et bien visible |
 
-En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, ou pour plusieurs robots, utilisez les marqueurs ArUco.
+En bref : pour un essai rapide, le carré coloré suffit. Pour suivre un objet sans rien coller dessus, utilisez le suivi d'objet encadré. Pour un suivi fiable, ou pour plusieurs robots, utilisez les marqueurs ArUco.
+
+Quelle que soit la méthode, l'application peut aussi :
+- donner les positions **en millimètres sur le sol** (section 8) ;
+- donner la **position 3D** des marqueurs, une fois la caméra calibrée (section 7) ;
+- **lisser** les positions et calculer les **vitesses** (section 6.4) ;
+- **envoyer** toutes les mesures à un autre programme, par exemple celui qui pilote le robot (section 10).
 
 ---
 
@@ -74,7 +80,7 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 └───────────────────────────────────────┴───────────────────────────────┘
 ```
 
-- **Zone d'image** (à gauche) : l'image de la caméra, avec les contours des carrés, des marqueurs et du damier détectés. Le curseur en croix rappelle qu'un clic sert à choisir une couleur.
+- **Zone d'image** (à gauche) : l'image de la caméra, avec les détections dessinées : carrés, marqueurs, damier, repère du sol, objet suivi et trajectoires. Un clic sur l'image choisit la couleur du carré, sauf pendant la sélection d'un objet (onglet **Suivi**) ou la saisie des points du sol (onglet **Sol**). Pendant ces deux saisies, la touche **Échap** annule.
 - **Webcam** :
   - **Caméra** : la webcam utilisée ;
   - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
@@ -85,7 +91,7 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
   - **ArUco** : dictionnaire et taille des marqueurs ;
   - **Calibration** : damier et calibration de la caméra ;
   - **Sol** : repère du sol, pour avoir les positions en millimètres sur le sol (voir [section 8](#8-définir-le-repère-du-sol)) ;
-  - **Suivi** : suivi d'un objet quelconque, encadré à la souris (voir [section 6](#6-suivre-un-objet-encadré)) ;
+  - **Suivi** : suivi d'un objet quelconque désigné à la souris, journal de ses mouvements, et lissage des positions des carrés et des marqueurs (voir [section 6](#6-suivre-un-objet-encadré)). L'onglet défile s'il ne tient pas en hauteur ;
   - **Envoi UDP** : envoi des positions à un autre programme (voir [section 10](#10-envoyer-les-positions-à-un-autre-programme)).
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
 - **Quitter** : ferme l'application. Une fenêtre demande de confirmer : cliquez sur **Quitter** pour fermer, ou sur **Annuler** (ou appuyez sur Échap) pour continuer. La même confirmation s'affiche si vous fermez la fenêtre avec la croix de la barre de titre.
@@ -670,12 +676,13 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Laissez l'objectif propre ; une image floue gêne surtout les marqueurs ArUco.
 
 **Robot en mouvement**
-- Un déplacement rapide rend l'image floue et peut faire perdre la détection. Un meilleur éclairage réduit ce flou, car la caméra peut alors prendre ses images plus rapidement.
+- Un déplacement rapide rend l'image floue et peut faire perdre la détection. Une **exposition manuelle courte** (**Réglages de l'image...**, 20 à 30 ms) réduit ce flou ; éclairez davantage si l'image devient trop sombre.
 
 **Performances**
 - Le nombre d'images par seconde (i/s) est affiché dans **Résultat**.
 - Choisissez une **résolution plus basse** (liste **Résolution**) : la détection est plus rapide.
 - Désactivez les détections inutiles (case **Activer la détection** de chaque onglet) et le **Mode calibration** pour gagner en vitesse.
+- Le suivi d'un objet avec **CSRT** demande environ 20 ms par image : passez à **KCF** (environ 5 ms), ou arrêtez le suivi s'il ne sert pas.
 
 ---
 
@@ -779,6 +786,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 | `~/.config/RobotDetectionByWebcam/calibration.yml` | Calibration de la caméra (créé par **Calibrer**, relu à chaque lancement). Peut être copié sur une autre machine utilisant la même webcam. |
 | `aruco_<dictionnaire>_<id>.png` | Marqueurs générés, à l'emplacement choisi |
 | `damier_<largeur>x<hauteur>.png` | Damiers générés, à l'emplacement choisi |
+| `evenements.csv` (nom proposé) | Journal des événements de mouvement, exporté avec **Enregistrer...** (onglet **Suivi**) |
 
 ### Réglages mémorisés
 
@@ -795,8 +803,8 @@ L'application retrouve au lancement les réglages de la fois précédente :
 
 Le fichier contient aussi une option sans équivalent dans l'interface : `hideLibraryMessages`, dans la section `[logging]`. Elle vaut `true` par défaut et masque des messages techniques sans gravité dans le terminal (par exemple « Corrupt JPEG data »). Mettez-la à `false` pour les réafficher, par exemple pour signaler un problème. Ce réglage est pris en compte au lancement suivant.
 
-La résolution est enregistrée dès qu'on la choisit. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
+La résolution, l'exposition, la balance des blancs et le repère du sol sont enregistrés dès qu'on les modifie. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
 
-Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique** et les captures du damier en cours.
+Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, l'objet suivi et le journal des événements.
 
 Pour revenir aux réglages par défaut, fermez l'application et supprimez le fichier `settings.ini`. La calibration, enregistrée à part dans `calibration.yml`, est conservée.

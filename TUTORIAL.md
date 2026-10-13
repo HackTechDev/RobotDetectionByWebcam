@@ -10,7 +10,7 @@ Les parties s'enchaînent, mais vous pouvez vous arrêter après n'importe laque
 | [1. Prendre en main la caméra](#1-prendre-en-main-la-caméra) | Choisir la résolution, régler l'image | 10 min |
 | [2. Détecter un carré coloré](#2-détecter-un-carré-coloré) | Repérer un carré de papier rouge, puis blanc | 15 min |
 | [3. Utiliser les marqueurs ArUco](#3-utiliser-les-marqueurs-aruco) | Imprimer et détecter des marqueurs numérotés | 15 min |
-| [4. Suivre un objet quelconque](#4-suivre-un-objet-quelconque) | Encadrer une tasse et suivre sa trajectoire | 10 min |
+| [4. Suivre un objet quelconque](#4-suivre-un-objet-quelconque) | Désigner une tasse d'un clic, suivre sa trajectoire et ses mouvements | 10 min |
 | [5. Calibrer la caméra](#5-calibrer-la-caméra) | Mesurer l'objectif avec un damier, obtenir la position 3D | 20 min |
 | [6. Mesurer sur le sol en millimètres](#6-mesurer-sur-le-sol-en-millimètres) | Tracer un rectangle au ruban adhésif, lire des positions en mm | 15 min |
 | [7. Lisser les positions et mesurer la vitesse](#7-lisser-les-positions-et-mesurer-la-vitesse) | Mesurer une vitesse, voir une position prédite | 10 min |
@@ -328,7 +328,7 @@ Une ligne s'affiche par image :
 image 812 | carré (310, 242) px 12° | sol X 288 Y 196 mm | ArUco 1 (402, 250) px 0° | sol X 412 Y 198 mm cap 90° | carré vitesse 0 mm/s | ArUco 1 vitesse 85 mm/s
 ```
 
-Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
+Si un objet est suivi (partie 4), ses débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
 
 ### 8.3 Écrire son propre programme : aller vers une cible
 
@@ -441,7 +441,8 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, e
 | Détecter un carré de couleur | Onglet **Carré coloré** | Cliquer sur le carré dans l'image |
 | Détecter un carré blanc, gris ou noir | Onglet **Carré coloré** | Cliquer dessus : le type « Blanc, gris ou noir » est choisi |
 | Imprimer un marqueur | Onglet **ArUco** | **Générer un marqueur...** |
-| Suivre un objet quelconque | Onglet **Suivi** | **Sélectionner un objet**, puis tracer un rectangle |
+| Suivre un objet quelconque | Onglet **Suivi** | **Sélectionner un objet**, cliquer sur l'objet, puis **Entrée** |
+| Savoir quand un objet suivi bouge | Onglet **Suivi** | **Journal des événements**, ou liste `events` en UDP |
 | La position 3D d'un marqueur | Onglet **Calibration** | Calibrer une fois avec le damier |
 | Des positions en mm sur le sol | Onglet **Sol** | **Définir les 4 points** d'un rectangle connu |
 | La vitesse d'un marqueur | Onglet **Suivi** | Groupe **Lissage des carrés et marqueurs** |

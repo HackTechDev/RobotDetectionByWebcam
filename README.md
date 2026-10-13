@@ -4,9 +4,13 @@ Application Qt6 qui affiche le flux d'une webcam et détecte en temps réel :
 
 - un **carré d'une couleur donnée** ;
 - des **marqueurs ArUco** (ou AprilTag), avec leur identifiant ;
-- **n'importe quel objet encadré à la souris**, suivi d'image en image avec sa trajectoire et sa vitesse.
+- **n'importe quel objet désigné à la souris** (d'un clic ou en l'encadrant), suivi d'image en image avec sa trajectoire, sa vitesse et ses débuts et fins de mouvement.
 
-Pour chacun, l'application donne la position, la taille et l'orientation dans l'image. Une fois la caméra **calibrée** avec un damier, elle donne aussi la **position 3D en millimètres** et l'orientation des marqueurs ArUco.
+Pour chacun, l'application donne la position dans l'image, ainsi que la taille et l'orientation des carrés et des marqueurs. Elle peut aussi :
+- donner les positions **en millimètres sur le sol**, après avoir cliqué les 4 coins d'un rectangle connu ;
+- donner la **position 3D** et l'orientation des marqueurs ArUco, une fois la caméra **calibrée** avec un damier ;
+- **lisser** les positions et calculer les **vitesses** (filtre de Kalman) ;
+- **envoyer** toutes les mesures en JSON sur UDP à un autre programme, par exemple celui qui pilote le robot.
 
 Pour découvrir l'application pas à pas, suivez le [tutoriel](TUTORIAL.md). Le mode d'emploi détaillé (réglages, calibration pas à pas, lecture des résultats, dépannage) se trouve dans le [guide utilisateur](USER_GUIDE.md).
 
@@ -46,6 +50,16 @@ Pour chaque résolution, l'application choisit le format vidéo le plus rapide. 
 
 Les réglages sont répartis en six onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Suivi** et **Envoi UDP**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
 
+### Caméra, réglages et fermeture
+
+Le bouton « Réglages de l'image... » ouvre une fenêtre pour régler l'**exposition** (automatique ou temps de pose manuel) et la **balance des blancs** (automatique ou température manuelle). Une pose courte donne plus d'images par seconde et moins de flou de mouvement dans une pièce peu éclairée, au prix d'une image plus sombre. Une balance des blancs manuelle empêche les couleurs de dériver. Ces réglages sont mémorisés pour chaque modèle de caméra et réappliqués au démarrage de la caméra. À la fermeture normale, l'application remet la webcam en automatique, car ces réglages sont stockés dans la webcam elle-même. Pour l'exposition automatique, l'application écrit directement le contrôle V4L2 (`V4L2_CID_EXPOSURE_AUTO`) : sur les webcams qui n'acceptent que le mode « priorité ouverture » (comme la Logitech C270), Qt ne parvient pas à rétablir l'automatique.
+
+L'option « Effet miroir » retourne seulement l'image affichée. Les détections se font toujours sur l'image réelle de la caméra : les marqueurs ArUco et le damier restent reconnus, et toutes les mesures (coordonnées, angles, pose 3D, positions au sol) restent dans le repère réel de la caméra, que le miroir soit activé ou non. Les clics sur l'image (couleur, sélection d'un objet, points du sol) sont convertis automatiquement.
+
+Les réglages (caméra, résolution, exposition, balance des blancs, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, repère du sol, méthode, trajectoire et seuils du suivi, lissage, envoi UDP, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution, l'exposition, la balance des blancs et le repère du sol sont enregistrés dès qu'on les modifie, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
+
+Le bouton « Quitter », en bas à droite, ferme l'application après une confirmation. La même confirmation s'affiche avec la croix de la fenêtre.
+
 ### Carré coloré
 
 1. **Choisir la couleur du carré** :
@@ -66,14 +80,6 @@ Les réglages sont répartis en six onglets : **Carré coloré**, **ArUco**, **C
 | Saturation max | *Blanc, gris ou noir* : écarte les zones colorées ; à augmenter sous une lumière chaude qui teinte le blanc |
 | Surface min | Taille minimale d'un carré (en pixels de l'image de travail, 320 px de large) |
 | Remplissage min (%) | Part du rectangle orienté que la zone doit remplir ; à augmenter pour mieux écarter les cercles |
-
-Le bouton « Quitter », en bas à droite, ferme l'application après une confirmation. La même confirmation s'affiche avec la croix de la fenêtre.
-
-Le bouton « Réglages de l'image... » ouvre une fenêtre pour régler l'**exposition** (automatique ou temps de pose manuel) et la **balance des blancs** (automatique ou température manuelle). Une pose courte donne plus d'images par seconde et moins de flou de mouvement dans une pièce peu éclairée, au prix d'une image plus sombre. Une balance des blancs manuelle empêche les couleurs de dériver. Ces réglages sont mémorisés pour chaque modèle de caméra et réappliqués au démarrage de la caméra. À la fermeture normale, l'application remet la webcam en automatique, car ces réglages sont stockés dans la webcam elle-même. Pour l'exposition automatique, l'application écrit directement le contrôle V4L2 (`V4L2_CID_EXPOSURE_AUTO`) : sur les webcams qui n'acceptent que le mode « priorité ouverture » (comme la Logitech C270), Qt ne parvient pas à rétablir l'automatique.
-
-Les réglages (caméra, résolution, exposition, balance des blancs, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, repère du sol, méthode et trajectoire du suivi, lissage, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
-
-L'option « Effet miroir » retourne seulement l'image affichée. Les détections se font toujours sur l'image réelle de la caméra : les marqueurs ArUco et le damier restent reconnus, et toutes les mesures (coordonnées, angles, pose 3D) restent dans le repère réel de la caméra, que le miroir soit activé ou non.
 
 ### Marqueurs ArUco
 
@@ -114,6 +120,9 @@ Changer les dimensions du damier efface les captures en cours.
   - Sans calibration, un trait part du centre vers le bord supérieur pour montrer l'orientation.
   - Avec calibration, les axes 3D du marqueur sont dessinés : **X en rouge** (droite), **Y en vert** (bas), **normale en bleu** (sort du marqueur vers la caméra).
 - En mode calibration, les coins du damier détecté sont reliés en bleu clair.
+- Le repère du sol est dessiné en pointillés orange, avec l'axe X en rouge et l'axe Y en vert.
+- L'objet suivi est entouré en **cyan** (orange quand la confiance baisse, pointillés quand sa position est prédite, rouge quand il est perdu), avec sa trajectoire et une flèche dans le sens du déplacement.
+- Les trajectoires lissées du carré (vert clair) et des marqueurs (rose) sont tracées, et la position prédite d'un objet momentanément perdu est marquée d'un cercle en pointillés.
 - Le panneau « Résultat » indique le centre (en pixels de l'image d'origine), le côté, l'angle (0–90°), le nombre de carrés et les images par seconde. Pour chaque marqueur ArUco, il indique l'identifiant, le centre, le côté et l'angle : 0° quand le marqueur est droit, positif dans le sens horaire, entre −180° et 180°.
 
 Avec calibration, chaque marqueur a aussi :
@@ -147,7 +156,7 @@ Le groupe « Lissage des carrés et marqueurs » de l'onglet « Suivi » suit da
 
 L'onglet « Envoi UDP » envoie les résultats à un autre programme, par exemple celui qui pilote le robot : un message JSON par image traitée, en UDP, vers l'adresse et le port choisis (`127.0.0.1:5005` par défaut). Cocher « Envoyer les positions » pour l'activer.
 
-Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si le lissage est actif, la liste `tracks` donne la position lissée, la vitesse et l'état (détecté ou prédit) de chaque carré principal ou marqueur suivi. Si un objet est suivi, l'objet `tracked` donne son cadre, sa position, sa vitesse, sa direction et son état (trouvé, en mouvement). Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
+Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si le lissage est actif, la liste `tracks` donne la position lissée, la vitesse et l'état (détecté ou prédit) de chaque carré principal ou marqueur suivi. Si un objet est suivi, l'objet `tracked` donne son cadre, sa position, sa vitesse, sa direction, son état (trouvé, prédit, en mouvement), son indice de confiance et le nombre de reprises automatiques. La liste `events` signale les débuts et fins de mouvement, les pertes et les reprises de l'objet suivi, une seule fois chacun. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
 
 Pour tester la réception :
 
@@ -194,19 +203,19 @@ Sur une image de synthèse, la position est retrouvée à environ 1 mm près à 
 
 Le code se trouve dans `src/objecttracker.cpp`.
 
-1. L'image est réduite à 640 px de large au plus, ce qui garde le coût du suivi presque constant quelle que soit la résolution.
-2. Le tracker (`cv::TrackerCSRT` ou `cv::TrackerKCF`) est initialisé sur le rectangle sélectionné, puis mis à jour à chaque image. S'il perd l'objet, la dernière position est conservée et il continue de chercher aux images suivantes.
-3. **Indice de confiance.** À la sélection, l'apparence de l'objet est mémorisée sous deux formes : un histogramme teinte-saturation et un motif en niveaux de gris. À chaque image, le contenu du cadre est comparé à cette référence :
+1. **Sélection d'un clic.** `cv::grabCut` est appliqué sur une zone carrée de 40 % du petit côté de l'image, centrée sur le clic, avec une marge de fond autour (image réduite à 480 px de large). On garde la zone de premier plan qui contient le clic. Si elle est trop petite ou remplit presque toute la zone, un carré est proposé autour du clic. Sur des objets de synthèse (texturé, disque, boîte, petit objet), le cadre obtenu recouvre le vrai cadre à 92 à 100 %, en 70 à 120 ms.
+2. L'image est réduite à 640 px de large au plus, ce qui garde le coût du suivi presque constant quelle que soit la résolution.
+3. Le tracker (`cv::TrackerCSRT` ou `cv::TrackerKCF`) est initialisé sur le rectangle sélectionné, puis mis à jour à chaque image. S'il perd l'objet, la dernière position est conservée et il continue de chercher aux images suivantes.
+4. **Indice de confiance.** À la sélection, l'apparence de l'objet est mémorisée sous deux formes : un histogramme teinte-saturation et un motif en niveaux de gris. À chaque image, le contenu du cadre est comparé à cette référence :
    - par la distance de Bhattacharyya entre histogrammes, peu sensible à la rotation ;
    - par une corrélation normalisée des motifs (`cv::matchTemplate`), qui distingue l'objet d'un fond ou d'un intrus aux couleurs proches.
 
    La confiance est la moyenne des deux, lissée dans le temps. Sous 0,45 pendant 3 images, l'objet est déclaré perdu (« glissé »). Au-dessus de 0,7, la référence suit lentement l'objet (5 % par image), ce qui accepte une rotation progressive mais pas un intrus qui surgit. Sur une séquence de synthèse, CSRT s'accroche à un intrus passé devant l'objet et le suit en affirmant l'avoir trouvé. La confiance tombe alors à 0,35 et aucune position fausse n'est plus donnée. Pendant une rotation de 90° de l'objet, elle reste au-dessus de 0,72.
-4. **Reprise automatique.** Tant que l'objet est perdu, il est recherché dans toute l'image, une image sur trois, sur une image réduite de moitié. Les deux motifs (celui d'origine et celui qui a suivi l'objet) sont cherchés par `cv::matchTemplate` (corrélation normalisée), à trois échelles autour de la dernière taille connue (×0,85, ×1, ×1,2). Le meilleur candidat n'est accepté que si sa corrélation dépasse 0,6 et son indice de confiance 0,55. Le tracker est alors relancé à cet endroit, le filtre de Kalman repart de cette position, et la trajectoire commence un nouveau tronçon. Sur des séquences de synthèse, l'objet est retrouvé après le passage d'un intrus, après un accrochage du tracker à cet intrus, et après une réapparition ailleurs (en 3 images). Aucune fausse reprise n'a lieu quand l'objet est absent et qu'un intrus est présent. Le suivi d'un objet perdu coûte environ 15 ms par image en 1280 × 960.
-5. Chaque position trouvée est ajoutée à la trajectoire, horodatée. Les points plus anciens que la durée choisie sont retirés.
-6. Le centre du cadre passe dans un filtre de Kalman à vitesse constante (`KalmanFilter2D`, le même que pour le lissage des carrés et des marqueurs). On en tire la position lissée et la vitesse. Quand le tracker perd l'objet, le filtre prédit la position pendant le délai de maintien. Sans lissage, la position est celle du tracker, mais la vitesse reste filtrée (force 50). L'objet est « en mouvement » au-delà de 10 % de la diagonale de son cadre par seconde (au moins 5 px/s).
-7. Si le repère du sol est prêt, la position est projetée sur le sol, ainsi que la position atteinte 0,1 s plus tard à la vitesse estimée, pour obtenir la vitesse et la direction en mm.
-8. **Événements de mouvement.** L'objet passe « en mouvement » quand il s'éloigne de sa position de repos de plus du seuil, en mm sur le sol si le repère est prêt, sinon en pixels. Il redevient « immobile » quand, sur la dernière demi-seconde, il est resté dans un rayon de la moitié du seuil. Ce critère de position résiste mieux au tremblement qu'un seuil de vitesse : à l'arrêt, la vitesse mesurée peut atteindre une douzaine de px/s. La fin de mouvement donne la distance nette, la longueur du chemin et la durée, sans la demi-seconde de confirmation. Une perte est signalée une fois la position prédite épuisée, une reprise dès que l'objet est retrouvé. Sur une séquence de synthèse avec bruit de capteur, il n'y a aucun faux départ à l'arrêt ni pour un déplacement de 8 px, et un déplacement de 300 px est mesuré à 304 px.
-9. **Sélection d'un clic.** `cv::grabCut` est appliqué sur une zone carrée de 40 % du petit côté de l'image, centrée sur le clic, avec une marge de fond autour (image réduite à 480 px de large). On garde la zone de premier plan qui contient le clic. Si elle est trop petite ou remplit presque toute la zone, un carré est proposé autour du clic. Sur des objets de synthèse (texturé, disque, boîte, petit objet), le cadre obtenu recouvre le vrai cadre à 92 à 100 %, en 70 à 120 ms.
+5. **Reprise automatique.** Tant que l'objet est perdu, il est recherché dans toute l'image, une image sur trois, sur une image réduite de moitié. Les deux motifs (celui d'origine et celui qui a suivi l'objet) sont cherchés par `cv::matchTemplate` (corrélation normalisée), à trois échelles autour de la dernière taille connue (×0,85, ×1, ×1,2). Le meilleur candidat n'est accepté que si sa corrélation dépasse 0,6 et son indice de confiance 0,55. Le tracker est alors relancé à cet endroit, le filtre de Kalman repart de cette position, et la trajectoire commence un nouveau tronçon. Sur des séquences de synthèse, l'objet est retrouvé après le passage d'un intrus, après un accrochage du tracker à cet intrus, et après une réapparition ailleurs (en 3 images). Aucune fausse reprise n'a lieu quand l'objet est absent et qu'un intrus est présent. Le suivi d'un objet perdu coûte environ 15 ms par image en 1280 × 960.
+6. Chaque position trouvée est ajoutée à la trajectoire, horodatée. Les points plus anciens que la durée choisie sont retirés.
+7. Le centre du cadre passe dans un filtre de Kalman à vitesse constante (`KalmanFilter2D`, le même que pour le lissage des carrés et des marqueurs). On en tire la position lissée et la vitesse. Quand le tracker perd l'objet, le filtre prédit la position pendant le délai de maintien. Sans lissage, la position est celle du tracker, mais la vitesse reste filtrée (force 50).
+8. Si le repère du sol est prêt, la position est projetée sur le sol, ainsi que la position atteinte 0,1 s plus tard à la vitesse estimée, pour obtenir la vitesse et la direction en mm.
+9. **Événements de mouvement.** L'objet passe « en mouvement » quand il s'éloigne de sa position de repos de plus du seuil, en mm sur le sol si le repère est prêt, sinon en pixels. Il redevient « immobile » quand, sur la dernière demi-seconde, il est resté dans un rayon de la moitié du seuil. Ce critère de position résiste mieux au tremblement qu'un seuil de vitesse : à l'arrêt, la vitesse mesurée peut atteindre une douzaine de px/s. La fin de mouvement donne la distance nette, la longueur du chemin et la durée, sans la demi-seconde de confirmation. Une perte est signalée une fois la position prédite épuisée, une reprise dès que l'objet est retrouvé. Sur une séquence de synthèse avec bruit de capteur, il n'y a aucun faux départ à l'arrêt ni pour un déplacement de 8 px, et un déplacement de 300 px est mesuré à 304 px.
 
 Sur une séquence de synthèse (objet texturé sur fond texturé, 1280 × 960, bruit de capteur simulé), la vitesse est retrouvée à 299 px/s pour 300 px/s réels. À l'arrêt, la vitesse mesurée est de 6 px/s avec le lissage par défaut, contre 30 px/s sans filtre.
 
@@ -247,17 +256,21 @@ Le code se trouve dans `src/cameracalibration.cpp`.
 
 ```
 CMakeLists.txt
+README.md                installation, utilisation et principes (ce fichier)
+TUTORIAL.md              découverte pas à pas de toutes les fonctionnalités
+USER_GUIDE.md            guide utilisateur : référence de chaque réglage, dépannage
+IMPROVEMENTS.md          fonctionnalités réalisées et améliorations envisagées
 src/
 ├── main.cpp             point d'entrée
 ├── mainwindow.h/.cpp    fenêtre, caméra (QCamera + QVideoSink), réglages, affichage des résultats
-├── videowidget.h/.cpp   affichage de l'image en gardant ses proportions, clic pour choisir la couleur
+├── videowidget.h/.cpp   affichage de l'image en gardant ses proportions, clics, sélection et ajustement du cadre
 ├── squaredetector.h/.cpp  détection du carré coloré (OpenCV)
 ├── markerdetector.h/.cpp  détection, génération et pose 3D des marqueurs ArUco (OpenCV)
 ├── cameracalibration.h/.cpp  calibration de la caméra avec un damier (OpenCV)
 ├── positionsender.h/.cpp  envoi des positions en JSON sur UDP
 ├── floormapper.h/.cpp   conversion des positions de l'image en mm sur le sol
 ├── camerasettingsdialog.h/.cpp  réglages de l'image : exposition et balance des blancs
-├── objecttracker.h/.cpp  suivi d'un objet encadré, trajectoire et vitesse
+├── objecttracker.h/.cpp  suivi d'un objet : sélection d'un clic, confiance, reprise, vitesse, événements
 └── motionfilter.h/.cpp  lissage dans le temps (filtre de Kalman) des carrés et des marqueurs
 tools/
 └── udp_receiver.py      récepteur de test des positions UDP
@@ -266,7 +279,6 @@ tools/
 ## Dépannage
 
 - **Une autre application trouve la webcam très sombre ou très claire** : l'application a été arrêtée brutalement avec une exposition manuelle, réglage que la webcam garde en mémoire. La relancer puis la quitter normalement remet la webcam en automatique.
-
 - **`Could not find a package configuration file provided by "OpenCV"`** : installer `libopencv-dev`. Pour une installation d'OpenCV compilée à la main, ajouter `-DOpenCV_DIR=<prefix>/lib/cmake/opencv4` à la commande `cmake`.
 - **« Aucune webcam détectée »** : vérifier `ls /dev/video*` et que l'utilisateur appartient au groupe `video` (`groups`).
 - **Messages dans la console** : par défaut, l'application masque deux types de messages sans gravité, la version de FFmpeg utilisée par Qt Multimedia (`qt.multimedia.ffmpeg`) et les « Corrupt JPEG data » (`qt.gui.imageio.jpeg`) que produisent certaines webcams en MJPEG. Pour les réafficher, mettre `hideLibraryMessages=false` dans la section `[logging]` de `~/.config/RobotDetectionByWebcam/settings.ini`. La variable d'environnement `QT_LOGGING_RULES` reste prioritaire, par exemple `QT_LOGGING_RULES="qt.gui.imageio.jpeg.warning=true" ./build/RobotDetectionByWebcam`.
@@ -277,5 +289,5 @@ tools/
 - **Le damier n'est pas détecté** : il doit être entièrement visible avec sa marge blanche. Vérifier que le nombre de **coins intérieurs** saisi correspond au damier (un damier de 10 × 7 cases a 9 × 6 coins intérieurs). Éviter les reflets.
 - **Erreur RMS élevée** : damier gondolé, images floues ou vues trop semblables. Recommencer avec « Effacer les captures ».
 - **Distances fausses d'un facteur constant** : vérifier la « Taille du marqueur » et le « Côté d'une case », mesurés à la règle sur les impressions.
-- **Repartir de zéro** : supprimer `~/.config/RobotDetectionByWebcam/calibration.yml`.
+- **Repartir de zéro** : supprimer `~/.config/RobotDetectionByWebcam/calibration.yml` (calibration) ou `settings.ini` (réglages).
 - **Erreur de compilation sur `aruco_detector.hpp`** : la version d'OpenCV est antérieure à 4.7. Installer une version plus récente.

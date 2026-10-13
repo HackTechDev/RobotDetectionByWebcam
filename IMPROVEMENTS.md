@@ -21,15 +21,12 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
   - seuils réglables et affichage du masque ;
   - forme vérifiée par le rectangle orienté minimal, ce qui écarte les disques et les rectangles.
 - **Marqueurs ArUco et AprilTag** : six dictionnaires, coins affinés au sous-pixel, génération de marqueurs à imprimer.
-- **Suivi d'un objet encadré** à la souris (trackers OpenCV CSRT ou KCF) :
-  - trajectoire, vitesse, direction ;
-  - état « immobile » ou « en mouvement » ;
-  - signalement de la perte de l'objet ;
-  - position lissée et vitesse par filtre de Kalman, position prédite juste après une perte ;
+- **Suivi d'un objet quelconque** désigné à la souris (trackers OpenCV CSRT ou KCF) :
+  - sélection d'un clic (délimitation automatique) ou par un cadre, ajustable avant validation ; Échap pour annuler ;
+  - trajectoire, position lissée, vitesse et direction (filtre de Kalman), position prédite juste après une perte ;
   - indice de confiance, qui détecte le cadre qui glisse sur le fond ou s'accroche à un autre objet ;
   - reprise automatique : un objet perdu est recherché dans toute l'image et le suivi reprend dès qu'il réapparaît ;
-  - sélection d'un clic (délimitation automatique), cadre ajustable avant validation, Échap pour annuler ;
-  - événements de mouvement (début, fin, perte, reprise) avec seuil réglable, journal horodaté exportable en CSV et envoi en UDP.
+  - état « immobile » ou « en mouvement » selon un seuil de distance réglable, et événements (début et fin de mouvement, perte, reprise) dans un journal horodaté exportable en CSV.
 
 ### Mesures
 
@@ -41,12 +38,12 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
   - calibration enregistrée et rechargée au lancement ;
   - adaptation aux résolutions du même format d'image.
 - **Pose 3D des marqueurs** (si la caméra est calibrée) : position en mm, distance et rotations par rapport à la caméra. Les axes du marqueur sont dessinés sur l'image.
-- **Positions sur le sol en millimètres** : repère défini par les 4 coins d'un rectangle de dimensions connues, cliqués dans l'image. Il donne la position et le cap des carrés, des marqueurs et de l'objet suivi, et fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus.
+- **Positions sur le sol en millimètres** : repère défini par les 4 coins d'un rectangle de dimensions connues, cliqués dans l'image. Il donne la position et le cap des carrés et des marqueurs, ainsi que la position, la vitesse et la direction de déplacement de l'objet suivi. Il fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus.
 - **Lissage dans le temps** (filtre de Kalman) du carré principal et de chaque marqueur : position lissée, vitesse, position prédite pendant une courte perte de détection, trajectoires.
 
 ### Intégration
 
-- **Envoi des positions en JSON sur UDP**, un message par image : carrés, marqueurs, pose 3D, positions au sol, objet suivi et objets lissés (`tracks`).
+- **Envoi des positions en JSON sur UDP**, un message par image : carrés, marqueurs, pose 3D, positions au sol, objet suivi (`tracked`), objets lissés (`tracks`) et événements de mouvement (`events`).
 - Script de réception `tools/udp_receiver.py`, pour tester l'envoi ou servir de base à un programme de pilotage.
 
 ### Confort
@@ -86,6 +83,8 @@ Ces efforts sont des estimations.
 - calibration sur caméra simulée (fx et fy retrouvés à 600 px) ;
 - pose 3D ;
 - repère du sol (positions à 1 à 2 mm près) ;
+- suivi d'objet : vitesse, prédiction, indice de confiance (intrus, rotation), reprise automatique, sélection d'un clic, événements de mouvement ;
+- lissage de Kalman (tremblement, retard, prédiction) ;
 - format des messages JSON.
 
 Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
