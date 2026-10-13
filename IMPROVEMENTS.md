@@ -107,15 +107,6 @@ Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
 
 **Piste.** Choisir un ID réservé et sa taille. Ses 4 coins donnent l'homographie à chaque image. La précision baisse loin du marqueur : prévoir un grand marqueur, ou plusieurs marqueurs combinés.
 
-#### Suivi d'objet : plusieurs objets et reprise automatique — M
-
-**Intérêt.** Le suivi d'un objet encadré ne gère qu'un objet à la fois. Quand l'objet est perdu, il faut le resélectionner à la main.
-
-**Piste.**
-- Une liste d'objets suivis, chacun avec son nom et sa couleur d'affichage. Le coût augmente avec le nombre d'objets (environ 20 ms par objet avec CSRT).
-- Mémoriser l'apparence de l'objet au moment de la sélection et la rechercher dans toute l'image quand il est perdu (`cv::matchTemplate` ou points caractéristiques ORB).
-- Proposer les trackers à base de réseaux de neurones d'OpenCV (Nano, Vit), plus robustes, qui demandent de télécharger un modèle.
-
 #### Détection dans un fil d'exécution séparé — M
 
 **Intérêt.** En haute résolution, ou avec le suivi CSRT, la détection ralentit l'interface. Un fil dédié garderait l'affichage fluide et utiliserait un second cœur du processeur.
@@ -123,6 +114,90 @@ Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
 **Piste.** Déplacer la détection dans un `QThread` qui traite toujours l'image la plus récente, en ignorant celles reçues pendant le traitement, et renvoie les résultats par signal.
 
 ---
+
+### Suivi d'objet
+
+Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Ordre conseillé : d'abord le lissage de Kalman, rapide grâce au code existant ; puis l'indice de confiance et la reprise automatique, qui s'attaquent à la principale faiblesse actuelle (perdre l'objet ou glisser sur le fond sans le signaler).
+
+#### Lissage de Kalman et prédiction pendant les pertes — S
+
+**Intérêt.** La vitesse est calculée par différence entre les positions brutes sur une demi-seconde. Elle est bruitée, et rien n'est prédit quand l'objet est perdu un instant.
+
+**Piste.** Réutiliser `KalmanFilter2D` (`src/motionfilter.cpp`), déjà utilisé pour les carrés et les marqueurs. On obtiendrait une position plus stable, une vitesse moins bruitée et une position prédite pendant une courte perte. Le comportement serait le même que pour les carrés et les marqueurs, y compris la force du lissage.
+
+#### Indice de confiance et détection du glissement — M
+
+**Intérêt.** L'objet n'est déclaré perdu que si le tracker le dit lui-même. CSRT et KCF peuvent continuer à affirmer qu'ils l'ont trouvé alors que le cadre a glissé sur le fond.
+
+**Piste.** Comparer à chaque image le contenu du cadre avec l'apparence de l'objet mémorisée à la sélection : comparaison d'image normalisée (`cv::matchTemplate`) ou histogramme de couleurs (`cv::compareHist`). Afficher un indice de confiance et déclarer l'objet perdu sous un seuil. Mettre à jour lentement l'image de référence quand la confiance est haute, pour suivre les changements d'éclairage.
+
+#### Reprise automatique après une perte — M
+
+**Intérêt.** Quand l'objet est perdu, le tracker ne le cherche qu'autour de sa dernière position. S'il réapparaît ailleurs, il faut le resélectionner à la main.
+
+**Piste.** Rechercher l'image de référence de l'objet dans toute l'image, à plusieurs échelles (`cv::matchTemplate`), ou par points caractéristiques ORB et mise en correspondance. Dès qu'elle est retrouvée avec une confiance suffisante, réinitialiser le tracker à cet endroit.
+
+#### Orientation de l'objet — M
+
+**Intérêt.** Le cadre reste droit : on connaît la direction du déplacement, mais pas celle vers laquelle l'objet est tourné. Pour un robot sans marqueur, c'est pourtant son cap.
+
+**Piste.** Suivre des points caractéristiques à l'intérieur du cadre (`cv::goodFeaturesToTrack`, puis flux optique `cv::calcOpticalFlowPyrLK`). En déduire la rotation et le changement d'échelle entre deux images (`cv::estimateAffinePartial2D`), cumulés depuis la sélection. Afficher un cadre tourné et envoyer l'angle en UDP.
+
+#### Point de contact avec le sol — S
+
+**Intérêt.** La position au sol est calculée à partir du centre du cadre. Pour un objet vu de biais et posé au sol, le point qui touche le sol est plutôt le bas du cadre. Le centre, plus haut, décale la position mesurée.
+
+**Piste.** Une option « Point de référence : centre ou bas du cadre » dans l'onglet Suivi, utilisée pour la position et la vitesse sur le sol.
+
+#### Garder le suivi en changeant de résolution — S
+
+**Intérêt.** Changer de résolution arrête le suivi, même quand le format d'image ne change pas.
+
+**Piste.** Si le format reste le même (4:3 vers 4:3), mettre le cadre et la trajectoire à l'échelle, puis réinitialiser le tracker sur la nouvelle image au lieu de l'arrêter.
+
+#### Plusieurs objets suivis — M
+
+**Intérêt.** Un seul objet peut être suivi à la fois.
+
+**Piste.** Une liste d'objets suivis, chacun avec son nom et sa couleur d'affichage, dans le panneau Résultat et dans les messages UDP (`tracked` deviendrait une liste). Le coût augmente avec le nombre d'objets, environ 20 ms par objet avec CSRT : à combiner avec le suivi dans un fil séparé.
+
+#### Événements de mouvement — S
+
+**Intérêt.** Être prévenu quand l'objet bouge, plutôt que surveiller sa position en continu : par exemple « l'objet s'est déplacé de plus de 2 cm ».
+
+**Piste.**
+- Un seuil réglable de déplacement (en mm si le repère du sol est défini, sinon en pixels) et de vitesse, à la place des 10 % de la taille de l'objet.
+- Deux seuils différents, pour la mise en mouvement et pour l'arrêt, afin que l'état n'oscille pas entre « immobile » et « en mouvement ».
+- Un message UDP d'événement et un journal horodaté des débuts et fins de mouvement.
+
+#### Statistiques et export de la trajectoire — S
+
+**Intérêt.** Analyser un déplacement après coup.
+
+**Piste.** Afficher la distance parcourue, les vitesses moyenne et maximale et la durée de mouvement, et exporter la trajectoire en CSV (heure, position dans l'image et sur le sol, vitesse).
+
+#### Suivi plus rapide — M
+
+**Intérêt.** CSRT prend environ 20 ms par image dans le fil principal de l'application, ce qui peut faire baisser le nombre d'images par seconde.
+
+**Piste.**
+- Exécuter le suivi dans un fil dédié (voir « Détection dans un fil d'exécution séparé »).
+- Adapter la réduction d'image à la taille de l'objet : un grand objet peut être suivi sur une image plus petite que 640 px de large.
+
+#### Trackers à base de réseaux de neurones — M
+
+**Intérêt.** Les trackers `TrackerNano` et `TrackerVit` d'OpenCV 4.10 sont plus robustes aux changements d'aspect et aux pertes momentanées que CSRT et KCF.
+
+**Piste.** Les proposer dans la liste **Méthode**. Ils demandent de télécharger un modèle (quelques Mo) et une machine plus puissante : il faudra indiquer où placer le modèle et vérifier la vitesse obtenue.
+
+#### Sélection plus simple — S
+
+**Intérêt.** Tracer un rectangle précis autour d'un objet n'est pas toujours facile, surtout s'il bouge.
+
+**Piste.**
+- Sélectionner l'objet d'un simple clic : l'application délimite elle-même l'objet autour du point cliqué (`cv::grabCut` ou remplissage de région).
+- Pouvoir ajuster le cadre après l'avoir tracé.
+- Annuler la sélection avec la touche Échap.
 
 ### Caméra et calibration
 
