@@ -64,7 +64,8 @@ QString PositionSender::targetDescription() const
 
 QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const QSize &imageSize,
                                         const std::vector<DetectedSquare> *squares,
-                                        const std::vector<DetectedMarker> *markers)
+                                        const std::vector<DetectedMarker> *markers,
+                                        const TrackedObject *tracked)
 {
     QJsonObject msg;
     msg.insert(QStringLiteral("frame"), frame);
@@ -113,17 +114,37 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
         msg.insert(QStringLiteral("markers"), list);
     }
 
+    if (tracked && tracked->active) {
+        QJsonObject o{{QStringLiteral("found"), tracked->found},
+                      {QStringLiteral("center"), point(tracked->center)},
+                      {QStringLiteral("box"), QJsonArray{round1(tracked->box.x()), round1(tracked->box.y()),
+                                                         round1(tracked->box.width()),
+                                                         round1(tracked->box.height())}},
+                      {QStringLiteral("moving"), tracked->moving},
+                      {QStringLiteral("velocity_px_s"), point(tracked->velocity)},
+                      {QStringLiteral("speed_px_s"), round1(tracked->speed)},
+                      {QStringLiteral("direction_deg"), round1(tracked->direction)}};
+        if (tracked->hasFloor) {
+            o.insert(QStringLiteral("floor"),
+                     QJsonObject{{QStringLiteral("position_mm"), point(tracked->floorPosition)},
+                                 {QStringLiteral("velocity_mm_s"), point(tracked->floorVelocity)},
+                                 {QStringLiteral("speed_mm_s"), round1(tracked->floorSpeed)},
+                                 {QStringLiteral("direction_deg"), round1(tracked->floorDirection)}});
+        }
+        msg.insert(QStringLiteral("tracked"), o);
+    }
+
     return QJsonDocument(msg).toJson(QJsonDocument::Compact);
 }
 
 bool PositionSender::send(const QSize &imageSize, const std::vector<DetectedSquare> *squares,
-                          const std::vector<DetectedMarker> *markers)
+                          const std::vector<DetectedMarker> *markers, const TrackedObject *tracked)
 {
     if (m_address.isNull())
         return false;
 
     const QByteArray data =
-        buildMessage(m_frame++, QDateTime::currentMSecsSinceEpoch(), imageSize, squares, markers);
+        buildMessage(m_frame++, QDateTime::currentMSecsSinceEpoch(), imageSize, squares, markers, tracked);
     if (m_socket.writeDatagram(data, m_address, m_port) != data.size()) {
         m_lastError = m_socket.errorString();
         return false;

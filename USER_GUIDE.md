@@ -11,13 +11,14 @@ Pour l'installation et la compilation, voir le [README](README.md).
 3. [L'écran principal](#3-lécran-principal)
 4. [Suivre un carré coloré](#4-suivre-un-carré-coloré)
 5. [Suivre des marqueurs ArUco](#5-suivre-des-marqueurs-aruco)
-6. [Calibrer la caméra](#6-calibrer-la-caméra)
-7. [Définir le repère du sol](#7-définir-le-repère-du-sol)
-8. [Lire les résultats](#8-lire-les-résultats)
-9. [Envoyer les positions à un autre programme](#9-envoyer-les-positions-à-un-autre-programme)
-10. [Conseils pour une détection fiable](#10-conseils-pour-une-détection-fiable)
-11. [Questions fréquentes et dépannage](#11-questions-fréquentes-et-dépannage)
-12. [Fichiers utilisés par l'application](#12-fichiers-utilisés-par-lapplication)
+6. [Suivre un objet encadré](#6-suivre-un-objet-encadré)
+7. [Calibrer la caméra](#7-calibrer-la-caméra)
+8. [Définir le repère du sol](#8-définir-le-repère-du-sol)
+9. [Lire les résultats](#9-lire-les-résultats)
+10. [Envoyer les positions à un autre programme](#10-envoyer-les-positions-à-un-autre-programme)
+11. [Conseils pour une détection fiable](#11-conseils-pour-une-détection-fiable)
+12. [Questions fréquentes et dépannage](#12-questions-fréquentes-et-dépannage)
+13. [Fichiers utilisés par l'application](#13-fichiers-utilisés-par-lapplication)
 
 ---
 
@@ -28,6 +29,7 @@ L'application filme la scène avec une webcam et repère le robot de deux façon
 | Méthode | Ce qu'il faut sur le robot | Ce qu'on obtient | Points forts | Limites |
 |---|---|---|---|---|
 | **Carré coloré** | Un carré d'une couleur vive, ou blanc, gris ou noir (papier, gommette, pièce peinte) | Position et taille en pixels, angle de 0 à 90° | Très simple à mettre en place | Sensible à l'éclairage et aux objets de même couleur ; un seul robot facile à distinguer ; angle connu à 90° près |
+| **Objet encadré** | Rien : on encadre l'objet à la souris | Position, trajectoire, vitesse et direction du déplacement ; position et vitesse en mm sur le sol si le repère du sol est défini | Aucune préparation, fonctionne avec n'importe quel objet | Peut perdre l'objet ou glisser sur le fond ; pas d'orientation ; un seul objet à la fois |
 | **Marqueur ArUco** | Un marqueur noir et blanc imprimé | Identifiant, position et angle complet (−180° à 180°) ; **position 3D en mm** si la caméra est calibrée | Fiable, plusieurs robots distingués par leur identifiant | Le marqueur doit être assez grand et bien visible |
 
 En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, ou pour plusieurs robots, utilisez les marqueurs ArUco.
@@ -58,7 +60,7 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
 │                                       │   Résolution [........... ▼]  │
 │                                       │   [ ] Effet miroir [Réglages] │
 │          Image de la webcam           ├───────────────────────────────┤
-│      (avec les détections dessinées)  │ [Carré][ArUco][Cal.][Sol][UDP]│
+│      (avec les détections dessinées)  │ Carré|ArUco|Cal.|Sol|Suivi|UDP│
 │                                       │                               │
 │                                       │   Réglages de l'onglet        │
 │    Cliquer sur l'image = choisir      │   sélectionné                 │
@@ -77,13 +79,14 @@ En bref : pour un essai rapide, le carré coloré suffit. Pour un suivi fiable, 
   - **Caméra** : la webcam utilisée ;
   - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
   - **Réglages de l'image...** : exposition et balance des blancs. Voir [Régler l'exposition et la balance des blancs](#régler-lexposition-et-la-balance-des-blancs) ;
-  - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 8.1](#81-coordonnées-dans-limage-en-pixels)).
+  - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 9.1](#91-coordonnées-dans-limage-en-pixels)).
 - **Onglets** :
   - **Carré coloré** : couleur et réglages de la détection du carré ;
   - **ArUco** : dictionnaire et taille des marqueurs ;
   - **Calibration** : damier et calibration de la caméra ;
-  - **Sol** : repère du sol, pour avoir les positions en millimètres sur le sol (voir [section 7](#7-définir-le-repère-du-sol)) ;
-  - **Envoi UDP** : envoi des positions à un autre programme (voir [section 9](#9-envoyer-les-positions-à-un-autre-programme)).
+  - **Sol** : repère du sol, pour avoir les positions en millimètres sur le sol (voir [section 8](#8-définir-le-repère-du-sol)) ;
+  - **Suivi** : suivi d'un objet quelconque, encadré à la souris (voir [section 6](#6-suivre-un-objet-encadré)) ;
+  - **Envoi UDP** : envoi des positions à un autre programme (voir [section 10](#10-envoyer-les-positions-à-un-autre-programme)).
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
 - **Quitter** : ferme l'application. Une fenêtre demande de confirmer : cliquez sur **Quitter** pour fermer, ou sur **Annuler** (ou appuyez sur Échap) pour continuer. La même confirmation s'affiche si vous fermez la fenêtre avec la croix de la barre de titre.
 
@@ -98,7 +101,7 @@ La résolution choisie est **mémorisée** pour chaque modèle de caméra et ré
 
 Conseils :
 - Commencez par **640 x 480** et montez si les marqueurs ne sont pas détectés d'assez loin.
-- Restez dans le **même format d'image que votre calibration** (indiqué entre parenthèses) : une calibration faite en 4:3 ne s'applique pas à une image 16:9. Voir [section 6.4](#64-quand-refaire-la-calibration-).
+- Restez dans le **même format d'image que votre calibration** (indiqué entre parenthèses) : une calibration faite en 4:3 ne s'applique pas à une image 16:9. Voir [section 7.4](#74-quand-refaire-la-calibration-).
 - Le nombre d'images par seconde affiché dans la liste est le **maximum annoncé par la caméra**. Le nombre réel, affiché dans **Résultat**, peut être plus bas, en particulier dans une pièce sombre : la caméra allonge alors son temps de pose. Une **exposition manuelle** courte permet de retrouver le débit maximal (voir ci-dessous).
 
 Certaines webcams n'envoient pas la résolution demandée dans leur format rapide (MJPEG). L'application le détecte et passe automatiquement au format non compressé de la même résolution. Le nombre d'images par seconde indiqué dans la liste est alors mis à jour, et il est souvent plus bas.
@@ -243,17 +246,67 @@ Tous les marqueurs suivis doivent avoir **la même taille imprimée**, car l'app
   - **rouge** : axe X (vers la droite du marqueur) ;
   - **vert** : axe Y (vers le bas du marqueur) ;
   - **bleu** : direction perpendiculaire au marqueur, vers la caméra.
-- Dans **Résultat**, une ligne par marqueur, triés par identifiant : position et angle dans l'image, puis, si la caméra est calibrée, position 3D, distance et rotations (voir [section 8](#8-lire-les-résultats)).
+- Dans **Résultat**, une ligne par marqueur, triés par identifiant : position et angle dans l'image, puis, si la caméra est calibrée, position 3D, distance et rotations (voir [section 9](#9-lire-les-résultats)).
 
 **Astuce** : collez le marqueur sur le robot avec son bord supérieur orienté vers l'avant du robot. L'angle du marqueur devient alors directement le cap du robot.
 
 ---
 
-## 6. Calibrer la caméra
+## 6. Suivre un objet encadré
+
+Cette méthode suit **n'importe quel objet**, sans couleur particulière ni marqueur : il suffit de l'encadrer dans l'image. L'application le suit ensuite d'image en image d'après son apparence, et donne sa **position**, sa **trajectoire**, sa **vitesse** et la **direction** de son déplacement.
+
+### 6.1 Sélectionner l'objet
+
+1. Ouvrez l'onglet **Suivi**.
+2. Choisissez la **Méthode** :
+   - **CSRT (précis)** : suit mieux l'objet, y compris quand sa taille change. C'est le choix par défaut.
+   - **KCF (rapide)** : environ 4 fois plus rapide, mais décroche plus facilement.
+3. Cliquez sur **Sélectionner un objet**.
+4. Dans l'image, **cliquez-glissez** pour tracer un rectangle autour de l'objet, au plus près, avec le moins de fond possible. Le rectangle s'affiche en pointillés pendant le tracé.
+
+Le suivi démarre dès que vous relâchez le bouton de la souris. **Annuler** abandonne la sélection. **Arrêter le suivi** arrête de suivre l'objet. Pour suivre un autre objet, sélectionnez-le simplement : il remplace le précédent.
+
+Le choix de la méthode s'applique à la prochaine sélection.
+
+### 6.2 Ce qui s'affiche
+
+- **Cadre cyan** autour de l'objet, avec sa vitesse au-dessus (en mm/s si le repère du sol est défini, sinon en pixels par seconde).
+- **Trajectoire** : la ligne cyan des positions passées, sur la **Durée de la trajectoire** choisie (10 s par défaut). La case **Afficher la trajectoire** la masque.
+- **Flèche** dans le sens du déplacement, quand l'objet bouge. Elle est plus longue quand il va plus vite.
+- **Cadre rouge en pointillés** et « Objet perdu » quand l'objet n'est plus trouvé.
+
+Dans le panneau **Résultat** :
+
+| Valeur | Signification |
+|---|---|
+| **en mouvement / immobile** | L'objet est « en mouvement » s'il parcourt plus de 10 % de sa taille par seconde. En dessous, on considère qu'il ne bouge pas : le cadre tremble toujours un peu. |
+| **Position** | Centre du cadre, en pixels (voir [9.1](#91-coordonnées-dans-limage-en-pixels)) |
+| **Vitesse, direction** | Calculées sur la dernière demi-seconde. La direction est en degrés, de −180 à 180 : 0° vers la droite, 90° vers le bas de l'image. |
+| **Sol, vitesse au sol** | Si le repère du sol est défini : position en mm, vitesse en mm/s et direction sur le sol, comptée de l'axe X vers l'axe Y (voir [section 8](#8-définir-le-repère-du-sol)) |
+
+Ces valeurs sont aussi envoyées en UDP (champ `tracked`, voir [10.3](#103-format-des-messages)).
+
+### 6.3 Limites
+
+Le suivi d'un objet encadré est très pratique, mais moins fiable que les marqueurs ArUco :
+
+- **L'objet peut être perdu** s'il est entièrement caché, sort de l'image, bouge très vite ou ressemble trop au fond. L'application continue de le chercher près de sa dernière position. S'il ne réapparaît pas là, resélectionnez-le.
+- **Le cadre peut glisser** lentement sur le fond au fil du temps, surtout si l'objet change d'aspect en tournant. Resélectionnez-le si le cadre ne colle plus à l'objet.
+- **Pas d'orientation** : le cadre reste droit. Seule la direction du déplacement est connue, pas celle vers laquelle l'objet est tourné.
+- **Un seul objet** est suivi à la fois.
+- **Changer de résolution arrête le suivi** : il faut resélectionner l'objet.
+- **Vitesse de l'application** : CSRT demande environ 20 ms par image, ce qui peut réduire le nombre d'images par seconde. Choisissez KCF si l'image devient saccadée.
+
+Conseils : un objet bien contrasté et texturé (motif, logo, couleurs) se suit mieux qu'un objet uni. Un éclairage stable et une exposition courte (moins de flou, voir [Régler l'exposition et la balance des blancs](#régler-lexposition-et-la-balance-des-blancs)) aident aussi.
+
+---
+
+## 7. Calibrer la caméra
 
 La calibration mesure les caractéristiques optiques de votre webcam : focale, centre de l'image et déformation de l'objectif. Elle est **indispensable pour obtenir des positions en millimètres**. Elle se fait **une seule fois** par caméra et dure environ 5 minutes.
 
-### 6.1 Préparer le damier
+### 7.1 Préparer le damier
 
 1. Ouvrez l'onglet **Calibration**.
 2. Laissez les valeurs par défaut : **9 × 6 coins intérieurs**, soit un damier de 10 × 7 cases.
@@ -265,7 +318,7 @@ La calibration mesure les caractéristiques optiques de votre webcam : focale, c
 
 Si vous avez déjà un damier, saisissez son nombre de coins intérieurs et la taille de ses cases.
 
-### 6.2 Faire les captures
+### 7.2 Faire les captures
 
 1. Cochez **Mode calibration**.
 2. Montrez le damier à la caméra. Quand il est **entièrement visible**, ses coins s'affichent **en bleu clair** et le texte `Damier détecté` apparaît en haut de l'image. Sinon, le texte `Damier non détecté` s'affiche en rouge.
@@ -285,7 +338,7 @@ Si vous avez déjà un damier, saisissez son nombre de coins intérieurs et la t
 
    Une série de captures toutes prises de face, au même endroit, donne une mauvaise calibration, même si l'erreur affichée paraît faible.
 
-### 6.3 Lancer le calcul
+### 7.3 Lancer le calcul
 
 1. Cliquez sur **Calibrer**. Le bouton est actif à partir de 5 captures. Le calcul prend quelques secondes.
 2. Une fenêtre indique l'**erreur RMS**, en pixels :
@@ -301,7 +354,7 @@ Si vous avez déjà un damier, saisissez son nombre de coins intérieurs et la t
 
 Pour recommencer, cliquez sur **Effacer les captures** puis refaites une série.
 
-### 6.4 Quand refaire la calibration ?
+### 7.4 Quand refaire la calibration ?
 
 - Quand vous **changez de webcam**.
 - Si l'objectif a un **zoom** ou une **mise au point manuelle** et que vous les modifiez.
@@ -309,19 +362,19 @@ Pour recommencer, cliquez sur **Effacer les captures** puis refaites une série.
 
 Changer de résolution **dans le même format** (de 1280 x 960 à 640 x 480, par exemple) ne demande pas de recalibrer : la calibration est adaptée automatiquement. Pour la meilleure précision, calibrez de préférence dans la résolution que vous utiliserez le plus.
 
-### 6.5 Vérifier la calibration
+### 7.5 Vérifier la calibration
 
 Posez un marqueur à une distance connue de la caméra, mesurée au mètre ruban, face à l'objectif. La **distance** affichée doit correspondre, à 1 ou 2 % près. Sinon, vérifiez la **Taille du marqueur** et le **Côté d'une case**.
 
 ---
 
-## 7. Définir le repère du sol
+## 8. Définir le repère du sol
 
 Par défaut, les positions sont données en pixels dans l'image. Une fois le **repère du sol** défini, l'application donne aussi la position de chaque carré et de chaque marqueur **en millimètres sur le sol**, ainsi que son orientation sur le sol. C'est le plus pratique pour piloter un robot qui roule sur une table ou par terre.
 
 Ce repère fonctionne **sans calibration**, pour le carré coloré comme pour les marqueurs ArUco. Si la caméra est calibrée, la déformation de l'objectif est en plus corrigée, ce qui améliore la précision sur les bords de l'image.
 
-### 7.1 Préparer le rectangle de référence
+### 8.1 Préparer le rectangle de référence
 
 Il faut 4 repères au sol formant un **rectangle de dimensions connues** :
 - 4 morceaux de ruban adhésif, les coins d'une table, d'une plaque ou d'une grande feuille...
@@ -330,7 +383,7 @@ Il faut 4 repères au sol formant un **rectangle de dimensions connues** :
 - Mesurez ses deux côtés au mètre ruban, le plus précisément possible.
 - Fixez la caméra solidement : **si elle bouge, le repère doit être redéfini**.
 
-### 7.2 Définir le repère
+### 8.2 Définir le repère
 
 1. Ouvrez l'onglet **Sol**.
 2. Saisissez les deux dimensions du rectangle :
@@ -351,7 +404,7 @@ Une fois les 4 points cliqués, le rectangle s'affiche sur l'image en pointillé
 
 Le repère est **enregistré immédiatement** et rechargé au lancement suivant. Changer les dimensions plus tard ne demande pas de recliquer les points. **Effacer le repère** le supprime.
 
-### 7.3 Lire les positions au sol
+### 8.3 Lire les positions au sol
 
 Dans le panneau **Résultat** apparaissent :
 - pour le carré : `Sol : X 698  Y 48 mm, angle 20.7°` ;
@@ -365,9 +418,9 @@ Dans le panneau **Résultat** apparaissent :
 
 Si le haut du marqueur est collé vers l'avant du robot, le **cap** est directement la direction du robot sur le sol.
 
-Ces valeurs sont aussi envoyées en UDP (champ `floor`, voir [9.3](#93-format-des-messages)).
+Ces valeurs sont aussi envoyées en UDP (champ `floor`, voir [10.3](#103-format-des-messages)).
 
-### 7.4 Précision et limites
+### 8.4 Précision et limites
 
 - **La hauteur compte.** Le repère est défini au niveau du sol. Un marqueur collé sur le dessus du robot est plus haut, donc plus proche de la caméra, et sa position est légèrement décalée vers l'extérieur de l'image. Le décalage vaut environ *hauteur du marqueur × distance au point situé sous la caméra ÷ hauteur de la caméra*. Par exemple, avec une caméra à 2 m, un marqueur à 10 cm de haut et à 1 m du point sous la caméra, le décalage est d'environ 5 cm. Pour l'éviter :
   - collez les marqueurs **le plus bas possible** sur le robot ;
@@ -378,9 +431,9 @@ Ces valeurs sont aussi envoyées en UDP (champ `floor`, voir [9.3](#93-format-de
 
 ---
 
-## 8. Lire les résultats
+## 9. Lire les résultats
 
-### 8.1 Coordonnées dans l'image (en pixels)
+### 9.1 Coordonnées dans l'image (en pixels)
 
 ```
 (0,0) ──────────────► x
@@ -397,7 +450,7 @@ Ces valeurs sont aussi envoyées en UDP (champ `floor`, voir [9.3](#93-format-de
 - **Angle d'un marqueur** : 0° quand le marqueur est droit, positif quand il tourne **dans le sens des aiguilles d'une montre**, de −180° à 180°.
 - **Angle d'un carré** : de 0° à 90° seulement (voir [section 4.4](#44-ce-qui-saffiche)).
 
-### 8.2 Position 3D d'un marqueur (en mm, après calibration)
+### 9.2 Position 3D d'un marqueur (en mm, après calibration)
 
 Les positions 3D sont mesurées **depuis la caméra** :
 
@@ -419,7 +472,7 @@ Les positions 3D sont mesurées **depuis la caméra** :
 
 Exemple : `X 120  Y -40  Z 800 mm (distance 811 mm)` signifie que le marqueur est 12 cm à droite, 4 cm plus haut que l'axe de la caméra, et 80 cm devant elle.
 
-### 8.3 Rotations d'un marqueur (en degrés, après calibration)
+### 9.3 Rotations d'un marqueur (en degrés, après calibration)
 
 La référence (0°, 0°, 0°) est un marqueur **droit, face à la caméra**.
 
@@ -435,11 +488,11 @@ Les inclinaisons X et Y sont moins précises (1 à 2°) que la position et la ro
 
 ---
 
-## 9. Envoyer les positions à un autre programme
+## 10. Envoyer les positions à un autre programme
 
 L'application peut envoyer en temps réel tout ce qu'elle détecte (carrés, marqueurs, positions 3D) à un autre programme, sur le même ordinateur ou sur le réseau. Par exemple, au programme qui pilote votre robot. Les données sont envoyées en **JSON**, par le protocole réseau **UDP**.
 
-### 9.1 Activer l'envoi
+### 10.1 Activer l'envoi
 
 1. Ouvrez l'onglet **Envoi UDP**.
 2. Saisissez l'**Adresse** de la machine qui reçoit les données :
@@ -451,7 +504,7 @@ L'application peut envoyer en temps réel tout ce qu'elle détecte (carrés, mar
 
 Sous les réglages, le compteur **Messages envoyés** augmente à chaque image traitée. L'envoi continue quel que soit l'onglet affiché. L'adresse, le port et l'activation sont mémorisés.
 
-### 9.2 Tester la réception
+### 10.2 Tester la réception
 
 Un programme de test est fourni. Dans un second terminal, lancez :
 
@@ -469,7 +522,7 @@ Options : `--port 6000` pour écouter un autre port, `--raw` pour afficher le JS
 
 Ce programme sert aussi de point de départ pour écrire votre propre programme de pilotage : la fonction `handle()` reçoit chaque message déjà décodé.
 
-### 9.3 Format des messages
+### 10.3 Format des messages
 
 Chaque image traitée produit **un message**, sur une seule ligne. Voici un exemple, mis en forme pour la lecture :
 
@@ -479,13 +532,13 @@ Chaque image traitée produit **un message**, sur une seule ligne. Voici un exem
   "timestamp_ms": 1791830806877,
   "image": {"width": 800, "height": 600},
   "squares": [
-    {"center": [664.8, 483.8], "side": 87.5, "angle": 0,
-     "corners": [[621, 440], [708.5, 440], [708.5, 527.5], [621, 527.5]]}
+    {"center": [665.8, 483.8], "side": 87.5, "angle": 0,
+     "corners": [[622, 440], [709.5, 440], [709.5, 527.5], [622, 527.5]]}
   ],
   "markers": [
-    {"id": 7, "center": [200.5, 199.5], "side": 149.9, "angle": 0,
-     "corners": [[125.6, 124.6], [275.4, 124.6], [275.4, 274.4], [125.6, 274.4]],
-     "floor": {"position_mm": [149.3, 101.2], "heading_deg": -89.8},
+    {"id": 7, "center": [201.5, 199.5], "side": 149.9, "angle": 0,
+     "corners": [[126.6, 124.6], [276.4, 124.6], [276.4, 274.4], [126.6, 274.4]],
+     "floor": {"position_mm": [150.3, 101.2], "heading_deg": -89.8},
      "pose": {"position_mm": [-67, -33.3, 251.3], "rotation_deg": [-4.3, 5.2, -0.4],
               "distance_mm": 262.3}}
   ]
@@ -499,17 +552,18 @@ Chaque image traitée produit **un message**, sur une seule ligne. Voici un exem
 | `image` | Taille de l'image en pixels |
 | `squares` | Carrés détectés, **le plus grand en premier** (le carré principal, entouré en vert). Liste vide si aucun carré n'est détecté. **Absent** si la détection du carré est désactivée. |
 | `markers` | Marqueurs ArUco détectés, triés par identifiant. Liste vide si aucun marqueur n'est détecté. **Absent** si la détection ArUco est désactivée. |
-| `center` | Centre `[x, y]`, en pixels (voir [8.1](#81-coordonnées-dans-limage-en-pixels)) |
+| `center` | Centre `[x, y]`, en pixels (voir [9.1](#91-coordonnées-dans-limage-en-pixels)) |
 | `side` | Côté moyen, en pixels |
 | `angle` | Angle en degrés : de 0 à 90 pour un carré, de −180 à 180 pour un marqueur |
 | `corners` | Les 4 coins `[x, y]`, en pixels. Pour un marqueur, le premier est le coin d'origine (point rouge à l'écran). |
 | `id` | Identifiant du marqueur |
-| `floor` | Uniquement si le repère du sol est défini : `position_mm` `[X, Y]` sur le sol, et `heading_deg` (cap d'un marqueur) ou `angle_deg` (angle d'un carré, de 0 à 90), voir [7.3](#73-lire-les-positions-au-sol) |
-| `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [8.2](#82-position-3d-dun-marqueur-en-mm-après-calibration) et [8.3](#83-rotations-dun-marqueur-en-degrés-après-calibration)) |
+| `floor` | Uniquement si le repère du sol est défini : `position_mm` `[X, Y]` sur le sol, et `heading_deg` (cap d'un marqueur) ou `angle_deg` (angle d'un carré, de 0 à 90), voir [8.3](#83-lire-les-positions-au-sol) |
+| `tracked` | Uniquement si un objet est suivi (voir [section 6](#6-suivre-un-objet-encadré)) : `found` (trouvé ou perdu), `center`, `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
+| `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [9.2](#92-position-3d-dun-marqueur-en-mm-après-calibration) et [9.3](#93-rotations-dun-marqueur-en-degrés-après-calibration)) |
 
 Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont celles de l'image réelle de la caméra, même avec l'effet miroir.
 
-### 9.4 Bon à savoir
+### 10.4 Bon à savoir
 
 - **UDP ne garantit pas la livraison** : un message peut être perdu, surtout en Wi-Fi. Ce n'est pas gênant pour suivre un robot, car le message suivant arrive quelques dizaines de millisecondes plus tard. Utilisez `frame` pour repérer les pertes.
 - **Débit** : un message par image traitée, soit autant de messages par seconde que le nombre d'i/s affiché dans **Résultat**. Un message pèse moins d'1 Ko avec quelques marqueurs.
@@ -529,7 +583,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 
 ---
 
-## 10. Conseils pour une détection fiable
+## 11. Conseils pour une détection fiable
 
 **Éclairage**
 - Un éclairage **homogène et stable** est le facteur le plus important.
@@ -551,7 +605,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 
 ---
 
-## 11. Questions fréquentes et dépannage
+## 12. Questions fréquentes et dépannage
 
 **L'image reste noire avec « En attente de la webcam... »**
 - Vérifiez que la webcam est branchée et choisissez-la dans la liste **Caméra**.
@@ -582,7 +636,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Le marqueur doit être net, sans reflet, et mesurer au moins 30 pixels dans l'image : rapprochez-le ou imprimez-le plus grand.
 
 **Les positions 3D (X, Y, Z) ne s'affichent pas**
-- La caméra n'est pas calibrée : l'onglet **Calibration** indique `Caméra non calibrée`. Suivez la [section 6](#6-calibrer-la-caméra).
+- La caméra n'est pas calibrée : l'onglet **Calibration** indique `Caméra non calibrée`. Suivez la [section 7](#7-calibrer-la-caméra).
 - Le panneau **Résultat** affiche `Pas de pose 3D : calibration faite en ...` : la résolution choisie n'a pas le même format d'image que la calibration. Choisissez une résolution du format indiqué, ou recalibrez.
 
 **Le nombre d'images par seconde est faible**
@@ -607,14 +661,20 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 **Les captures ont disparu**
 - Changer les dimensions du damier (coins ou taille des cases) efface les captures en cours. Elles sont aussi effacées si la résolution de la caméra change pendant la série.
 
+**L'objet suivi est perdu ou le cadre glisse sur le fond**
+- Resélectionnez l'objet en l'encadrant au plus près.
+- Préférez la méthode **CSRT**, plus robuste que KCF.
+- Un objet uni, petit ou qui ressemble au fond se suit mal : ajoutez-lui un motif contrasté, ou utilisez un marqueur ArUco.
+- Si l'objet bouge vite, réduisez le flou avec une exposition manuelle courte (**Réglages de l'image...**).
+
 **Pas de position au sol**
-- Le repère n'est pas défini : l'onglet **Sol** indique `Repère du sol non défini`. Suivez la [section 7](#7-définir-le-repère-du-sol).
+- Le repère n'est pas défini : l'onglet **Sol** indique `Repère du sol non défini`. Suivez la [section 8](#8-définir-le-repère-du-sol).
 - Le panneau **Résultat** affiche `Pas de position au sol : repère défini en ...` : la résolution choisie n'a pas le même format d'image que lors de la définition du repère.
 
 **Les positions au sol sont décalées**
 - La caméra a bougé depuis la définition du repère : redéfinissez-le.
 - Vérifiez les **longueurs X et Y** saisies et l'**ordre des 4 points**.
-- Le décalage augmente vers les bords de l'image : les marqueurs sont plus hauts que le sol (voir [7.4](#74-précision-et-limites)), ou l'objectif déforme l'image (calibrez la caméra).
+- Le décalage augmente vers les bords de l'image : les marqueurs sont plus hauts que le sol (voir [8.4](#84-précision-et-limites)), ou l'objectif déforme l'image (calibrez la caméra).
 
 **Le programme de réception ne reçoit rien**
 - Vérifiez que **Envoyer les positions** est coché et que le compteur **Messages envoyés** augmente.
@@ -627,7 +687,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 
 ---
 
-## 12. Fichiers utilisés par l'application
+## 13. Fichiers utilisés par l'application
 
 | Fichier | Contenu |
 |---|---|
@@ -645,6 +705,7 @@ L'application retrouve au lancement les réglages de la fois précédente :
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
 - **Sol** : les 4 points du repère, les dimensions du rectangle et l'affichage de la zone ;
+- **Suivi** : la méthode, l'affichage et la durée de la trajectoire (l'objet sélectionné, lui, n'est pas mémorisé) ;
 - **Envoi UDP** : activation, adresse et port ;
 - **Fenêtre** : taille, position et onglet ouvert.
 

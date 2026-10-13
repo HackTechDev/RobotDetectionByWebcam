@@ -4,6 +4,7 @@
 #include "camerasettingsdialog.h"
 #include "floormapper.h"
 #include "markerdetector.h"
+#include "objecttracker.h"
 #include "positionsender.h"
 #include "squaredetector.h"
 
@@ -59,6 +60,9 @@ private slots:
     void toggleFloorPicking();
     void clearFloor();
     void onFloorSizeChanged();
+    void toggleTrackSelection();
+    void onRectangleSelected(const QRect &displayRect);
+    void stopTracking();
 
 private:
     QSlider *addSlider(QFormLayout *form, const QString &label, int min, int max, int value);
@@ -77,6 +81,7 @@ private:
     void loadSettings();
     void saveFloorSettings() const;
     void updateFloorStatus();
+    void updateTrackStatus();
     void saveSettings() const;
 
     QMediaCaptureSession *m_session = nullptr;
@@ -123,6 +128,13 @@ private:
     QPushButton *m_floorPickButton = nullptr;
     QCheckBox *m_floorShowCheck = nullptr;
     QLabel *m_floorLabel = nullptr;
+
+    QComboBox *m_trackAlgoCombo = nullptr;
+    QPushButton *m_trackSelectButton = nullptr;
+    QPushButton *m_trackStopButton = nullptr;
+    QCheckBox *m_trackTrailCheck = nullptr;
+    QDoubleSpinBox *m_trackTrailSpin = nullptr;
+    QLabel *m_trackLabel = nullptr;
     QLabel *m_statusLabel = nullptr;
 
     SquareDetector m_detector;
@@ -130,6 +142,9 @@ private:
     CameraCalibration m_calibration;
     PositionSender m_sender;
     FloorMapper m_floor;
+    ObjectTracker m_tracker;
+    QSize m_trackImageSize;    // résolution à laquelle l'objet a été sélectionné
+    QElapsedTimer m_clock;     // horloge des points de trajectoire
     bool m_floorPicking = false;
     std::vector<QPointF> m_floorPicked;  // points cliqués, dans l'image réelle de la caméra
     QSize m_lastFrameSizeAtPick;

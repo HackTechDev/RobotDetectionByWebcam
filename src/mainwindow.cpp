@@ -210,6 +210,43 @@ MainWindow::MainWindow(QWidget *parent)
     floorLayout->addStretch();
     tabs->addTab(floorTab, tr("Sol"));
 
+    // Onglet suivi : objet encadré à la main, suivi par un tracker OpenCV.
+    auto *trackTab = new QWidget(tabs);
+    auto *trackLayout = new QVBoxLayout(trackTab);
+    auto *trackBox = new QGroupBox(tr("Suivi d'un objet"), trackTab);
+    auto *trackForm = new QFormLayout(trackBox);
+    m_trackAlgoCombo = new QComboBox(trackBox);
+    m_trackAlgoCombo->addItems(ObjectTracker::algorithmNames());
+    m_trackAlgoCombo->setToolTip(tr("CSRT suit mieux l'objet, KCF est plus rapide.\n"
+                                    "Le choix s'applique à la prochaine sélection."));
+    trackForm->addRow(tr("Méthode"), m_trackAlgoCombo);
+    m_trackSelectButton = new QPushButton(trackBox);
+    trackForm->addRow(m_trackSelectButton);
+    m_trackStopButton = new QPushButton(tr("Arrêter le suivi"), trackBox);
+    trackForm->addRow(m_trackStopButton);
+    m_trackTrailCheck = new QCheckBox(tr("Afficher la trajectoire"), trackBox);
+    m_trackTrailCheck->setChecked(true);
+    trackForm->addRow(m_trackTrailCheck);
+    m_trackTrailSpin = new QDoubleSpinBox(trackBox);
+    m_trackTrailSpin->setRange(1, 120);
+    m_trackTrailSpin->setDecimals(0);
+    m_trackTrailSpin->setSuffix(QStringLiteral(" s"));
+    m_trackTrailSpin->setValue(10);
+    trackForm->addRow(tr("Durée de la trajectoire"), m_trackTrailSpin);
+    trackLayout->addWidget(trackBox);
+    m_trackLabel = new QLabel(trackTab);
+    m_trackLabel->setWordWrap(true);
+    m_trackLabel->setTextFormat(Qt::RichText);
+    trackLayout->addWidget(m_trackLabel);
+    auto *trackHelp = new QLabel(tr("<i>Cliquez sur « Sélectionner un objet », puis tracez un rectangle "
+                                    "autour de l'objet dans l'image. Encadrez l'objet au plus près, "
+                                    "avec le moins de fond possible.</i>"),
+                                 trackTab);
+    trackHelp->setWordWrap(true);
+    trackLayout->addWidget(trackHelp);
+    trackLayout->addStretch();
+    tabs->addTab(trackTab, tr("Suivi"));
+
     // Onglet envoi UDP : un message JSON par image traitée.
     auto *udpTab = new QWidget(tabs);
     auto *udpLayout = new QVBoxLayout(udpTab);
@@ -285,6 +322,14 @@ MainWindow::MainWindow(QWidget *parent)
         updateCalibrationStatus();
     });
     connect(m_calibrateButton, &QPushButton::clicked, this, &MainWindow::calibrate);
+    connect(m_trackSelectButton, &QPushButton::clicked, this, &MainWindow::toggleTrackSelection);
+    connect(m_trackStopButton, &QPushButton::clicked, this, &MainWindow::stopTracking);
+    connect(m_video, &VideoWidget::rectangleSelected, this, &MainWindow::onRectangleSelected);
+    connect(m_trackAlgoCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
+        m_tracker.setAlgorithm(ObjectTracker::Algorithm(index));
+    });
+    connect(m_trackTrailSpin, &QDoubleSpinBox::valueChanged, this,
+            [this](double seconds) { m_tracker.setTrailDuration(seconds); });
     connect(m_floorPickButton, &QPushButton::clicked, this, &MainWindow::toggleFloorPicking);
     connect(floorClearButton, &QPushButton::clicked, this, &MainWindow::clearFloor);
     connect(m_floorSizeXSpin, &QDoubleSpinBox::valueChanged, this, &MainWindow::onFloorSizeChanged);
@@ -294,6 +339,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     applyUdpTarget();
     updateFloorStatus();
+    m_clock.start();
+    updateTrackStatus();
     m_calibration.load(calibrationPath());
     m_lastCapture.start();
     updateCalibrationStatus();
@@ -509,6 +556,10 @@ void MainWindow::loadSettings()
     }
     updateFloorStatus();
 
+    m_trackAlgoCombo->setCurrentIndex(std::clamp(s.value(QStringLiteral("tracking/algorithm"), 0).toInt(), 0, 1));
+    m_trackTrailCheck->setChecked(s.value(QStringLiteral("tracking/showTrail"), true).toBool());
+    m_trackTrailSpin->setValue(s.value(QStringLiteral("tracking/trailSeconds"), m_trackTrailSpin->value()).toDouble());
+
     m_udpHostEdit->setText(s.value(QStringLiteral("udp/host"), m_udpHostEdit->text()).toString());
     m_udpPortSpin->setValue(s.value(QStringLiteral("udp/port"), m_udpPortSpin->value()).toInt());
     applyUdpTarget();
@@ -547,6 +598,9 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value());
 
     s.setValue(QStringLiteral("floor/show"), m_floorShowCheck->isChecked());
+    s.setValue(QStringLiteral("tracking/algorithm"), m_trackAlgoCombo->currentIndex());
+    s.setValue(QStringLiteral("tracking/showTrail"), m_trackTrailCheck->isChecked());
+    s.setValue(QStringLiteral("tracking/trailSeconds"), m_trackTrailSpin->value());
     s.setValue(QStringLiteral("udp/enabled"), m_udpBox->isChecked());
     s.setValue(QStringLiteral("udp/host"), m_udpHostEdit->text());
     s.setValue(QStringLiteral("udp/port"), m_udpPortSpin->value());
@@ -863,6 +917,10 @@ void MainWindow::applyUdpTarget()
 
 void MainWindow::toggleFloorPicking()
 {
+    if (m_video->selectionMode()) {  // une seule saisie à la fois
+        m_video->setSelectionMode(false);
+        updateTrackStatus();
+    }
     m_floorPicking = !m_floorPicking;
     m_floorPicked.clear();
     updateFloorStatus();
@@ -936,6 +994,64 @@ void MainWindow::saveFloorSettings() const
     s.setValue(QStringLiteral("floor/sizeY"), m_floor.size().height());
 }
 
+void MainWindow::toggleTrackSelection()
+{
+    if (m_floorPicking) {  // une seule saisie à la fois
+        m_floorPicking = false;
+        m_floorPicked.clear();
+        updateFloorStatus();
+    }
+    m_video->setSelectionMode(!m_video->selectionMode());
+    updateTrackStatus();
+}
+
+void MainWindow::onRectangleSelected(const QRect &displayRect)
+{
+    m_video->setSelectionMode(false);
+    if (m_lastFrame.isNull()) {
+        updateTrackStatus();
+        return;
+    }
+    // Le rectangle est tracé sur l'image affichée, éventuellement en miroir.
+    QRect rect = displayRect;
+    if (m_mirrorCheck->isChecked())
+        rect.moveLeft(m_lastFrame.width() - displayRect.right() - 1);
+    if (m_tracker.start(m_lastFrame, rect, m_clock.elapsed())) {
+        m_trackImageSize = m_lastFrame.size();
+        updateTrackStatus();
+    } else {
+        updateTrackStatus();
+        m_trackLabel->setText(tr("<b style='color:#c00'>Sélection trop petite</b> : tracez un rectangle "
+                                 "plus grand autour de l'objet."));
+    }
+}
+
+void MainWindow::stopTracking()
+{
+    m_video->setSelectionMode(false);
+    m_tracker.stop();
+    updateTrackStatus();
+}
+
+void MainWindow::updateTrackStatus()
+{
+    const bool selecting = m_video->selectionMode();
+    m_trackSelectButton->setText(selecting ? tr("Annuler") : tr("Sélectionner un objet"));
+    m_trackStopButton->setEnabled(m_tracker.isActive());
+    if (selecting) {
+        m_trackLabel->setText(tr("<b style='color:#c60'>Tracez un rectangle</b> autour de l'objet dans "
+                                 "l'image (cliquer-glisser)."));
+    } else if (!m_tracker.isActive()) {
+        m_trackLabel->setText(tr("Aucun objet suivi."));
+    } else if (m_tracker.state().found) {
+        m_trackLabel->setText(tr("<b style='color:#080'>Suivi en cours</b> (%1)")
+                                  .arg(m_trackAlgoCombo->itemText(int(m_tracker.algorithm()))));
+    } else {
+        m_trackLabel->setText(tr("<b style='color:#c00'>Objet perdu</b> : le suivi continue de le chercher "
+                                 "près de sa dernière position. Resélectionnez-le si besoin."));
+    }
+}
+
 void MainWindow::onFrame(const QVideoFrame &frame)
 {
     QImage image = frame.toImage();
@@ -985,6 +1101,19 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         markersOn ? m_markerDetector.detect(image) : std::vector<DetectedMarker>();
     if (m_floor.prepare(image.size()))
         m_floor.apply(squares, markers);
+    if (m_tracker.isActive()) {
+        if (image.size() != m_trackImageSize) {
+            m_tracker.stop();  // le cadre n'a plus de sens dans une autre résolution
+            updateTrackStatus();
+            m_trackLabel->setText(tr("<b style='color:#c60'>Suivi arrêté</b> : la résolution a changé. "
+                                     "Resélectionnez l'objet."));
+        } else {
+            const bool wasFound = m_tracker.state().found;
+            m_tracker.update(image, m_clock.elapsed(), &m_floor);
+            if (m_tracker.state().found != wasFound)
+                updateTrackStatus();
+        }
+    }
     if (m_floorPicking && !m_floorPicked.empty() && image.size() != m_lastFrameSizeAtPick) {
         m_floorPicked.clear();  // la résolution a changé pendant la saisie : on recommence
         updateFloorStatus();
@@ -1009,7 +1138,8 @@ void MainWindow::onFrame(const QVideoFrame &frame)
     m_captureRequested = false;
 
     if (m_udpBox->isChecked() && m_sender.hasTarget()) {
-        m_sender.send(image.size(), squaresOn ? &squares : nullptr, markersOn ? &markers : nullptr);
+        m_sender.send(image.size(), squaresOn ? &squares : nullptr, markersOn ? &markers : nullptr,
+                      m_tracker.isActive() ? &m_tracker.state() : nullptr);
         QString text = tr("Destination : <b>%1</b><br>Messages envoyés : %2 (dernier : %3 octets)")
                            .arg(m_sender.targetDescription())
                            .arg(m_sender.sentCount())
@@ -1129,6 +1259,46 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                              .arg(floorPointName(int(m_floorPicked.size()), m_floor.size())));
     }
 
+    // Objet suivi : trajectoire, cadre, flèche de direction quand il bouge.
+    if (m_tracker.isActive()) {
+        const TrackedObject &t = m_tracker.state();
+        const QColor trackColor(0, 255, 255);
+        if (m_trackTrailCheck->isChecked() && m_tracker.trail().size() > 1) {
+            QPolygonF trail;
+            for (const ObjectTracker::TrailPoint &p : m_tracker.trail())
+                trail << toDisplay(p.position);
+            painter.setPen(QPen(trackColor, std::max(1, penWidth / 2)));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawPolyline(trail);
+        }
+        QRectF box = t.box;
+        if (mirror)
+            box.moveLeft(width - t.box.right());
+        painter.setPen(QPen(t.found ? trackColor : QColor(255, 60, 60), penWidth,
+                            t.found ? Qt::SolidLine : Qt::DashLine));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(box);
+        const QPointF center = toDisplay(t.center);
+        if (t.moving) {
+            // Flèche dans le sens du déplacement, plus longue quand l'objet va plus vite.
+            QPointF dir = toDisplay(t.center + t.velocity) - center;
+            dir /= std::hypot(dir.x(), dir.y());
+            const double length = std::clamp(t.speed * 0.3, penWidth * 8.0, penWidth * 40.0);
+            const QPointF tip = center + dir * length;
+            const QPointF side(-dir.y(), dir.x());
+            painter.setPen(QPen(trackColor, penWidth));
+            painter.drawLine(center, tip);
+            painter.drawLine(tip, tip - dir * penWidth * 4 + side * penWidth * 3);
+            painter.drawLine(tip, tip - dir * penWidth * 4 - side * penWidth * 3);
+        }
+        QString label = t.found ? tr("Objet") : tr("Objet perdu");
+        if (t.found)
+            label += t.hasFloor ? tr(" %1 mm/s").arg(t.floorSpeed, 0, 'f', 0)
+                                : tr(" %1 px/s").arg(t.speed, 0, 'f', 0);
+        painter.setPen(t.found ? trackColor : QColor(255, 60, 60));
+        painter.drawText(box.topLeft() - QPointF(0, penWidth * 2), label);
+    }
+
     // Marqueurs ArUco : contour, coin d'origine en rouge, flèche vers le bord supérieur.
     for (const DetectedMarker &m : markers) {
         const QColor color(255, 0, 255);
@@ -1214,6 +1384,31 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                               .arg(m.rotation.x(), 0, 'f', 1)
                               .arg(m.rotation.y(), 0, 'f', 1)
                               .arg(m.rotation.z(), 0, 'f', 1);
+            }
+        }
+    }
+    if (m_tracker.isActive()) {
+        const TrackedObject &t = m_tracker.state();
+        status += QStringLiteral("<br><br>");
+        if (!t.found) {
+            status += tr("<b style='color:#c00'>Objet suivi perdu</b> (dernière position (%1, %2) px)")
+                          .arg(t.center.x(), 0, 'f', 0)
+                          .arg(t.center.y(), 0, 'f', 0);
+        } else {
+            status += tr("<b style='color:#088'>Objet suivi</b> : %1<br>"
+                         "Position : (%2, %3) px<br>"
+                         "Vitesse : %4 px/s, direction %5°")
+                          .arg(t.moving ? tr("en mouvement") : tr("immobile"))
+                          .arg(t.center.x(), 0, 'f', 0)
+                          .arg(t.center.y(), 0, 'f', 0)
+                          .arg(t.speed, 0, 'f', 0)
+                          .arg(t.direction, 0, 'f', 0);
+            if (t.hasFloor) {
+                status += tr("<br>Sol : X %1  Y %2 mm<br>Vitesse au sol : %3 mm/s, direction %4°")
+                              .arg(t.floorPosition.x(), 0, 'f', 0)
+                              .arg(t.floorPosition.y(), 0, 'f', 0)
+                              .arg(t.floorSpeed, 0, 'f', 0)
+                              .arg(t.floorDirection, 0, 'f', 0);
             }
         }
     }

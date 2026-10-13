@@ -13,6 +13,7 @@ Ces efforts sont des estimations.
 - Envoi des positions en JSON sur UDP (onglet « Envoi UDP »).
 - Positions sur le sol en millimètres (onglet « Sol »).
 - Réglages manuels de l'exposition et de la balance des blancs (« Réglages de l'image... »).
+- Suivi d'un objet encadré à la souris, avec trajectoire et vitesse (onglet « Suivi »).
 
 ---
 
@@ -72,9 +73,18 @@ Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
 
 **Piste.** Choisir un ID réservé et sa taille. Ses 4 coins donnent l'homographie à chaque image. La précision baisse loin du marqueur : prévoir un grand marqueur, ou plusieurs marqueurs combinés.
 
+### Suivi d'objet : plusieurs objets et reprise automatique — M
+
+**Intérêt.** Le suivi d'un objet encadré ne gère qu'un objet à la fois. Quand l'objet est perdu, il faut le resélectionner à la main.
+
+**Piste.**
+- Une liste d'objets suivis, chacun avec son nom et sa couleur d'affichage. Le coût augmente avec le nombre d'objets (environ 20 ms par objet avec CSRT).
+- Mémoriser l'apparence de l'objet au moment de la sélection et la rechercher dans toute l'image quand il est perdu (`cv::matchTemplate` ou points caractéristiques ORB).
+- Proposer les trackers à base de réseaux de neurones d'OpenCV (Nano, Vit), plus robustes, qui demandent de télécharger un modèle.
+
 ### Détection dans un fil d'exécution séparé — M
 
-**Intérêt.** En haute résolution, la détection ralentit l'interface. Un fil dédié garderait l'affichage fluide et utiliserait un second cœur du processeur.
+**Intérêt.** En haute résolution, ou avec le suivi CSRT, la détection ralentit l'interface. Un fil dédié garderait l'affichage fluide et utiliserait un second cœur du processeur.
 
 **Piste.** Déplacer la détection dans un `QThread` qui traite toujours l'image la plus récente, en ignorant celles reçues pendant le traitement, et renvoie les résultats par signal.
 

@@ -3,7 +3,8 @@
 Application Qt6 qui affiche le flux d'une webcam et détecte en temps réel :
 
 - un **carré d'une couleur donnée** ;
-- des **marqueurs ArUco** (ou AprilTag), avec leur identifiant.
+- des **marqueurs ArUco** (ou AprilTag), avec leur identifiant ;
+- **n'importe quel objet encadré à la souris**, suivi d'image en image avec sa trajectoire et sa vitesse.
 
 Pour chacun, l'application donne la position, la taille et l'orientation dans l'image. Une fois la caméra **calibrée** avec un damier, elle donne aussi la **position 3D en millimètres** et l'orientation des marqueurs ArUco.
 
@@ -16,7 +17,7 @@ Les améliorations envisagées sont listées dans [IMPROVEMENTS.md](IMPROVEMENTS
 - Linux avec une webcam (`/dev/video*`)
 - CMake ≥ 3.16 et un compilateur C++17 (g++ ou clang)
 - Qt 6 : modules **Widgets**, **Multimedia** (capture et affichage) et **Network** (envoi UDP)
-- OpenCV ≥ 4.7 : modules **core**, **imgproc**, **calib3d** et **objdetect** (détection et calibration ; ArUco fait partie d'`objdetect` depuis la 4.7)
+- OpenCV ≥ 4.7 : modules **core**, **imgproc**, **calib3d**, **objdetect**, **video** et **tracking** (détection, calibration et suivi). ArUco fait partie d'`objdetect` depuis la 4.7. `tracking` vient des modules contrib (paquet `libopencv-contrib-dev`, installé avec `libopencv-dev`).
 
 Sur Debian/Ubuntu :
 
@@ -43,7 +44,7 @@ Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchée
 
 Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution. Ce basculement est mémorisé avec la résolution.
 
-Les réglages sont répartis en cinq onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol** et **Envoi UDP**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
+Les réglages sont répartis en six onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Suivi** et **Envoi UDP**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
 
 ### Carré coloré
 
@@ -70,7 +71,7 @@ Le bouton « Quitter », en bas à droite, ferme l'application après une confir
 
 Le bouton « Réglages de l'image... » ouvre une fenêtre pour régler l'**exposition** (automatique ou temps de pose manuel) et la **balance des blancs** (automatique ou température manuelle). Une pose courte donne plus d'images par seconde et moins de flou de mouvement dans une pièce peu éclairée, au prix d'une image plus sombre. Une balance des blancs manuelle empêche les couleurs de dériver. Ces réglages sont mémorisés pour chaque modèle de caméra et réappliqués au démarrage de la caméra. À la fermeture normale, l'application remet la webcam en automatique, car ces réglages sont stockés dans la webcam elle-même. Pour l'exposition automatique, l'application écrit directement le contrôle V4L2 (`V4L2_CID_EXPOSURE_AUTO`) : sur les webcams qui n'acceptent que le mode « priorité ouverture » (comme la Logitech C270), Qt ne parvient pas à rétablir l'automatique.
 
-Les réglages (caméra, résolution, exposition, balance des blancs, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
+Les réglages (caméra, résolution, exposition, balance des blancs, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, repère du sol, méthode et trajectoire du suivi, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
 
 L'option « Effet miroir » retourne seulement l'image affichée. Les détections se font toujours sur l'image réelle de la caméra : les marqueurs ArUco et le damier restent reconnus, et toutes les mesures (coordonnées, angles, pose 3D) restent dans le repère réel de la caméra, que le miroir soit activé ou non.
 
@@ -126,11 +127,21 @@ L'onglet « Sol » définit un repère sur le sol : on saisit les dimensions d'u
 
 Le repère fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus. Il est enregistré dans `settings.ini` et reste valable pour toute résolution du même format d'image. La caméra ne doit plus bouger une fois le repère défini. Le repère est défini au niveau du sol, donc un marqueur placé en hauteur sur le robot est légèrement décalé. Le guide utilisateur détaille ce point.
 
+### Suivi d'un objet encadré
+
+Dans l'onglet « Suivi », cliquer sur « Sélectionner un objet », puis tracer un rectangle autour de l'objet dans l'image (cliquer-glisser). L'objet est ensuite suivi d'image en image par un tracker OpenCV :
+- **CSRT** : précis, environ 20 ms par image ;
+- **KCF** : rapide, environ 5 ms par image.
+
+L'application affiche le cadre, la **trajectoire** (durée réglable, 10 s par défaut) et une flèche dans le sens du déplacement. Le panneau « Résultat » donne la position, l'état (en mouvement ou immobile), la vitesse et la direction, calculées sur la dernière demi-seconde. Si le repère du sol est défini, il donne aussi la position, la vitesse et la direction en mm sur le sol. Ces valeurs sont envoyées en UDP (objet `tracked`).
+
+Le tracker peut perdre l'objet (objet caché, sorti de l'image, trop rapide) ou glisser lentement sur le fond. Il faut alors le resélectionner. Le cadre reste droit : l'orientation de l'objet n'est pas mesurée. Changer de résolution arrête le suivi.
+
 ### Envoi des positions en UDP
 
 L'onglet « Envoi UDP » envoie les résultats à un autre programme, par exemple celui qui pilote le robot : un message JSON par image traitée, en UDP, vers l'adresse et le port choisis (`127.0.0.1:5005` par défaut). Cocher « Envoyer les positions » pour l'activer.
 
-Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#93-format-des-messages).
+Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si un objet est suivi, l'objet `tracked` donne son cadre, sa position, sa vitesse, sa direction et son état (trouvé, en mouvement). Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
 
 Pour tester la réception :
 
@@ -173,6 +184,18 @@ Le code se trouve dans `src/markerdetector.cpp` et utilise `cv::aruco::ArucoDete
 
 Sur une image de synthèse, la position est retrouvée à environ 1 mm près à 40 cm. L'inclinaison (rotations X et Y) est moins précise, de l'ordre de 1 à 2°, car elle se déduit de la faible déformation perspective d'un seul marqueur.
 
+### Suivi d'objet
+
+Le code se trouve dans `src/objecttracker.cpp`.
+
+1. L'image est réduite à 640 px de large au plus, ce qui garde le coût du suivi presque constant quelle que soit la résolution.
+2. Le tracker (`cv::TrackerCSRT` ou `cv::TrackerKCF`) est initialisé sur le rectangle sélectionné, puis mis à jour à chaque image. S'il perd l'objet, la dernière position est conservée et il continue de chercher aux images suivantes.
+3. Chaque position trouvée est ajoutée à la trajectoire, horodatée. Les points plus anciens que la durée choisie sont retirés.
+4. La vitesse est le déplacement entre la position actuelle et la plus ancienne position de la dernière demi-seconde, divisé par le temps écoulé. L'objet est « en mouvement » au-delà de 10 % de la diagonale de son cadre par seconde (au moins 5 px/s).
+5. Si le repère du sol est prêt, les deux positions sont projetées sur le sol pour obtenir la vitesse et la direction en mm.
+
+Sur une séquence de synthèse (objet texturé sur fond texturé, 1280 × 960), la vitesse est retrouvée à 299 px/s pour 300 px/s réels, la position à 3 px près, et l'état immobile ou en mouvement est bien distingué.
+
 ### Repère du sol
 
 Le code se trouve dans `src/floormapper.cpp`.
@@ -206,7 +229,8 @@ src/
 ├── cameracalibration.h/.cpp  calibration de la caméra avec un damier (OpenCV)
 ├── positionsender.h/.cpp  envoi des positions en JSON sur UDP
 ├── floormapper.h/.cpp   conversion des positions de l'image en mm sur le sol
-└── camerasettingsdialog.h/.cpp  réglages de l'image : exposition et balance des blancs
+├── camerasettingsdialog.h/.cpp  réglages de l'image : exposition et balance des blancs
+└── objecttracker.h/.cpp  suivi d'un objet encadré, trajectoire et vitesse
 tools/
 └── udp_receiver.py      récepteur de test des positions UDP
 ```

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "markerdetector.h"
+#include "objecttracker.h"
 #include "squaredetector.h"
 
 #include <QHostAddress>
@@ -18,10 +19,10 @@ public:
     bool hasTarget() const { return !m_address.isNull(); }
     QString targetDescription() const;
 
-    // Une liste nulle (pointeur nul) signifie que la détection correspondante est désactivée :
-    // la clé est alors absente du message.
+    // Un pointeur nul signifie que la détection correspondante est désactivée (ou qu'aucun
+    // objet n'est suivi) : la clé est alors absente du message.
     bool send(const QSize &imageSize, const std::vector<DetectedSquare> *squares,
-              const std::vector<DetectedMarker> *markers);
+              const std::vector<DetectedMarker> *markers, const TrackedObject *tracked = nullptr);
 
     qint64 sentCount() const { return m_sentCount; }
     qint64 lastSize() const { return m_lastSize; }
@@ -30,7 +31,8 @@ public:
     // Construit le message JSON (compact, sur une ligne).
     static QByteArray buildMessage(qint64 frame, qint64 timestampMs, const QSize &imageSize,
                                    const std::vector<DetectedSquare> *squares,
-                                   const std::vector<DetectedMarker> *markers);
+                                   const std::vector<DetectedMarker> *markers,
+                                   const TrackedObject *tracked = nullptr);
 
 private:
     QUdpSocket m_socket;
