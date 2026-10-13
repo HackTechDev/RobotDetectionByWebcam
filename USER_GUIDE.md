@@ -274,6 +274,7 @@ Le choix de la méthode s'applique à la prochaine sélection.
 ### 6.2 Ce qui s'affiche
 
 - **Cadre cyan** autour de l'objet, avec sa vitesse au-dessus (en mm/s si le repère du sol est défini, sinon en pixels par seconde).
+- **Cadre orange** quand la **confiance** baisse sous 60 % : le contenu du cadre ressemble moins à l'objet sélectionné.
 - **Trajectoire** : la ligne cyan des positions passées, sur la **Durée de la trajectoire** choisie (10 s par défaut). La case **Afficher la trajectoire** la masque.
 - **Flèche** dans le sens du déplacement, quand l'objet bouge. Elle est plus longue quand il va plus vite.
 - **Cadre cyan en pointillés** et « Objet (prédit) » juste après une perte : pendant le **Maintien après perte** du lissage (0,5 s par défaut), la position est prédite à la même vitesse.
@@ -284,8 +285,8 @@ Dans le panneau **Résultat** :
 | Valeur | Signification |
 |---|---|
 | **en mouvement / immobile** | L'objet est « en mouvement » s'il parcourt plus de 10 % de sa taille par seconde. En dessous, on considère qu'il ne bouge pas : le cadre tremble toujours un peu. |
-| **Position** | Centre du cadre, en pixels (voir [9.1](#91-coordonnées-dans-limage-en-pixels)) |
-| **Position** lissée, **vitesse, direction** | Estimées par un filtre de Kalman, avec la **Force du lissage** du groupe « Lissage des carrés et marqueurs » (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)). La direction est en degrés, de −180 à 180 : 0° vers la droite, 90° vers le bas de l'image. |
+| **Position** lissée, **vitesse, direction** | Centre du cadre en pixels (voir [9.1](#91-coordonnées-dans-limage-en-pixels)), vitesse et direction, estimés par un filtre de Kalman, avec la **Force du lissage** du groupe « Lissage des carrés et marqueurs » (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)). La direction est en degrés, de −180 à 180 : 0° vers la droite, 90° vers le bas de l'image. |
+| **Confiance** | Ressemblance du contenu du cadre avec l'objet tel qu'il était à la sélection, de 0 à 100 %. Elle suit lentement les changements progressifs (éclairage, rotation), mais chute si le cadre glisse sur le fond ou s'accroche à un autre objet passé devant. Sous 45 % pendant quelques images, l'objet est déclaré perdu, même si le tracker croit encore le suivre. |
 | **Sol, vitesse au sol** | Si le repère du sol est défini : position en mm, vitesse en mm/s et direction sur le sol, comptée de l'axe X vers l'axe Y (voir [section 8](#8-définir-le-repère-du-sol)) |
 
 Ces valeurs sont aussi envoyées en UDP (champ `tracked`, voir [10.3](#103-format-des-messages)).
@@ -295,7 +296,7 @@ Ces valeurs sont aussi envoyées en UDP (champ `tracked`, voir [10.3](#103-forma
 Le suivi d'un objet encadré est très pratique, mais moins fiable que les marqueurs ArUco :
 
 - **L'objet peut être perdu** s'il est entièrement caché, sort de l'image, bouge très vite ou ressemble trop au fond. L'application continue de le chercher près de sa dernière position. S'il ne réapparaît pas là, resélectionnez-le.
-- **Le cadre peut glisser** lentement sur le fond au fil du temps, surtout si l'objet change d'aspect en tournant. Resélectionnez-le si le cadre ne colle plus à l'objet.
+- **Le cadre peut glisser** sur le fond, ou s'accrocher à un autre objet qui passe devant. L'**indice de confiance** le détecte dans la plupart des cas, et l'objet est alors déclaré perdu avec le message « Le cadre ne ressemble plus à l'objet sélectionné ». Un objet qui change très vite d'aspect (retourné d'un coup) peut aussi faire chuter la confiance.
 - **Pas d'orientation** : le cadre reste droit. Seule la direction du déplacement est connue, pas celle vers laquelle l'objet est tourné.
 - **Un seul objet** est suivi à la fois.
 - **Changer de résolution arrête le suivi** : il faut resélectionner l'objet.
@@ -593,7 +594,7 @@ Chaque image traitée produit **un message**, sur une seule ligne. Voici un exem
 | `id` | Identifiant du marqueur |
 | `floor` | Uniquement si le repère du sol est défini : `position_mm` `[X, Y]` sur le sol, et `heading_deg` (cap d'un marqueur) ou `angle_deg` (angle d'un carré, de 0 à 90), voir [8.3](#83-lire-les-positions-au-sol) |
 | `tracks` | Uniquement si le lissage est actif (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)) : une entrée par carré principal ou marqueur suivi, avec `type` (`square` ou `marker`), `id` (marqueur), `predicted` (non détecté dans cette image), `position_px` lissée, `velocity_px_s`, `speed_px_s`, `angle_deg` lissé et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s`, `direction_deg` et `heading_deg` (marqueur) ou `angle_deg` (carré) |
-| `tracked` | Uniquement si un objet est suivi (voir [section 6](#6-suivre-un-objet-encadré)) : `found` (trouvé ou perdu), `predicted` (perdu depuis peu, position prédite), `center` (position lissée), `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
+| `tracked` | Uniquement si un objet est suivi (voir [section 6](#6-suivre-un-objet-encadré)) : `found` (trouvé ou perdu), `predicted` (perdu depuis peu, position prédite), `confidence` (indice de confiance, de 0 à 1), `drifted` (perdu parce que le cadre ne ressemble plus à l'objet), `center` (position lissée), `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
 | `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [9.2](#92-position-3d-dun-marqueur-en-mm-après-calibration) et [9.3](#93-rotations-dun-marqueur-en-degrés-après-calibration)) |
 
 Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont celles de l'image réelle de la caméra, même avec l'effet miroir.
@@ -703,7 +704,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Diminuez la **Force du lissage**. Un lissage fort ralentit la réaction aux démarrages et aux virages.
 
 **L'objet suivi est perdu ou le cadre glisse sur le fond**
-- Resélectionnez l'objet en l'encadrant au plus près.
+- Resélectionnez l'objet en l'encadrant au plus près, avec le moins de fond possible : le fond compté dans la sélection abaisse la confiance quand l'objet se déplace devant un autre décor.
 - Préférez la méthode **CSRT**, plus robuste que KCF.
 - Un objet uni, petit ou qui ressemble au fond se suit mal : ajoutez-lui un motif contrasté, ou utilisez un marqueur ArUco.
 - Si l'objet bouge vite, réduisez le flou avec une exposition manuelle courte (**Réglages de l'image...**).

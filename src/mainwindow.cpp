@@ -1387,8 +1387,11 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         QRectF box = t.box;
         if (mirror)
             box.moveLeft(width - t.box.right());
-        painter.setPen(QPen(t.found || t.predicted ? trackColor : QColor(255, 60, 60), penWidth,
-                            t.found ? Qt::SolidLine : Qt::DashLine));
+        // Orange quand la confiance baisse : le cadre ressemble moins à l'objet sélectionné.
+        const QColor boxColor = !(t.found || t.predicted) ? QColor(255, 60, 60)
+                                : t.found && t.confidence < 0.6 ? QColor(255, 160, 0)
+                                                                : trackColor;
+        painter.setPen(QPen(boxColor, penWidth, t.found ? Qt::SolidLine : Qt::DashLine));
         painter.setBrush(Qt::NoBrush);
         painter.drawRect(box);
         const QPointF center = toDisplay(t.center);
@@ -1408,7 +1411,7 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         if (t.found)
             label += t.hasFloor ? tr(" %1 mm/s").arg(t.floorSpeed, 0, 'f', 0)
                                 : tr(" %1 px/s").arg(t.speed, 0, 'f', 0);
-        painter.setPen(t.found || t.predicted ? trackColor : QColor(255, 60, 60));
+        painter.setPen(boxColor);
         painter.drawText(box.topLeft() - QPointF(0, penWidth * 2), label);
     }
 
@@ -1528,6 +1531,8 @@ void MainWindow::onFrame(const QVideoFrame &frame)
             status += tr("<b style='color:#c00'>Objet suivi perdu</b> (dernière position (%1, %2) px)")
                           .arg(t.center.x(), 0, 'f', 0)
                           .arg(t.center.y(), 0, 'f', 0);
+            if (t.drifted)
+                status += tr("<br>Le cadre ne ressemble plus à l'objet sélectionné.");
         } else {
             status += tr("<b style='color:#088'>Objet suivi</b> : %1<br>"
                          "Position : (%2, %3) px<br>"
@@ -1537,6 +1542,7 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                           .arg(t.center.y(), 0, 'f', 0)
                           .arg(t.speed, 0, 'f', 0)
                           .arg(t.direction, 0, 'f', 0);
+            status += tr("<br>Confiance : %1 %").arg(t.confidence * 100, 0, 'f', 0);
             if (t.hasFloor) {
                 status += tr("<br>Sol : X %1  Y %2 mm<br>Vitesse au sol : %3 mm/s, direction %4°")
                               .arg(t.floorPosition.x(), 0, 'f', 0)

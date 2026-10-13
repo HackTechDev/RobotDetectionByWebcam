@@ -25,7 +25,8 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
   - trajectoire, vitesse, direction ;
   - état « immobile » ou « en mouvement » ;
   - signalement de la perte de l'objet ;
-  - position lissée et vitesse par filtre de Kalman, position prédite juste après une perte.
+  - position lissée et vitesse par filtre de Kalman, position prédite juste après une perte ;
+  - indice de confiance, qui détecte le cadre qui glisse sur le fond ou s'accroche à un autre objet.
 
 ### Mesures
 
@@ -118,13 +119,7 @@ Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
 
 ### Suivi d'objet
 
-Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Ordre conseillé : d'abord l'indice de confiance et la reprise automatique, qui s'attaquent à la principale faiblesse actuelle (perdre l'objet ou glisser sur le fond sans le signaler).
-
-#### Indice de confiance et détection du glissement — M
-
-**Intérêt.** L'objet n'est déclaré perdu que si le tracker le dit lui-même. CSRT et KCF peuvent continuer à affirmer qu'ils l'ont trouvé alors que le cadre a glissé sur le fond.
-
-**Piste.** Comparer à chaque image le contenu du cadre avec l'apparence de l'objet mémorisée à la sélection : comparaison d'image normalisée (`cv::matchTemplate`) ou histogramme de couleurs (`cv::compareHist`). Afficher un indice de confiance et déclarer l'objet perdu sous un seuil. Mettre à jour lentement l'image de référence quand la confiance est haute, pour suivre les changements d'éclairage.
+Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Ordre conseillé : d'abord la reprise automatique, qui complète l'indice de confiance (un objet perdu est aujourd'hui signalé, mais pas retrouvé tout seul).
 
 #### Reprise automatique après une perte — M
 

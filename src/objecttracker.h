@@ -21,6 +21,9 @@ struct TrackedObject
     bool active = false;  // un objet a été sélectionné
     bool found = false;   // l'objet est trouvé dans l'image courante
     bool predicted = false;  // perdu depuis peu : position prédite à vitesse constante
+    // Ressemblance du contenu du cadre avec l'objet sélectionné, de 0 à 1 (lissée dans le temps).
+    double confidence = 0.0;
+    bool drifted = false;  // perdu parce que le cadre ne ressemble plus à l'objet
     QRectF box;           // cadre du tracker (dernière position connue si l'objet est perdu)
     QPointF center;       // position lissée (ou prédite)
 
@@ -84,6 +87,9 @@ public:
 
 private:
     cv::Mat toWorkingImage(const QImage &image, double &scale) const;
+    // Ressemblance (0 à 1) du contenu de « roi » avec l'apparence mémorisée de l'objet.
+    double appearanceScore(const cv::Mat &work, const cv::Rect &roi) const;
+    static cv::Mat colorHistogram(const cv::Mat &bgrPatch);
     void computeMotion(const FloorMapper *floor);
 
     cv::Ptr<cv::Tracker> m_tracker;
@@ -95,6 +101,12 @@ private:
     KalmanFilter2D m_filter;
     qint64 m_lastUpdateMs = 0;
     qint64 m_lastSeenMs = 0;
+
+    // Apparence de l'objet mémorisée à la sélection, pour l'indice de confiance.
+    cv::Mat m_refHist;   // histogramme teinte-saturation (mis à jour lentement)
+    cv::Mat m_refGray;   // motif en niveaux de gris, mis à jour lentement (suit les rotations lentes)
+    cv::Mat m_initGray;  // motif d'origine, tel qu'à la sélection
+    int m_lowConfidenceFrames = 0;
     TrackedObject m_state;
     std::deque<TrailPoint> m_trail;
 };
