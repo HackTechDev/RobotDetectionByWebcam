@@ -1114,11 +1114,15 @@ void MainWindow::updateTrackStatus()
     } else if (!m_tracker.isActive()) {
         m_trackLabel->setText(tr("Aucun objet suivi."));
     } else if (m_tracker.state().found) {
-        m_trackLabel->setText(tr("<b style='color:#080'>Suivi en cours</b> (%1)")
-                                  .arg(m_trackAlgoCombo->itemText(int(m_tracker.algorithm()))));
+        QString text = tr("<b style='color:#080'>Suivi en cours</b> (%1)")
+                           .arg(m_trackAlgoCombo->itemText(int(m_tracker.algorithm())));
+        if (m_tracker.state().reacquisitions > 0)
+            text += tr("<br>Retrouvé automatiquement %n fois.", nullptr, m_tracker.state().reacquisitions);
+        m_trackLabel->setText(text);
     } else {
-        m_trackLabel->setText(tr("<b style='color:#c00'>Objet perdu</b> : le suivi continue de le chercher "
-                                 "près de sa dernière position. Resélectionnez-le si besoin."));
+        m_trackLabel->setText(tr("<b style='color:#c00'>Objet perdu</b> : recherche en cours dans toute "
+                                 "l'image. Il sera retrouvé automatiquement s'il réapparaît avec un aspect "
+                                 "proche ; sinon, resélectionnez-le."));
     }
 }
 
@@ -1377,12 +1381,19 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         const TrackedObject &t = m_tracker.state();
         const QColor trackColor(0, 255, 255);
         if (m_trackTrailCheck->isChecked() && m_tracker.trail().size() > 1) {
-            QPolygonF trail;
-            for (const ObjectTracker::TrailPoint &p : m_tracker.trail())
-                trail << toDisplay(p.position);
+            // Une reprise automatique commence un nouveau tronçon : pas de trait à travers l'image.
             painter.setPen(QPen(trackColor, std::max(1, penWidth / 2)));
             painter.setBrush(Qt::NoBrush);
-            painter.drawPolyline(trail);
+            QPolygonF segment;
+            for (const ObjectTracker::TrailPoint &p : m_tracker.trail()) {
+                if (p.newSegment && segment.size() > 1)
+                    painter.drawPolyline(segment);
+                if (p.newSegment)
+                    segment.clear();
+                segment << toDisplay(p.position);
+            }
+            if (segment.size() > 1)
+                painter.drawPolyline(segment);
         }
         QRectF box = t.box;
         if (mirror)
@@ -1533,6 +1544,7 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                           .arg(t.center.y(), 0, 'f', 0);
             if (t.drifted)
                 status += tr("<br>Le cadre ne ressemble plus à l'objet sélectionné.");
+            status += tr("<br>Recherche dans toute l'image...");
         } else {
             status += tr("<b style='color:#088'>Objet suivi</b> : %1<br>"
                          "Position : (%2, %3) px<br>"
@@ -1543,6 +1555,8 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                           .arg(t.speed, 0, 'f', 0)
                           .arg(t.direction, 0, 'f', 0);
             status += tr("<br>Confiance : %1 %").arg(t.confidence * 100, 0, 'f', 0);
+            if (t.reacquisitions > 0)
+                status += tr(" — retrouvé automatiquement %n fois", nullptr, t.reacquisitions);
             if (t.hasFloor) {
                 status += tr("<br>Sol : X %1  Y %2 mm<br>Vitesse au sol : %3 mm/s, direction %4°")
                               .arg(t.floorPosition.x(), 0, 'f', 0)

@@ -24,6 +24,8 @@ struct TrackedObject
     // Ressemblance du contenu du cadre avec l'objet sélectionné, de 0 à 1 (lissée dans le temps).
     double confidence = 0.0;
     bool drifted = false;  // perdu parce que le cadre ne ressemble plus à l'objet
+    bool reacquired = false;  // retrouvé à cette image par la recherche dans toute l'image
+    int reacquisitions = 0;   // nombre de reprises automatiques depuis la sélection
     QRectF box;           // cadre du tracker (dernière position connue si l'objet est perdu)
     QPointF center;       // position lissée (ou prédite)
 
@@ -50,7 +52,8 @@ public:
     struct TrailPoint
     {
         qint64 timeMs;
-        QPointF position;  // centre dans l'image
+        QPointF position;         // centre dans l'image
+        bool newSegment = false;  // premier point après une reprise : pas de trait depuis le précédent
     };
 
     ObjectTracker();
@@ -90,6 +93,9 @@ private:
     // Ressemblance (0 à 1) du contenu de « roi » avec l'apparence mémorisée de l'objet.
     double appearanceScore(const cv::Mat &work, const cv::Rect &roi) const;
     static cv::Mat colorHistogram(const cv::Mat &bgrPatch);
+    // Cherche l'objet dans toute l'image de travail ; retourne un cadre vide s'il n'est pas trouvé.
+    cv::Rect searchObject(const cv::Mat &work) const;
+    bool createTracker(const cv::Mat &work, const cv::Rect &roi);
     void computeMotion(const FloorMapper *floor);
 
     cv::Ptr<cv::Tracker> m_tracker;
@@ -107,6 +113,8 @@ private:
     cv::Mat m_refGray;   // motif en niveaux de gris, mis à jour lentement (suit les rotations lentes)
     cv::Mat m_initGray;  // motif d'origine, tel qu'à la sélection
     int m_lowConfidenceFrames = 0;
+    int m_lostFrames = 0;    // images consécutives sans l'objet
+    QSizeF m_lastBoxSize;    // taille du cadre (image de travail) quand l'objet était trouvé
     TrackedObject m_state;
     std::deque<TrailPoint> m_trail;
 };

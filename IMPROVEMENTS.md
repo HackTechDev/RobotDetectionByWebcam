@@ -26,7 +26,8 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
   - état « immobile » ou « en mouvement » ;
   - signalement de la perte de l'objet ;
   - position lissée et vitesse par filtre de Kalman, position prédite juste après une perte ;
-  - indice de confiance, qui détecte le cadre qui glisse sur le fond ou s'accroche à un autre objet.
+  - indice de confiance, qui détecte le cadre qui glisse sur le fond ou s'accroche à un autre objet ;
+  - reprise automatique : un objet perdu est recherché dans toute l'image et le suivi reprend dès qu'il réapparaît.
 
 ### Mesures
 
@@ -119,13 +120,7 @@ Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
 
 ### Suivi d'objet
 
-Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Ordre conseillé : d'abord la reprise automatique, qui complète l'indice de confiance (un objet perdu est aujourd'hui signalé, mais pas retrouvé tout seul).
-
-#### Reprise automatique après une perte — M
-
-**Intérêt.** Quand l'objet est perdu, le tracker ne le cherche qu'autour de sa dernière position. S'il réapparaît ailleurs, il faut le resélectionner à la main.
-
-**Piste.** Rechercher l'image de référence de l'objet dans toute l'image, à plusieurs échelles (`cv::matchTemplate`), ou par points caractéristiques ORB et mise en correspondance. Dès qu'elle est retrouvée avec une confiance suffisante, réinitialiser le tracker à cet endroit.
+Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissage de Kalman, l'indice de confiance et la reprise automatique sont réalisés. Parmi les pistes restantes, l'orientation de l'objet est la plus utile pour suivre un robot sans marqueur.
 
 #### Orientation de l'objet — M
 

@@ -24,6 +24,13 @@ constexpr int kLostConfidenceFrames = 3;
 constexpr double kUpdateConfidence = 0.7;
 constexpr double kReferenceUpdateRate = 0.05;
 
+// Reprise automatique : recherche dans toute l'image, une image sur trois, sur une image réduite
+// de moitié ; un candidat doit ressembler à l'objet par son motif ET par l'indice de confiance.
+constexpr int kSearchEveryFrames = 3;
+constexpr double kSearchDownscale = 0.5;
+constexpr double kSearchMinCorrelation = 0.6;
+constexpr double kSearchMinConfidence = 0.55;
+
 } // namespace
 
 ObjectTracker::ObjectTracker() = default;
@@ -83,6 +90,61 @@ double ObjectTracker::appearanceScore(const cv::Mat &work, const cv::Rect &roi) 
     return 0.5 * colorScore + 0.5 * patternScore;
 }
 
+bool ObjectTracker::createTracker(const cv::Mat &work, const cv::Rect &roi)
+{
+    if (m_algorithm == Kcf)
+        m_tracker = cv::TrackerKCF::create();
+    else
+        m_tracker = cv::TrackerCSRT::create();
+    try {
+        m_tracker->init(work, roi);
+    } catch (const cv::Exception &) {
+        m_tracker.release();
+        return false;
+    }
+    return true;
+}
+
+cv::Rect ObjectTracker::searchObject(const cv::Mat &work) const
+{
+    if (m_initGray.empty())
+        return {};
+    cv::Mat gray, small;
+    cv::cvtColor(work, gray, cv::COLOR_BGR2GRAY);
+    cv::resize(gray, small, cv::Size(), kSearchDownscale, kSearchDownscale, cv::INTER_AREA);
+
+    // Échelles autour de la dernière taille connue de l'objet.
+    const double base = m_lastBoxSize.width() / m_initGray.cols;
+    double bestScore = -1.0;
+    cv::Rect best;
+    for (const cv::Mat *reference : {&m_initGray, &m_refGray}) {
+        for (double factor : {0.85, 1.0, 1.2}) {
+            const double s = base * factor * kSearchDownscale;
+            const cv::Size size(int(reference->cols * s), int(reference->rows * s));
+            if (size.width < 8 || size.height < 8 || size.width >= small.cols || size.height >= small.rows)
+                continue;
+            cv::Mat templ, result;
+            cv::resize(*reference, templ, size, 0, 0, cv::INTER_AREA);
+            cv::matchTemplate(small, templ, result, cv::TM_CCOEFF_NORMED);
+            double maxVal = 0;
+            cv::Point maxLoc;
+            cv::minMaxLoc(result, nullptr, &maxVal, nullptr, &maxLoc);
+            if (maxVal > bestScore) {
+                bestScore = maxVal;
+                best = cv::Rect(int(maxLoc.x / kSearchDownscale), int(maxLoc.y / kSearchDownscale),
+                                int(size.width / kSearchDownscale), int(size.height / kSearchDownscale));
+            }
+        }
+    }
+    best &= cv::Rect(0, 0, work.cols, work.rows);
+    if (bestScore < kSearchMinCorrelation || best.width < 8 || best.height < 8)
+        return {};
+    // Vérification complète (couleurs et motif) avant d'accepter le candidat.
+    if (appearanceScore(work, best) < kSearchMinConfidence)
+        return {};
+    return best;
+}
+
 bool ObjectTracker::start(const QImage &image, const QRectF &box, qint64 timeMs)
 {
     stop();
@@ -94,21 +156,15 @@ bool ObjectTracker::start(const QImage &image, const QRectF &box, qint64 timeMs)
     if (roi.width < 8 || roi.height < 8)
         return false;
 
-    if (m_algorithm == Kcf)
-        m_tracker = cv::TrackerKCF::create();
-    else
-        m_tracker = cv::TrackerCSRT::create();
-    try {
-        m_tracker->init(work, roi);
-    } catch (const cv::Exception &) {
-        m_tracker.release();
+    if (!createTracker(work, roi))
         return false;
-    }
 
     m_refHist = colorHistogram(work(roi));
     cv::cvtColor(work(roi), m_initGray, cv::COLOR_BGR2GRAY);
     m_refGray = m_initGray.clone();
     m_lowConfidenceFrames = 0;
+    m_lostFrames = 0;
+    m_lastBoxSize = QSizeF(roi.width, roi.height);
 
     m_state = TrackedObject();
     m_state.active = true;
@@ -172,6 +228,27 @@ const TrackedObject &ObjectTracker::update(const QImage &image, qint64 timeMs, c
         m_state.confidence = 0.6 * m_state.confidence;
     }
 
+    // Reprise automatique : objet perdu (par le tracker ou par l'indice de confiance), on le
+    // cherche dans toute l'image et on relance le tracker là où il est retrouvé.
+    m_state.reacquired = false;
+    if (found) {
+        m_lostFrames = 0;
+        m_lastBoxSize = QSizeF(roi.width, roi.height);
+    } else if (++m_lostFrames % kSearchEveryFrames == 0) {
+        const cv::Rect candidate = searchObject(work);
+        if (!candidate.empty() && createTracker(work, candidate)) {
+            roi = candidate;
+            found = true;
+            m_state.reacquired = true;
+            m_state.drifted = false;
+            ++m_state.reacquisitions;
+            m_state.confidence = appearanceScore(work, roi);
+            m_lowConfidenceFrames = 0;
+            m_lostFrames = 0;
+            m_lastBoxSize = QSizeF(roi.width, roi.height);
+        }
+    }
+
     // Filtre de Kalman : prédiction au temps de l'image, puis correction par la mesure.
     m_filter.setStrength(m_smoothing);
     m_filter.predict((timeMs - m_lastUpdateMs) / 1000.0);
@@ -180,7 +257,10 @@ const TrackedObject &ObjectTracker::update(const QImage &image, qint64 timeMs, c
     m_state.found = found;
     if (found) {
         m_state.box = QRectF(roi.x * scale, roi.y * scale, roi.width * scale, roi.height * scale);
-        m_filter.update(m_state.box.center());
+        if (m_state.reacquired)
+            m_filter.reset(m_state.box.center());  // l'objet a pu réapparaître loin : on repart de là
+        else
+            m_filter.update(m_state.box.center());
         m_lastSeenMs = timeMs;
     }
     // Objet perdu : position prédite pendant le délai de maintien, puis figée à la dernière
@@ -193,7 +273,7 @@ const TrackedObject &ObjectTracker::update(const QImage &image, qint64 timeMs, c
         m_state.center = m_smoothPosition ? m_filter.position() : m_state.box.center();
     }
     if (found)
-        m_trail.push_back({timeMs, m_state.center});
+        m_trail.push_back({timeMs, m_state.center, m_state.reacquired});
     while (!m_trail.empty() && timeMs - m_trail.front().timeMs > m_trailMs)
         m_trail.pop_front();
 

@@ -148,6 +148,8 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
                       {QStringLiteral("predicted"), tracked->predicted},
                       {QStringLiteral("confidence"), std::round(tracked->confidence * 100) / 100},
                       {QStringLiteral("drifted"), tracked->drifted},
+                      {QStringLiteral("reacquired"), tracked->reacquired},
+                      {QStringLiteral("reacquisitions"), tracked->reacquisitions},
                       {QStringLiteral("center"), point(tracked->center)},
                       {QStringLiteral("box"), QJsonArray{round1(tracked->box.x()), round1(tracked->box.y()),
                                                          round1(tracked->box.width()),

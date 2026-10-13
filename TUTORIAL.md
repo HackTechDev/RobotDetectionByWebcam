@@ -180,7 +180,7 @@ ID 1 : (320, 241) px, côté 82 px, 0.0°
    - une **ligne cyan** dessine sa trajectoire sur les 10 dernières secondes ;
    - une **flèche** indique le sens du déplacement.
 6. Le panneau **Résultat** affiche `Objet suivi : en mouvement`, puis `immobile` quand vous la lâchez, avec sa position, sa vitesse et sa direction.
-7. Cachez entièrement la tasse avec la main : le cadre devient **rouge en pointillés** et indique « Objet perdu ». Retirez la main : selon les cas, le suivi la retrouve ou il faut la resélectionner.
+7. Cachez entièrement la tasse avec la main : le cadre passe en pointillés, d'abord « Objet (prédit) », puis **rouge** avec « Objet perdu ». L'application cherche alors la tasse dans toute l'image. Retirez la main, ou reposez la tasse **ailleurs** : le suivi reprend tout seul, et le panneau indique « retrouvé automatiquement 1 fois ». Pendant le suivi, la **confiance** affichée dans **Résultat** indique à quel point le cadre ressemble encore à la tasse.
 8. Cliquez sur **Arrêter le suivi**.
 
 ✅ **Vérification** : la trajectoire de la tasse est dessinée, et l'état passe de « en mouvement » à « immobile ».
