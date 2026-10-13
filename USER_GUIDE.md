@@ -2,7 +2,7 @@
 
 Ce guide explique comment utiliser l'application au quotidien : repérer un robot avec un carré de couleur ou avec des marqueurs ArUco, calibrer la caméra et lire les résultats.
 
-Pour l'installation et la compilation, voir le [README](README.md).
+Pour l'installation et la compilation, voir le [README](README.md). Pour une découverte pas à pas de toutes les fonctionnalités, avec des exercices, voir le [tutoriel](TUTORIAL.md).
 
 ## Sommaire
 

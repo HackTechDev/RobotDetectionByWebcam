@@ -49,7 +49,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - Tous les réglages sont **mémorisés** entre deux lancements (`settings.ini`) : la résolution, l'exposition et la balance des blancs pour chaque modèle de caméra, le repère du sol, etc.
 - Bouton **Quitter**, avec une confirmation.
 - Option pour masquer les messages techniques sans gravité dans le terminal.
-- Documentation : [README](README.md) (installation et principes) et [guide utilisateur](USER_GUIDE.md).
+- Documentation : [README](README.md) (installation et principes), [tutoriel](TUTORIAL.md) (découverte pas à pas) et [guide utilisateur](USER_GUIDE.md) (référence).
 
 ---
 
