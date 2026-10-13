@@ -276,7 +276,8 @@ Le choix de la méthode s'applique à la prochaine sélection.
 - **Cadre cyan** autour de l'objet, avec sa vitesse au-dessus (en mm/s si le repère du sol est défini, sinon en pixels par seconde).
 - **Trajectoire** : la ligne cyan des positions passées, sur la **Durée de la trajectoire** choisie (10 s par défaut). La case **Afficher la trajectoire** la masque.
 - **Flèche** dans le sens du déplacement, quand l'objet bouge. Elle est plus longue quand il va plus vite.
-- **Cadre rouge en pointillés** et « Objet perdu » quand l'objet n'est plus trouvé.
+- **Cadre cyan en pointillés** et « Objet (prédit) » juste après une perte : pendant le **Maintien après perte** du lissage (0,5 s par défaut), la position est prédite à la même vitesse.
+- **Cadre rouge en pointillés** et « Objet perdu » ensuite, quand l'objet n'est toujours pas retrouvé.
 
 Dans le panneau **Résultat** :
 
@@ -284,7 +285,7 @@ Dans le panneau **Résultat** :
 |---|---|
 | **en mouvement / immobile** | L'objet est « en mouvement » s'il parcourt plus de 10 % de sa taille par seconde. En dessous, on considère qu'il ne bouge pas : le cadre tremble toujours un peu. |
 | **Position** | Centre du cadre, en pixels (voir [9.1](#91-coordonnées-dans-limage-en-pixels)) |
-| **Vitesse, direction** | Calculées sur la dernière demi-seconde. La direction est en degrés, de −180 à 180 : 0° vers la droite, 90° vers le bas de l'image. |
+| **Position** lissée, **vitesse, direction** | Estimées par un filtre de Kalman, avec la **Force du lissage** du groupe « Lissage des carrés et marqueurs » (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)). La direction est en degrés, de −180 à 180 : 0° vers la droite, 90° vers le bas de l'image. |
 | **Sol, vitesse au sol** | Si le repère du sol est défini : position en mm, vitesse en mm/s et direction sur le sol, comptée de l'axe X vers l'axe Y (voir [section 8](#8-définir-le-repère-du-sol)) |
 
 Ces valeurs sont aussi envoyées en UDP (champ `tracked`, voir [10.3](#103-format-des-messages)).
@@ -304,7 +305,7 @@ Conseils : un objet bien contrasté et texturé (motif, logo, couleurs) se suit 
 
 ### 6.4 Lisser les positions des carrés et des marqueurs
 
-L'onglet **Suivi** contient aussi le groupe **Lissage des carrés et marqueurs**, actif par défaut. Il suit dans le temps le **carré coloré principal** (le plus grand) et **chaque marqueur ArUco**, reconnu par son identifiant. Il apporte :
+L'onglet **Suivi** contient aussi le groupe **Lissage des carrés et marqueurs**, actif par défaut. Il suit dans le temps le **carré coloré principal** (le plus grand) et **chaque marqueur ArUco**, reconnu par son identifiant. Ses réglages (force et maintien après perte) s'appliquent aussi à l'**objet encadré**. Le lissage apporte :
 - une **position lissée**, qui tremble moins d'une image à l'autre ;
 - la **vitesse** et la **direction** du déplacement, en mm/s sur le sol si le repère du sol est défini, sinon en pixels par seconde ;
 - une **position prédite** quand un objet n'est plus détecté pendant un court instant : il est supposé continuer à la même vitesse ;
@@ -330,6 +331,8 @@ Le gain principal est donc la **vitesse** et la **position prédite**. Pour un r
 Dans le panneau **Résultat**, la vitesse s'ajoute sous chaque carré et marqueur. Un objet momentanément perdu apparaît comme `ID 7 : non détecté, position prédite (x, y) px`, et sur l'image comme un cercle en pointillés marqué « (prédit) ». Les valeurs brutes (position, angle, sol, pose 3D) restent celles de la détection. Seules la vitesse et la position prédite viennent du lissage. Le tout est envoyé en UDP dans la liste `tracks` (voir [10.3](#103-format-des-messages)).
 
 Changer de résolution remet le lissage à zéro.
+
+Si vous décochez le groupe, la position de l'objet encadré redevient celle du tracker, sans prédiction. Sa vitesse reste estimée par le filtre, avec une force moyenne, car la vitesse brute est trop bruitée pour distinguer un objet immobile d'un objet en mouvement. Pour la même raison, une force de 0 rend la vitesse instable.
 
 ---
 
@@ -590,7 +593,7 @@ Chaque image traitée produit **un message**, sur une seule ligne. Voici un exem
 | `id` | Identifiant du marqueur |
 | `floor` | Uniquement si le repère du sol est défini : `position_mm` `[X, Y]` sur le sol, et `heading_deg` (cap d'un marqueur) ou `angle_deg` (angle d'un carré, de 0 à 90), voir [8.3](#83-lire-les-positions-au-sol) |
 | `tracks` | Uniquement si le lissage est actif (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)) : une entrée par carré principal ou marqueur suivi, avec `type` (`square` ou `marker`), `id` (marqueur), `predicted` (non détecté dans cette image), `position_px` lissée, `velocity_px_s`, `speed_px_s`, `angle_deg` lissé et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s`, `direction_deg` et `heading_deg` (marqueur) ou `angle_deg` (carré) |
-| `tracked` | Uniquement si un objet est suivi (voir [section 6](#6-suivre-un-objet-encadré)) : `found` (trouvé ou perdu), `center`, `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
+| `tracked` | Uniquement si un objet est suivi (voir [section 6](#6-suivre-un-objet-encadré)) : `found` (trouvé ou perdu), `predicted` (perdu depuis peu, position prédite), `center` (position lissée), `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
 | `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [9.2](#92-position-3d-dun-marqueur-en-mm-après-calibration) et [9.3](#93-rotations-dun-marqueur-en-degrés-après-calibration)) |
 
 Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont celles de l'image réelle de la caméra, même avec l'effet miroir.

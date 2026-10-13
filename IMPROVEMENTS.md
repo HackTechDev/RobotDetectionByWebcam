@@ -24,7 +24,8 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - **Suivi d'un objet encadré** à la souris (trackers OpenCV CSRT ou KCF) :
   - trajectoire, vitesse, direction ;
   - état « immobile » ou « en mouvement » ;
-  - signalement de la perte de l'objet.
+  - signalement de la perte de l'objet ;
+  - position lissée et vitesse par filtre de Kalman, position prédite juste après une perte.
 
 ### Mesures
 
@@ -117,13 +118,7 @@ Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
 
 ### Suivi d'objet
 
-Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Ordre conseillé : d'abord le lissage de Kalman, rapide grâce au code existant ; puis l'indice de confiance et la reprise automatique, qui s'attaquent à la principale faiblesse actuelle (perdre l'objet ou glisser sur le fond sans le signaler).
-
-#### Lissage de Kalman et prédiction pendant les pertes — S
-
-**Intérêt.** La vitesse est calculée par différence entre les positions brutes sur une demi-seconde. Elle est bruitée, et rien n'est prédit quand l'objet est perdu un instant.
-
-**Piste.** Réutiliser `KalmanFilter2D` (`src/motionfilter.cpp`), déjà utilisé pour les carrés et les marqueurs. On obtiendrait une position plus stable, une vitesse moins bruitée et une position prédite pendant une courte perte. Le comportement serait le même que pour les carrés et les marqueurs, y compris la force du lissage.
+Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Ordre conseillé : d'abord l'indice de confiance et la reprise automatique, qui s'attaquent à la principale faiblesse actuelle (perdre l'objet ou glisser sur le fond sans le signaler).
 
 #### Indice de confiance et détection du glissement — M
 

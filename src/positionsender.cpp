@@ -145,6 +145,7 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
 
     if (tracked && tracked->active) {
         QJsonObject o{{QStringLiteral("found"), tracked->found},
+                      {QStringLiteral("predicted"), tracked->predicted},
                       {QStringLiteral("center"), point(tracked->center)},
                       {QStringLiteral("box"), QJsonArray{round1(tracked->box.x()), round1(tracked->box.y()),
                                                          round1(tracked->box.width()),

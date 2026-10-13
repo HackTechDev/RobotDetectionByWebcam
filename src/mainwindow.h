@@ -83,6 +83,7 @@ private:
     void saveFloorSettings() const;
     void updateFloorStatus();
     void updateTrackStatus();
+    void applySmoothingToTracker();
     void saveSettings() const;
 
     QMediaCaptureSession *m_session = nullptr;

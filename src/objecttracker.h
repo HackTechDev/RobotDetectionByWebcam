@@ -1,5 +1,7 @@
 #pragma once
 
+#include "motionfilter.h"
+
 #include <QImage>
 #include <QPointF>
 #include <QRectF>
@@ -18,10 +20,11 @@ struct TrackedObject
 {
     bool active = false;  // un objet a été sélectionné
     bool found = false;   // l'objet est trouvé dans l'image courante
-    QRectF box;           // cadre (dernière position connue si l'objet est perdu)
-    QPointF center;
+    bool predicted = false;  // perdu depuis peu : position prédite à vitesse constante
+    QRectF box;           // cadre du tracker (dernière position connue si l'objet est perdu)
+    QPointF center;       // position lissée (ou prédite)
 
-    // Mouvement, calculé sur la dernière demi-seconde.
+    // Mouvement, estimé par le filtre de Kalman.
     QPointF velocity;       // en pixels par seconde
     double speed = 0.0;     // en pixels par seconde
     double direction = 0.0; // direction du déplacement en degrés ]-180, 180] (sens horaire)
@@ -56,6 +59,15 @@ public:
 
     // Durée de trajectoire conservée.
     void setTrailDuration(double seconds) { m_trailMs = qint64(seconds * 1000); }
+    // Force du lissage (0 à 100). Si « smoothPosition » est faux, la position est celle du tracker
+    // (brute) ; la vitesse reste estimée par le filtre, sinon elle serait trop bruitée.
+    void setSmoothing(int strength, bool smoothPosition = true)
+    {
+        m_smoothing = strength;
+        m_smoothPosition = smoothPosition;
+    }
+    // Durée pendant laquelle la position reste prédite après une perte (0 = pas de prédiction).
+    void setHoldTime(double seconds) { m_holdMs = qint64(seconds * 1000); }
 
     // Commence le suivi de l'objet encadré par « box » dans « image ». Retourne false si le
     // cadre est trop petit ou si le tracker n'a pas pu démarrer.
@@ -77,6 +89,12 @@ private:
     cv::Ptr<cv::Tracker> m_tracker;
     Algorithm m_algorithm = Csrt;
     qint64 m_trailMs = 10000;
+    int m_smoothing = 50;
+    bool m_smoothPosition = true;
+    qint64 m_holdMs = 500;
+    KalmanFilter2D m_filter;
+    qint64 m_lastUpdateMs = 0;
+    qint64 m_lastSeenMs = 0;
     TrackedObject m_state;
     std::deque<TrailPoint> m_trail;
 };

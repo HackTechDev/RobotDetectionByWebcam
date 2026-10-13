@@ -18,6 +18,8 @@ public:
     // processNoise : densité spectrale de l'accélération (px²/s³). Plus elle est faible, plus
     // le lissage est fort (et le retard grand). measurementNoise : variance de la mesure (px²).
     void setNoise(double processNoise, double measurementNoise);
+    // Réglage du filtre pour une force de lissage de 0 (aucun) à 100 (très fort).
+    void setStrength(int strength);
 
     void reset(const QPointF &position);
     void predict(double dt);

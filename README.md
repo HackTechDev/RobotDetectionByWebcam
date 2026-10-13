@@ -133,7 +133,7 @@ Dans l'onglet « Suivi », cliquer sur « Sélectionner un objet », puis tracer
 - **CSRT** : précis, environ 20 ms par image ;
 - **KCF** : rapide, environ 5 ms par image.
 
-L'application affiche le cadre, la **trajectoire** (durée réglable, 10 s par défaut) et une flèche dans le sens du déplacement. Le panneau « Résultat » donne la position, l'état (en mouvement ou immobile), la vitesse et la direction, calculées sur la dernière demi-seconde. Si le repère du sol est défini, il donne aussi la position, la vitesse et la direction en mm sur le sol. Ces valeurs sont envoyées en UDP (objet `tracked`).
+L'application affiche le cadre, la **trajectoire** (durée réglable, 10 s par défaut) et une flèche dans le sens du déplacement. Le panneau « Résultat » donne la position, l'état (en mouvement ou immobile), la vitesse et la direction, lissées par un filtre de Kalman (mêmes réglages que le lissage des carrés et des marqueurs). Juste après une perte, la position est prédite à vitesse constante pendant le délai de maintien. Si le repère du sol est défini, il donne aussi la position, la vitesse et la direction en mm sur le sol. Ces valeurs sont envoyées en UDP (objet `tracked`).
 
 Le tracker peut perdre l'objet (objet caché, sorti de l'image, trop rapide) ou glisser lentement sur le fond. Il faut alors le resélectionner. Le cadre reste droit : l'orientation de l'objet n'est pas mesurée. Changer de résolution arrête le suivi.
 
@@ -195,10 +195,10 @@ Le code se trouve dans `src/objecttracker.cpp`.
 1. L'image est réduite à 640 px de large au plus, ce qui garde le coût du suivi presque constant quelle que soit la résolution.
 2. Le tracker (`cv::TrackerCSRT` ou `cv::TrackerKCF`) est initialisé sur le rectangle sélectionné, puis mis à jour à chaque image. S'il perd l'objet, la dernière position est conservée et il continue de chercher aux images suivantes.
 3. Chaque position trouvée est ajoutée à la trajectoire, horodatée. Les points plus anciens que la durée choisie sont retirés.
-4. La vitesse est le déplacement entre la position actuelle et la plus ancienne position de la dernière demi-seconde, divisé par le temps écoulé. L'objet est « en mouvement » au-delà de 10 % de la diagonale de son cadre par seconde (au moins 5 px/s).
-5. Si le repère du sol est prêt, les deux positions sont projetées sur le sol pour obtenir la vitesse et la direction en mm.
+4. Le centre du cadre passe dans un filtre de Kalman à vitesse constante (`KalmanFilter2D`, le même que pour le lissage des carrés et des marqueurs). On en tire la position lissée et la vitesse. Quand le tracker perd l'objet, le filtre prédit la position pendant le délai de maintien. Sans lissage, la position est celle du tracker, mais la vitesse reste filtrée (force 50). L'objet est « en mouvement » au-delà de 10 % de la diagonale de son cadre par seconde (au moins 5 px/s).
+5. Si le repère du sol est prêt, la position est projetée sur le sol, ainsi que la position atteinte 0,1 s plus tard à la vitesse estimée, pour obtenir la vitesse et la direction en mm.
 
-Sur une séquence de synthèse (objet texturé sur fond texturé, 1280 × 960), la vitesse est retrouvée à 299 px/s pour 300 px/s réels, la position à 3 px près, et l'état immobile ou en mouvement est bien distingué.
+Sur une séquence de synthèse (objet texturé sur fond texturé, 1280 × 960, bruit de capteur simulé), la vitesse est retrouvée à 299 px/s pour 300 px/s réels. À l'arrêt, la vitesse mesurée est de 6 px/s avec le lissage par défaut, contre 30 px/s sans filtre.
 
 ### Lissage dans le temps
 

@@ -358,11 +358,18 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_trackTrailSpin, &QDoubleSpinBox::valueChanged, this,
             [this](double seconds) { m_tracker.setTrailDuration(seconds); });
-    connect(m_smoothBox, &QGroupBox::toggled, this, [this] { m_smoother.clear(); });
-    connect(m_smoothStrengthSlider, &QSlider::valueChanged, this,
-            [this](int value) { m_smoother.setStrength(value); });
-    connect(m_smoothHoldSpin, &QDoubleSpinBox::valueChanged, this,
-            [this](double seconds) { m_smoother.setHoldTime(seconds); });
+    connect(m_smoothBox, &QGroupBox::toggled, this, [this] {
+        m_smoother.clear();
+        applySmoothingToTracker();
+    });
+    connect(m_smoothStrengthSlider, &QSlider::valueChanged, this, [this](int value) {
+        m_smoother.setStrength(value);
+        applySmoothingToTracker();
+    });
+    connect(m_smoothHoldSpin, &QDoubleSpinBox::valueChanged, this, [this](double seconds) {
+        m_smoother.setHoldTime(seconds);
+        applySmoothingToTracker();
+    });
     connect(m_smoothTrailSpin, &QDoubleSpinBox::valueChanged, this,
             [this](double seconds) { m_smoother.setTrailDuration(seconds); });
     connect(m_floorPickButton, &QPushButton::clicked, this, &MainWindow::toggleFloorPicking);
@@ -596,6 +603,7 @@ void MainWindow::loadSettings()
     m_smoothHoldSpin->setValue(s.value(QStringLiteral("smoothing/holdSeconds"), m_smoothHoldSpin->value()).toDouble());
     m_smoothTrailCheck->setChecked(s.value(QStringLiteral("smoothing/showTrails"), true).toBool());
     m_smoothTrailSpin->setValue(s.value(QStringLiteral("smoothing/trailSeconds"), m_smoothTrailSpin->value()).toDouble());
+    applySmoothingToTracker();
     m_trackAlgoCombo->setCurrentIndex(std::clamp(s.value(QStringLiteral("tracking/algorithm"), 0).toInt(), 0, 1));
     m_trackTrailCheck->setChecked(s.value(QStringLiteral("tracking/showTrail"), true).toBool());
     m_trackTrailSpin->setValue(s.value(QStringLiteral("tracking/trailSeconds"), m_trackTrailSpin->value()).toDouble());
@@ -1086,6 +1094,15 @@ void MainWindow::stopTracking()
     updateTrackStatus();
 }
 
+void MainWindow::applySmoothingToTracker()
+{
+    // L'objet suivi utilise les mêmes réglages que les carrés et les marqueurs. Sans lissage, sa
+    // position est celle du tracker et rien n'est prédit ; sa vitesse reste filtrée (force 50).
+    const bool on = m_smoothBox->isChecked();
+    m_tracker.setSmoothing(on ? m_smoothStrengthSlider->value() : 50, on);
+    m_tracker.setHoldTime(on ? m_smoothHoldSpin->value() : 0.0);
+}
+
 void MainWindow::updateTrackStatus()
 {
     const bool selecting = m_video->selectionMode();
@@ -1370,7 +1387,7 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         QRectF box = t.box;
         if (mirror)
             box.moveLeft(width - t.box.right());
-        painter.setPen(QPen(t.found ? trackColor : QColor(255, 60, 60), penWidth,
+        painter.setPen(QPen(t.found || t.predicted ? trackColor : QColor(255, 60, 60), penWidth,
                             t.found ? Qt::SolidLine : Qt::DashLine));
         painter.setBrush(Qt::NoBrush);
         painter.drawRect(box);
@@ -1387,11 +1404,11 @@ void MainWindow::onFrame(const QVideoFrame &frame)
             painter.drawLine(tip, tip - dir * penWidth * 4 + side * penWidth * 3);
             painter.drawLine(tip, tip - dir * penWidth * 4 - side * penWidth * 3);
         }
-        QString label = t.found ? tr("Objet") : tr("Objet perdu");
+        QString label = t.found ? tr("Objet") : t.predicted ? tr("Objet (prédit)") : tr("Objet perdu");
         if (t.found)
             label += t.hasFloor ? tr(" %1 mm/s").arg(t.floorSpeed, 0, 'f', 0)
                                 : tr(" %1 px/s").arg(t.speed, 0, 'f', 0);
-        painter.setPen(t.found ? trackColor : QColor(255, 60, 60));
+        painter.setPen(t.found || t.predicted ? trackColor : QColor(255, 60, 60));
         painter.drawText(box.topLeft() - QPointF(0, penWidth * 2), label);
     }
 
@@ -1503,7 +1520,11 @@ void MainWindow::onFrame(const QVideoFrame &frame)
     if (m_tracker.isActive()) {
         const TrackedObject &t = m_tracker.state();
         status += QStringLiteral("<br><br>");
-        if (!t.found) {
+        if (t.predicted) {
+            status += tr("<b style='color:#c60'>Objet suivi non trouvé</b>, position prédite (%1, %2) px")
+                          .arg(t.center.x(), 0, 'f', 0)
+                          .arg(t.center.y(), 0, 'f', 0);
+        } else if (!t.found) {
             status += tr("<b style='color:#c00'>Objet suivi perdu</b> (dernière position (%1, %2) px)")
                           .arg(t.center.x(), 0, 'f', 0)
                           .arg(t.center.y(), 0, 'f', 0);

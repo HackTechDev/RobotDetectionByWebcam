@@ -14,9 +14,6 @@ namespace {
 // Le suivi travaille sur une image d'au plus 640 px de large : CSRT prend environ 23 ms par
 // image à cette taille, bien plus en haute résolution.
 constexpr int kWorkingWidth = 640;
-// Fenêtre de calcul de la vitesse.
-constexpr qint64 kVelocityWindowMs = 500;
-constexpr qint64 kMinVelocityWindowMs = 150;
 constexpr double kRadToDeg = 180.0 / M_PI;
 
 } // namespace
@@ -71,6 +68,9 @@ bool ObjectTracker::start(const QImage &image, const QRectF &box, qint64 timeMs)
     m_state.found = true;
     m_state.box = QRectF(roi.x * scale, roi.y * scale, roi.width * scale, roi.height * scale);
     m_state.center = m_state.box.center();
+    m_filter.setStrength(m_smoothing);
+    m_filter.reset(m_state.center);
+    m_lastUpdateMs = m_lastSeenMs = timeMs;
     m_trail.push_back({timeMs, m_state.center});
     return true;
 }
@@ -97,13 +97,28 @@ const TrackedObject &ObjectTracker::update(const QImage &image, qint64 timeMs, c
         found = false;
     }
 
-    // Objet perdu : on garde sa dernière position et on continue d'essayer aux images suivantes.
+    // Filtre de Kalman : prédiction au temps de l'image, puis correction par la mesure.
+    m_filter.setStrength(m_smoothing);
+    m_filter.predict((timeMs - m_lastUpdateMs) / 1000.0);
+    m_lastUpdateMs = timeMs;
+
     m_state.found = found;
     if (found) {
         m_state.box = QRectF(roi.x * scale, roi.y * scale, roi.width * scale, roi.height * scale);
-        m_state.center = m_state.box.center();
-        m_trail.push_back({timeMs, m_state.center});
+        m_filter.update(m_state.box.center());
+        m_lastSeenMs = timeMs;
     }
+    // Objet perdu : position prédite pendant le délai de maintien, puis figée à la dernière
+    // position connue. Le tracker continue de chercher aux images suivantes.
+    m_state.predicted = !found && timeMs - m_lastSeenMs <= m_holdMs;
+    if (m_state.predicted) {
+        m_state.center = m_filter.position();
+        m_state.box.moveCenter(m_state.center);
+    } else if (found) {
+        m_state.center = m_smoothPosition ? m_filter.position() : m_state.box.center();
+    }
+    if (found)
+        m_trail.push_back({timeMs, m_state.center});
     while (!m_trail.empty() && timeMs - m_trail.front().timeMs > m_trailMs)
         m_trail.pop_front();
 
@@ -124,22 +139,10 @@ void ObjectTracker::computeMotion(const FloorMapper *floor)
     if (floorReady)
         m_state.floorPosition = floor->toFloor(m_state.center);
 
-    if (!m_state.found || m_trail.size() < 2)
+    if (!m_state.found && !m_state.predicted)
         return;
 
-    // Vitesse entre la position actuelle et la plus ancienne position de la fenêtre.
-    const TrailPoint &last = m_trail.back();
-    const TrailPoint *first = &last;
-    for (auto it = m_trail.rbegin(); it != m_trail.rend(); ++it) {
-        if (last.timeMs - it->timeMs > kVelocityWindowMs)
-            break;
-        first = &*it;
-    }
-    const double dt = (last.timeMs - first->timeMs) / 1000.0;
-    if (dt * 1000 < kMinVelocityWindowMs)
-        return;
-
-    m_state.velocity = (last.position - first->position) / dt;
+    m_state.velocity = m_filter.velocity();
     m_state.speed = std::hypot(m_state.velocity.x(), m_state.velocity.y());
     m_state.direction = std::atan2(m_state.velocity.y(), m_state.velocity.x()) * kRadToDeg;
 
@@ -149,9 +152,12 @@ void ObjectTracker::computeMotion(const FloorMapper *floor)
     m_state.moving = m_state.speed > std::max(5.0, 0.1 * size);
 
     if (floorReady) {
-        const QPointF d = floor->toFloor(last.position) - floor->toFloor(first->position);
-        m_state.floorVelocity = d / dt;
+        // La projection sur le sol n'est pas linéaire : vitesse calculée sur 0,1 s.
+        constexpr double h = 0.1;
+        m_state.floorVelocity =
+            (floor->toFloor(m_state.center + m_state.velocity * h) - m_state.floorPosition) / h;
         m_state.floorSpeed = std::hypot(m_state.floorVelocity.x(), m_state.floorVelocity.y());
-        m_state.floorDirection = std::atan2(d.y(), d.x()) * kRadToDeg;
+        m_state.floorDirection =
+            std::atan2(m_state.floorVelocity.y(), m_state.floorVelocity.x()) * kRadToDeg;
     }
 }

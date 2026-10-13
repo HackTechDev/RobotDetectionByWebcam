@@ -20,6 +20,13 @@ void KalmanFilter2D::setNoise(double processNoise, double measurementNoise)
     m_r = measurementNoise;
 }
 
+void KalmanFilter2D::setStrength(int strength)
+{
+    // Force 0 -> bruit d'accélération très grand (la mesure est suivie presque telle quelle),
+    // force 100 -> très faible (positions très stables mais en retard sur les mouvements rapides).
+    setNoise(std::pow(10.0, 5.5 - 0.035 * std::clamp(strength, 0, 100)), kMeasurementNoise);
+}
+
 void KalmanFilter2D::reset(const QPointF &position)
 {
     const double p[2] = {position.x(), position.y()};
@@ -82,10 +89,7 @@ void MotionSmoother::clear()
 void MotionSmoother::step(Track &track, qint64 timeMs, const QPointF *measurement, double angle,
                           double angleSymmetry, double resetDistance)
 {
-    // Force 0 -> bruit d'accélération très grand (la mesure est suivie presque telle quelle),
-    // force 100 -> très faible (positions très stables mais en retard sur les mouvements rapides).
-    const double processNoise = std::pow(10.0, 5.5 - 0.035 * m_strength);
-    track.filter.setNoise(processNoise, kMeasurementNoise);
+    track.filter.setStrength(m_strength);
 
     const double dt = (timeMs - track.lastUpdateMs) / 1000.0;
     track.lastUpdateMs = timeMs;
