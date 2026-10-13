@@ -10,7 +10,7 @@ Pour chacun, l'application donne la position, la taille et l'orientation dans l'
 
 Le mode d'emploi détaillé (réglages, calibration pas à pas, lecture des résultats, dépannage) se trouve dans le [guide utilisateur](USER_GUIDE.md).
 
-Les améliorations envisagées sont listées dans [IMPROVEMENTS.md](IMPROVEMENTS.md).
+La liste complète des fonctionnalités et des améliorations envisagées se trouve dans [IMPROVEMENTS.md](IMPROVEMENTS.md).
 
 ## Prérequis
 
