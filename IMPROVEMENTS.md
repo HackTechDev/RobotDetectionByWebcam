@@ -27,7 +27,9 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
   - signalement de la perte de l'objet ;
   - position lissée et vitesse par filtre de Kalman, position prédite juste après une perte ;
   - indice de confiance, qui détecte le cadre qui glisse sur le fond ou s'accroche à un autre objet ;
-  - reprise automatique : un objet perdu est recherché dans toute l'image et le suivi reprend dès qu'il réapparaît.
+  - reprise automatique : un objet perdu est recherché dans toute l'image et le suivi reprend dès qu'il réapparaît ;
+  - sélection d'un clic (délimitation automatique), cadre ajustable avant validation, Échap pour annuler ;
+  - événements de mouvement (début, fin, perte, reprise) avec seuil réglable, journal horodaté exportable en CSV et envoi en UDP.
 
 ### Mesures
 
@@ -120,7 +122,7 @@ Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
 
 ### Suivi d'objet
 
-Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissage de Kalman, l'indice de confiance et la reprise automatique sont réalisés. Parmi les pistes restantes, l'orientation de l'objet est la plus utile pour suivre un robot sans marqueur.
+Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissage de Kalman, l'indice de confiance, la reprise automatique, la sélection simplifiée et les événements de mouvement sont réalisés. Parmi les pistes restantes, l'orientation de l'objet est la plus utile pour suivre un robot sans marqueur.
 
 #### Orientation de l'objet — M
 
@@ -146,15 +148,6 @@ Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissag
 
 **Piste.** Une liste d'objets suivis, chacun avec son nom et sa couleur d'affichage, dans le panneau Résultat et dans les messages UDP (`tracked` deviendrait une liste). Le coût augmente avec le nombre d'objets, environ 20 ms par objet avec CSRT : à combiner avec le suivi dans un fil séparé.
 
-#### Événements de mouvement — S
-
-**Intérêt.** Être prévenu quand l'objet bouge, plutôt que surveiller sa position en continu : par exemple « l'objet s'est déplacé de plus de 2 cm ».
-
-**Piste.**
-- Un seuil réglable de déplacement (en mm si le repère du sol est défini, sinon en pixels) et de vitesse, à la place des 10 % de la taille de l'objet.
-- Deux seuils différents, pour la mise en mouvement et pour l'arrêt, afin que l'état n'oscille pas entre « immobile » et « en mouvement ».
-- Un message UDP d'événement et un journal horodaté des débuts et fins de mouvement.
-
 #### Statistiques et export de la trajectoire — S
 
 **Intérêt.** Analyser un déplacement après coup.
@@ -174,15 +167,6 @@ Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissag
 **Intérêt.** Les trackers `TrackerNano` et `TrackerVit` d'OpenCV 4.10 sont plus robustes aux changements d'aspect et aux pertes momentanées que CSRT et KCF.
 
 **Piste.** Les proposer dans la liste **Méthode**. Ils demandent de télécharger un modèle (quelques Mo) et une machine plus puissante : il faudra indiquer où placer le modèle et vérifier la vitesse obtenue.
-
-#### Sélection plus simple — S
-
-**Intérêt.** Tracer un rectangle précis autour d'un objet n'est pas toujours facile, surtout s'il bouge.
-
-**Piste.**
-- Sélectionner l'objet d'un simple clic : l'application délimite elle-même l'objet autour du point cliqué (`cv::grabCut` ou remplissage de région).
-- Pouvoir ajuster le cadre après l'avoir tracé.
-- Annuler la sélection avec la touche Échap.
 
 ### Caméra et calibration
 

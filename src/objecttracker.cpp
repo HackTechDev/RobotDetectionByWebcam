@@ -41,7 +41,10 @@ QStringList ObjectTracker::algorithmNames()
     return {QObject::tr("CSRT (précis)"), QObject::tr("KCF (rapide)")};
 }
 
-cv::Mat ObjectTracker::toWorkingImage(const QImage &image, double &scale) const
+namespace {
+
+// Image Qt -> BGR d'au plus « maxWidth » px de large ; « scale » = image d'origine / image réduite.
+cv::Mat toBgr(const QImage &image, int maxWidth, double &scale)
 {
     const QImage rgb = image.convertToFormat(QImage::Format_RGB32);
     const cv::Mat bgra(rgb.height(), rgb.width(), CV_8UC4, const_cast<uchar *>(rgb.constBits()),
@@ -49,11 +52,81 @@ cv::Mat ObjectTracker::toWorkingImage(const QImage &image, double &scale) const
     cv::Mat bgr;
     cv::cvtColor(bgra, bgr, cv::COLOR_BGRA2BGR);
     scale = 1.0;
-    if (bgr.cols > kWorkingWidth) {
-        scale = double(bgr.cols) / kWorkingWidth;
+    if (bgr.cols > maxWidth) {
+        scale = double(bgr.cols) / maxWidth;
         cv::resize(bgr, bgr, cv::Size(), 1.0 / scale, 1.0 / scale, cv::INTER_AREA);
     }
     return bgr;
+}
+
+} // namespace
+
+cv::Mat ObjectTracker::toWorkingImage(const QImage &image, double &scale) const
+{
+    return toBgr(image, kWorkingWidth, scale);
+}
+
+QRect ObjectTracker::delineateAt(const QImage &image, const QPoint &point, bool *uncertain)
+{
+    // GrabCut sur une fenêtre centrée sur le clic : on suppose l'objet dans la fenêtre et le fond
+    // autour. La fenêtre fait 40 % du petit côté de l'image (image réduite à 480 px de large).
+    double scale = 1.0;
+    const cv::Mat img = toBgr(image, 480, scale);
+    const cv::Point p(int(point.x() / scale), int(point.y() / scale));
+    const int side = int(0.4 * std::min(img.cols, img.rows));
+    const cv::Rect window = cv::Rect(p.x - side / 2, p.y - side / 2, side, side) & cv::Rect(0, 0, img.cols, img.rows);
+    const cv::Rect fallback(int((p.x - side / 4) * scale), int((p.y - side / 4) * scale), int(side / 2 * scale),
+                            int(side / 2 * scale));
+    if (uncertain)
+        *uncertain = true;
+    if (window.width < 20 || window.height < 20 || !window.contains(p))
+        return QRect(fallback.x, fallback.y, fallback.width, fallback.height);
+
+    // Zone de travail : la fenêtre et une marge de fond autour.
+    const int margin = side / 4;
+    const cv::Rect area = cv::Rect(window.x - margin, window.y - margin, window.width + 2 * margin,
+                                   window.height + 2 * margin) &
+                          cv::Rect(0, 0, img.cols, img.rows);
+    const cv::Mat crop = img(area).clone();
+    cv::Mat mask(crop.size(), CV_8UC1, cv::Scalar(cv::GC_BGD)), bgdModel, fgdModel;
+    const cv::Rect rect = window - area.tl();
+    try {
+        cv::grabCut(crop, mask, rect, bgdModel, fgdModel, 3, cv::GC_INIT_WITH_RECT);
+    } catch (const cv::Exception &) {
+        return QRect(fallback.x, fallback.y, fallback.width, fallback.height);
+    }
+    cv::Mat fg = (mask == cv::GC_FGD) | (mask == cv::GC_PR_FGD);
+    cv::morphologyEx(fg, fg, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_ELLIPSE, {5, 5}));
+
+    // Zone de premier plan qui contient le point cliqué (ou la plus proche, à 10 px près).
+    cv::Mat labels, stats, centroids;
+    const int n = cv::connectedComponentsWithStats(fg, labels, stats, centroids);
+    const cv::Point local = p - area.tl();
+    int best = labels.at<int>(local);
+    if (best == 0) {
+        double bestDist = 10.0;
+        for (int i = 1; i < n; ++i) {
+            const cv::Rect r(stats.at<int>(i, cv::CC_STAT_LEFT), stats.at<int>(i, cv::CC_STAT_TOP),
+                             stats.at<int>(i, cv::CC_STAT_WIDTH), stats.at<int>(i, cv::CC_STAT_HEIGHT));
+            const double dx = std::max({r.x - local.x, 0, local.x - (r.x + r.width)});
+            const double dy = std::max({r.y - local.y, 0, local.y - (r.y + r.height)});
+            if (std::hypot(dx, dy) < bestDist) {
+                bestDist = std::hypot(dx, dy);
+                best = i;
+            }
+        }
+    }
+    if (best <= 0)
+        return QRect(fallback.x, fallback.y, fallback.width, fallback.height);
+    const cv::Rect found(stats.at<int>(best, cv::CC_STAT_LEFT) + area.x, stats.at<int>(best, cv::CC_STAT_TOP) + area.y,
+                         stats.at<int>(best, cv::CC_STAT_WIDTH), stats.at<int>(best, cv::CC_STAT_HEIGHT));
+    // Trop petit, ou remplissant presque toute la fenêtre (objet plus grand que la fenêtre) : douteux.
+    const double fill = double(found.area()) / window.area();
+    if (found.width < 10 || found.height < 10 || fill > 0.9)
+        return QRect(fallback.x, fallback.y, fallback.width, fallback.height);
+    if (uncertain)
+        *uncertain = false;
+    return QRect(int(found.x * scale), int(found.y * scale), int(found.width * scale), int(found.height * scale));
 }
 
 cv::Mat ObjectTracker::colorHistogram(const cv::Mat &bgrPatch)
@@ -165,6 +238,10 @@ bool ObjectTracker::start(const QImage &image, const QRectF &box, qint64 timeMs)
     m_lowConfidenceFrames = 0;
     m_lostFrames = 0;
     m_lastBoxSize = QSizeF(roi.width, roi.height);
+    m_anchorValid = false;
+    m_recentPositions.clear();
+    m_lostReported = false;
+    m_events.clear();
 
     m_state = TrackedObject();
     m_state.active = true;
@@ -278,14 +355,104 @@ const TrackedObject &ObjectTracker::update(const QImage &image, qint64 timeMs, c
         m_trail.pop_front();
 
     computeMotion(floor);
+    updateMotionState(timeMs);
     return m_state;
+}
+
+std::vector<MotionEvent> ObjectTracker::takeEvents()
+{
+    std::vector<MotionEvent> events;
+    events.swap(m_events);
+    return events;
+}
+
+void ObjectTracker::addEvent(MotionEvent::Type type, qint64 timeMs)
+{
+    MotionEvent e;
+    e.type = type;
+    e.timeMs = timeMs;
+    e.onFloor = m_state.hasFloor;
+    e.position = m_state.hasFloor ? m_state.floorPosition : m_state.center;
+    m_events.push_back(e);
+}
+
+void ObjectTracker::updateMotionState(qint64 timeMs)
+{
+    // Perte : signalée une fois la prédiction terminée ; retour : dès que l'objet est retrouvé.
+    if (!m_state.found) {
+        if (!m_state.predicted && !m_lostReported) {
+            m_state.moving = false;
+            addEvent(MotionEvent::Lost, timeMs);
+            m_lostReported = true;
+        }
+        return;
+    }
+    if (m_lostReported || m_state.reacquired) {
+        m_lostReported = false;
+        m_anchorValid = false;  // l'objet a pu réapparaître ailleurs : nouvelle position de repos
+        addEvent(MotionEvent::Found, timeMs);
+    }
+
+    const bool onFloor = m_state.hasFloor;
+    const QPointF pos = onFloor ? m_state.floorPosition : m_state.center;
+    const double threshold = onFloor ? m_motionMm : m_motionPx;
+    // Position de repos à (re)définir : début du suivi, reprise, ou changement d'unité.
+    if (!m_anchorValid || m_anchorOnFloor != onFloor) {
+        m_anchorValid = true;
+        m_anchorOnFloor = onFloor;
+        m_anchor = pos;
+        m_state.moving = false;
+        m_recentPositions.clear();
+        return;
+    }
+
+    if (!m_state.moving) {
+        // Mise en mouvement : l'objet s'est éloigné de sa position de repos de plus que le seuil.
+        const QPointF d = pos - m_anchor;
+        if (std::hypot(d.x(), d.y()) > threshold) {
+            m_state.moving = true;
+            m_moveStartPos = m_anchor;
+            m_moveStartMs = timeMs;
+            m_travelled = std::hypot(d.x(), d.y());
+            m_lastMotionPos = pos;
+            m_recentPositions.clear();
+            addEvent(MotionEvent::MotionStart, timeMs);
+            m_events.back().position = m_anchor;  // le mouvement est parti de la position de repos
+        }
+        return;
+    }
+
+    const QPointF step = pos - m_lastMotionPos;
+    m_travelled += std::hypot(step.x(), step.y());
+    m_lastMotionPos = pos;
+
+    // Retour au repos : sur les 0,5 dernière seconde, l'objet est resté dans un rayon de la moitié
+    // du seuil. Un critère de position résiste mieux au tremblement qu'un seuil de vitesse.
+    m_recentPositions.emplace_back(timeMs, pos);
+    while (m_recentPositions.size() > 2 && timeMs - m_recentPositions[1].first >= 500)
+        m_recentPositions.pop_front();
+    if (timeMs - m_recentPositions.front().first < 500)
+        return;
+    double spread = 0.0;
+    for (const auto &[t, p] : m_recentPositions)
+        spread = std::max(spread, std::hypot(p.x() - pos.x(), p.y() - pos.y()));
+    if (spread < threshold / 2) {
+        m_state.moving = false;
+        m_anchor = pos;
+        addEvent(MotionEvent::MotionStop, timeMs);
+        MotionEvent &e = m_events.back();
+        const QPointF net = pos - m_moveStartPos;
+        e.distance = std::hypot(net.x(), net.y());
+        e.travelled = m_travelled;
+        // Sans la demi-seconde de confirmation de l'arrêt.
+        e.duration = std::max<qint64>(0, timeMs - 500 - m_moveStartMs) / 1000.0;
+    }
 }
 
 void ObjectTracker::computeMotion(const FloorMapper *floor)
 {
     m_state.velocity = QPointF();
     m_state.speed = 0.0;
-    m_state.moving = false;
     m_state.floorVelocity = QPointF();
     m_state.floorSpeed = 0.0;
 
@@ -301,10 +468,6 @@ void ObjectTracker::computeMotion(const FloorMapper *floor)
     m_state.speed = std::hypot(m_state.velocity.x(), m_state.velocity.y());
     m_state.direction = std::atan2(m_state.velocity.y(), m_state.velocity.x()) * kRadToDeg;
 
-    // En mouvement : plus de 10 % de la taille de l'objet par seconde (au moins 5 px/s), pour
-    // ne pas réagir au léger tremblement du cadre.
-    const double size = std::hypot(m_state.box.width(), m_state.box.height());
-    m_state.moving = m_state.speed > std::max(5.0, 0.1 * size);
 
     if (floorReady) {
         // La projection sur le sol n'est pas linéaire : vitesse calculée sur 0,1 s.

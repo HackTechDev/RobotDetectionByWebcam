@@ -4,9 +4,11 @@
 
 #include <QImage>
 #include <QPointF>
+#include <QRect>
 #include <QRectF>
 #include <QStringList>
 #include <deque>
+#include <vector>
 #include <opencv2/core.hpp>
 
 class FloorMapper;
@@ -43,6 +45,20 @@ struct TrackedObject
     double floorDirection = 0;  // en degrés, de l'axe X vers l'axe Y
 };
 
+// Événement de mouvement de l'objet suivi.
+struct MotionEvent
+{
+    enum Type { MotionStart, MotionStop, Lost, Found };
+    Type type = MotionStart;
+    qint64 timeMs = 0;      // horloge du suivi
+    qint64 wallTimeMs = 0;  // heure réelle (ms depuis 1970), renseignée par l'application
+    bool onFloor = false;   // positions et distances en mm sur le sol (sinon en pixels)
+    QPointF position;       // position de l'objet au moment de l'événement
+    double distance = 0;    // fin de mouvement : distance entre le départ et l'arrivée
+    double travelled = 0;   // fin de mouvement : longueur du chemin parcouru
+    double duration = 0;    // fin de mouvement : durée en secondes
+};
+
 // Suivi d'un objet encadré à la main (trackers CSRT ou KCF d'OpenCV), avec sa trajectoire.
 class ObjectTracker
 {
@@ -60,6 +76,10 @@ public:
     ~ObjectTracker();
 
     static QStringList algorithmNames();
+
+    // Délimite automatiquement l'objet situé sous « point » (sélection d'un clic). Si la
+    // délimitation échoue, retourne un carré autour du point et met « uncertain » à vrai.
+    static QRect delineateAt(const QImage &image, const QPoint &point, bool *uncertain = nullptr);
     void setAlgorithm(Algorithm algorithm) { m_algorithm = algorithm; }
     Algorithm algorithm() const { return m_algorithm; }
 
@@ -74,6 +94,17 @@ public:
     }
     // Durée pendant laquelle la position reste prédite après une perte (0 = pas de prédiction).
     void setHoldTime(double seconds) { m_holdMs = qint64(seconds * 1000); }
+    // Seuils de mise en mouvement : distance à la position de repos, en mm sur le sol (si le
+    // repère est défini) ou en pixels. Retour au repos quand l'objet reste dans un rayon de la
+    // moitié du seuil pendant 0,5 s.
+    void setMotionThresholds(double floorMm, double imagePx)
+    {
+        m_motionMm = floorMm;
+        m_motionPx = imagePx;
+    }
+
+    // Événements survenus depuis le dernier appel.
+    std::vector<MotionEvent> takeEvents();
 
     // Commence le suivi de l'objet encadré par « box » dans « image ». Retourne false si le
     // cadre est trop petit ou si le tracker n'a pas pu démarrer.
@@ -97,6 +128,8 @@ private:
     cv::Rect searchObject(const cv::Mat &work) const;
     bool createTracker(const cv::Mat &work, const cv::Rect &roi);
     void computeMotion(const FloorMapper *floor);
+    void updateMotionState(qint64 timeMs);
+    void addEvent(MotionEvent::Type type, qint64 timeMs);
 
     cv::Ptr<cv::Tracker> m_tracker;
     Algorithm m_algorithm = Csrt;
@@ -114,6 +147,20 @@ private:
     cv::Mat m_initGray;  // motif d'origine, tel qu'à la sélection
     int m_lowConfidenceFrames = 0;
     int m_lostFrames = 0;    // images consécutives sans l'objet
+
+    // Détection de mouvement (dans l'unité courante : mm sur le sol ou pixels).
+    double m_motionMm = 20.0;
+    double m_motionPx = 15.0;
+    bool m_anchorValid = false;
+    bool m_anchorOnFloor = false;
+    QPointF m_anchor;          // position de repos
+    QPointF m_lastMotionPos;
+    QPointF m_moveStartPos;
+    qint64 m_moveStartMs = 0;
+    std::deque<std::pair<qint64, QPointF>> m_recentPositions;  // dernières positions (fin de mouvement)
+    double m_travelled = 0.0;
+    bool m_lostReported = false;
+    std::vector<MotionEvent> m_events;
     QSizeF m_lastBoxSize;    // taille du cadre (image de travail) quand l'objet était trouvé
     TrackedObject m_state;
     std::deque<TrailPoint> m_trail;

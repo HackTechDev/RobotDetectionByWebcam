@@ -24,7 +24,8 @@ public:
     // objet n'est suivi) : la clé est alors absente du message.
     bool send(const QSize &imageSize, const std::vector<DetectedSquare> *squares,
               const std::vector<DetectedMarker> *markers, const TrackedObject *tracked = nullptr,
-              const std::vector<const SmoothedTrack *> *tracks = nullptr);
+              const std::vector<const SmoothedTrack *> *tracks = nullptr,
+              const std::vector<MotionEvent> *events = nullptr);
 
     qint64 sentCount() const { return m_sentCount; }
     qint64 lastSize() const { return m_lastSize; }
@@ -35,7 +36,8 @@ public:
                                    const std::vector<DetectedSquare> *squares,
                                    const std::vector<DetectedMarker> *markers,
                                    const TrackedObject *tracked = nullptr,
-                                   const std::vector<const SmoothedTrack *> *tracks = nullptr);
+                                   const std::vector<const SmoothedTrack *> *tracks = nullptr,
+                                   const std::vector<MotionEvent> *events = nullptr);
 
 private:
     QUdpSocket m_socket;

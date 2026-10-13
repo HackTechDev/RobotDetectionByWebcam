@@ -8,21 +8,27 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QColorDialog>
+#include <QFile>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QComboBox>
+#include <QDateTime>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMediaCaptureSession>
 #include <QMediaDevices>
 #include <QPainter>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
+#include <QTextStream>
+#include <QShortcut>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStandardPaths>
@@ -222,6 +228,9 @@ MainWindow::MainWindow(QWidget *parent)
     trackForm->addRow(tr("Méthode"), m_trackAlgoCombo);
     m_trackSelectButton = new QPushButton(trackBox);
     trackForm->addRow(m_trackSelectButton);
+    m_trackStartButton = new QPushButton(tr("Démarrer le suivi"), trackBox);
+    m_trackStartButton->setToolTip(tr("Valide le cadre (aussi avec Entrée ou un double-clic dans le cadre)"));
+    trackForm->addRow(m_trackStartButton);
     m_trackStopButton = new QPushButton(tr("Arrêter le suivi"), trackBox);
     trackForm->addRow(m_trackStopButton);
     m_trackTrailCheck = new QCheckBox(tr("Afficher la trajectoire"), trackBox);
@@ -233,6 +242,22 @@ MainWindow::MainWindow(QWidget *parent)
     m_trackTrailSpin->setSuffix(QStringLiteral(" s"));
     m_trackTrailSpin->setValue(10);
     trackForm->addRow(tr("Durée de la trajectoire"), m_trackTrailSpin);
+    auto makeThresholdSpin = [trackBox](double value, const QString &suffix) {
+        auto *spin = new QDoubleSpinBox(trackBox);
+        spin->setRange(1, 10000);
+        spin->setDecimals(0);
+        spin->setSuffix(suffix);
+        spin->setValue(value);
+        return spin;
+    };
+    m_motionMmSpin = makeThresholdSpin(20, QStringLiteral(" mm"));
+    m_motionMmSpin->setToolTip(tr("Distance à partir de laquelle l'objet est « en mouvement », quand le "
+                                  "repère du sol est défini."));
+    m_motionPxSpin = makeThresholdSpin(15, QStringLiteral(" px"));
+    m_motionPxSpin->setToolTip(tr("Distance à partir de laquelle l'objet est « en mouvement », sans "
+                                  "repère du sol."));
+    trackForm->addRow(tr("Seuil de mouvement (sol)"), m_motionMmSpin);
+    trackForm->addRow(tr("Seuil de mouvement (image)"), m_motionPxSpin);
     trackLayout->addWidget(trackBox);
 
     // Lissage dans le temps des carrés et des marqueurs (filtre de Kalman).
@@ -266,14 +291,37 @@ MainWindow::MainWindow(QWidget *parent)
     m_trackLabel->setWordWrap(true);
     m_trackLabel->setTextFormat(Qt::RichText);
     trackLayout->addWidget(m_trackLabel);
-    auto *trackHelp = new QLabel(tr("<i>Cliquez sur « Sélectionner un objet », puis tracez un rectangle "
-                                    "autour de l'objet dans l'image. Encadrez l'objet au plus près, "
-                                    "avec le moins de fond possible.</i>"),
+    auto *trackHelp = new QLabel(tr("<i>Cliquez sur « Sélectionner un objet », puis cliquez sur l'objet dans "
+                                    "l'image (délimitation automatique) ou tracez un rectangle autour. "
+                                    "Ajustez le cadre avec ses poignées, puis validez avec « Démarrer le suivi », "
+                                    "Entrée ou un double-clic. Échap annule.</i>"),
                                  trackTab);
     trackHelp->setWordWrap(true);
     trackLayout->addWidget(trackHelp);
+
+    // Journal des événements de mouvement de l'objet suivi.
+    auto *eventBox = new QGroupBox(tr("Journal des événements"), trackTab);
+    auto *eventLayout = new QVBoxLayout(eventBox);
+    m_eventList = new QListWidget(eventBox);
+    m_eventList->setMinimumHeight(110);
+    eventLayout->addWidget(m_eventList);
+    auto *eventButtons = new QHBoxLayout;
+    auto *clearEventsButton = new QPushButton(tr("Effacer"), eventBox);
+    auto *saveEventsButton = new QPushButton(tr("Enregistrer..."), eventBox);
+    eventButtons->addWidget(clearEventsButton);
+    eventButtons->addWidget(saveEventsButton);
+    eventLayout->addLayout(eventButtons);
+    trackLayout->addWidget(eventBox);
+    connect(clearEventsButton, &QPushButton::clicked, m_eventList, &QListWidget::clear);
+    connect(saveEventsButton, &QPushButton::clicked, this, &MainWindow::saveEventLog);
+
     trackLayout->addStretch();
-    tabs->addTab(trackTab, tr("Suivi"));
+    // Onglet long : zone défilante pour ne pas repousser le panneau Résultat.
+    auto *trackScroll = new QScrollArea(tabs);
+    trackScroll->setWidget(trackTab);
+    trackScroll->setWidgetResizable(true);
+    trackScroll->setFrameShape(QFrame::NoFrame);
+    tabs->addTab(trackScroll, tr("Suivi"));
 
     // Onglet envoi UDP : un message JSON par image traitée.
     auto *udpTab = new QWidget(tabs);
@@ -351,6 +399,19 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_calibrateButton, &QPushButton::clicked, this, &MainWindow::calibrate);
     connect(m_trackSelectButton, &QPushButton::clicked, this, &MainWindow::toggleTrackSelection);
+    connect(m_trackStartButton, &QPushButton::clicked, m_video, &VideoWidget::confirmSelection);
+    connect(m_video, &VideoWidget::selectionPointClicked, this, &MainWindow::onSelectionPointClicked);
+    connect(m_video, &VideoWidget::pendingRectChanged, this, &MainWindow::updateTrackStatus);
+    // Échap annule la saisie en cours ; Entrée valide le cadre (raccourci actif seulement
+    // quand un cadre attend, pour ne pas gêner la saisie dans les champs).
+    auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+    connect(escape, &QShortcut::activated, this, &MainWindow::cancelCurrentInput);
+    m_confirmShortcut = new QShortcut(QKeySequence(Qt::Key_Return), this);
+    m_confirmShortcutKeypad = new QShortcut(QKeySequence(Qt::Key_Enter), this);
+    for (QShortcut *shortcut : {m_confirmShortcut, m_confirmShortcutKeypad}) {
+        shortcut->setEnabled(false);
+        connect(shortcut, &QShortcut::activated, m_video, &VideoWidget::confirmSelection);
+    }
     connect(m_trackStopButton, &QPushButton::clicked, this, &MainWindow::stopTracking);
     connect(m_video, &VideoWidget::rectangleSelected, this, &MainWindow::onRectangleSelected);
     connect(m_trackAlgoCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
@@ -358,6 +419,11 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_trackTrailSpin, &QDoubleSpinBox::valueChanged, this,
             [this](double seconds) { m_tracker.setTrailDuration(seconds); });
+    for (QDoubleSpinBox *spin : {m_motionMmSpin, m_motionPxSpin}) {
+        connect(spin, &QDoubleSpinBox::valueChanged, this, [this] {
+            m_tracker.setMotionThresholds(m_motionMmSpin->value(), m_motionPxSpin->value());
+        });
+    }
     connect(m_smoothBox, &QGroupBox::toggled, this, [this] {
         m_smoother.clear();
         applySmoothingToTracker();
@@ -607,6 +673,9 @@ void MainWindow::loadSettings()
     m_trackAlgoCombo->setCurrentIndex(std::clamp(s.value(QStringLiteral("tracking/algorithm"), 0).toInt(), 0, 1));
     m_trackTrailCheck->setChecked(s.value(QStringLiteral("tracking/showTrail"), true).toBool());
     m_trackTrailSpin->setValue(s.value(QStringLiteral("tracking/trailSeconds"), m_trackTrailSpin->value()).toDouble());
+    m_motionMmSpin->setValue(s.value(QStringLiteral("tracking/motionThresholdMm"), m_motionMmSpin->value()).toDouble());
+    m_motionPxSpin->setValue(s.value(QStringLiteral("tracking/motionThresholdPx"), m_motionPxSpin->value()).toDouble());
+    m_tracker.setMotionThresholds(m_motionMmSpin->value(), m_motionPxSpin->value());
 
     m_udpHostEdit->setText(s.value(QStringLiteral("udp/host"), m_udpHostEdit->text()).toString());
     m_udpPortSpin->setValue(s.value(QStringLiteral("udp/port"), m_udpPortSpin->value()).toInt());
@@ -652,6 +721,8 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("smoothing/showTrails"), m_smoothTrailCheck->isChecked());
     s.setValue(QStringLiteral("smoothing/trailSeconds"), m_smoothTrailSpin->value());
     s.setValue(QStringLiteral("tracking/algorithm"), m_trackAlgoCombo->currentIndex());
+    s.setValue(QStringLiteral("tracking/motionThresholdMm"), m_motionMmSpin->value());
+    s.setValue(QStringLiteral("tracking/motionThresholdPx"), m_motionPxSpin->value());
     s.setValue(QStringLiteral("tracking/showTrail"), m_trackTrailCheck->isChecked());
     s.setValue(QStringLiteral("tracking/trailSeconds"), m_trackTrailSpin->value());
     s.setValue(QStringLiteral("udp/enabled"), m_udpBox->isChecked());
@@ -1087,6 +1158,35 @@ void MainWindow::onRectangleSelected(const QRect &displayRect)
     }
 }
 
+void MainWindow::onSelectionPointClicked(const QPoint &displayPos)
+{
+    if (m_lastFrame.isNull())
+        return;
+    // Délimitation automatique sur l'image réelle (le clic est fait sur l'image affichée).
+    const bool mirror = m_mirrorCheck->isChecked();
+    const int w = m_lastFrame.width();
+    const QPoint pos = mirror ? QPoint(w - 1 - displayPos.x(), displayPos.y()) : displayPos;
+    bool uncertain = false;
+    QRect rect = ObjectTracker::delineateAt(m_lastFrame, pos, &uncertain);
+    if (mirror)
+        rect.moveLeft(w - rect.right() - 1);
+    m_video->setPendingRect(rect);
+    if (uncertain) {
+        m_trackLabel->setText(tr("<b style='color:#c60'>Objet mal délimité</b> : ajustez le cadre avec ses "
+                                 "poignées, ou tracez un rectangle, puis validez."));
+    }
+}
+
+void MainWindow::cancelCurrentInput()
+{
+    if (m_video->selectionMode()) {
+        m_video->setSelectionMode(false);
+        updateTrackStatus();
+    } else if (m_floorPicking) {
+        toggleFloorPicking();
+    }
+}
+
 void MainWindow::stopTracking()
 {
     m_video->setSelectionMode(false);
@@ -1106,11 +1206,18 @@ void MainWindow::applySmoothingToTracker()
 void MainWindow::updateTrackStatus()
 {
     const bool selecting = m_video->selectionMode();
+    const bool pending = selecting && m_video->hasPendingRect();
     m_trackSelectButton->setText(selecting ? tr("Annuler") : tr("Sélectionner un objet"));
+    m_trackStartButton->setEnabled(pending);
+    m_confirmShortcut->setEnabled(pending);
+    m_confirmShortcutKeypad->setEnabled(pending);
     m_trackStopButton->setEnabled(m_tracker.isActive());
-    if (selecting) {
-        m_trackLabel->setText(tr("<b style='color:#c60'>Tracez un rectangle</b> autour de l'objet dans "
-                                 "l'image (cliquer-glisser)."));
+    if (pending) {
+        m_trackLabel->setText(tr("<b style='color:#c60'>Ajustez le cadre</b> (poignées, glisser), puis "
+                                 "validez : « Démarrer le suivi », Entrée ou double-clic dans le cadre."));
+    } else if (selecting) {
+        m_trackLabel->setText(tr("<b style='color:#c60'>Cliquez sur l'objet</b> dans l'image, ou tracez un "
+                                 "rectangle autour (cliquer-glisser)."));
     } else if (!m_tracker.isActive()) {
         m_trackLabel->setText(tr("Aucun objet suivi."));
     } else if (m_tracker.state().found) {
@@ -1123,6 +1230,82 @@ void MainWindow::updateTrackStatus()
         m_trackLabel->setText(tr("<b style='color:#c00'>Objet perdu</b> : recherche en cours dans toute "
                                  "l'image. Il sera retrouvé automatiquement s'il réapparaît avec un aspect "
                                  "proche ; sinon, resélectionnez-le."));
+    }
+}
+
+namespace {
+
+QString eventText(const MotionEvent &e)
+{
+    const QString unit = e.onFloor ? QStringLiteral("mm") : QStringLiteral("px");
+    const QString where = QStringLiteral("(%1, %2) %3").arg(e.position.x(), 0, 'f', 0).arg(e.position.y(), 0, 'f', 0).arg(unit);
+    switch (e.type) {
+    case MotionEvent::MotionStart:
+        return QObject::tr("Début de mouvement depuis %1").arg(where);
+    case MotionEvent::MotionStop:
+        return QObject::tr("Fin de mouvement en %1 — déplacement %2 %3, parcours %4 %3, durée %5 s")
+            .arg(where)
+            .arg(e.distance, 0, 'f', 0)
+            .arg(unit)
+            .arg(e.travelled, 0, 'f', 0)
+            .arg(e.duration, 0, 'f', 1);
+    case MotionEvent::Lost:
+        return QObject::tr("Objet perdu (dernière position %1)").arg(where);
+    case MotionEvent::Found:
+        return QObject::tr("Objet retrouvé en %1").arg(where);
+    }
+    return {};
+}
+
+QString eventTypeKey(MotionEvent::Type type)
+{
+    switch (type) {
+    case MotionEvent::MotionStart: return QStringLiteral("motion_start");
+    case MotionEvent::MotionStop: return QStringLiteral("motion_stop");
+    case MotionEvent::Lost: return QStringLiteral("lost");
+    case MotionEvent::Found: return QStringLiteral("found");
+    }
+    return {};
+}
+
+} // namespace
+
+void MainWindow::logEvents(const std::vector<MotionEvent> &events)
+{
+    // Le plus récent en haut ; on garde les 500 derniers.
+    for (const MotionEvent &e : events) {
+        const QString time = QDateTime::fromMSecsSinceEpoch(e.wallTimeMs).toString(QStringLiteral("HH:mm:ss.z"));
+        auto *item = new QListWidgetItem(QStringLiteral("%1  %2").arg(time, eventText(e)));
+        // Données brutes, pour l'enregistrement en CSV.
+        item->setData(Qt::UserRole, QVariantList{e.wallTimeMs, eventTypeKey(e.type), e.position.x(), e.position.y(),
+                                                 e.onFloor ? QStringLiteral("mm") : QStringLiteral("px"),
+                                                 e.distance, e.travelled, e.duration});
+        m_eventList->insertItem(0, item);
+    }
+    while (m_eventList->count() > 500)
+        delete m_eventList->takeItem(m_eventList->count() - 1);
+}
+
+void MainWindow::saveEventLog()
+{
+    const QString path = QFileDialog::getSaveFileName(this, tr("Enregistrer le journal"),
+                                                      QStringLiteral("evenements.csv"), tr("Fichiers CSV (*.csv)"));
+    if (path.isEmpty())
+        return;
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Erreur"), tr("Impossible d'enregistrer %1").arg(path));
+        return;
+    }
+    QTextStream out(&file);
+    out << "heure;horodatage_ms;type;x;y;unite;deplacement;parcours;duree_s\n";
+    for (int i = m_eventList->count() - 1; i >= 0; --i) {  // du plus ancien au plus récent
+        const QVariantList d = m_eventList->item(i)->data(Qt::UserRole).toList();
+        out << QDateTime::fromMSecsSinceEpoch(d[0].toLongLong()).toString(Qt::ISODateWithMs) << ';' << d[0].toLongLong()
+            << ';' << d[1].toString() << ';' << QString::number(d[2].toDouble(), 'f', 1) << ';'
+            << QString::number(d[3].toDouble(), 'f', 1) << ';' << d[4].toString() << ';'
+            << QString::number(d[5].toDouble(), 'f', 1) << ';' << QString::number(d[6].toDouble(), 'f', 1) << ';'
+            << QString::number(d[7].toDouble(), 'f', 2) << '\n';
     }
 }
 
@@ -1175,6 +1358,7 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         markersOn ? m_markerDetector.detect(image) : std::vector<DetectedMarker>();
     if (m_floor.prepare(image.size()))
         m_floor.apply(squares, markers);
+    std::vector<MotionEvent> frameEvents;
     if (m_tracker.isActive()) {
         if (image.size() != m_trackImageSize) {
             m_tracker.stop();  // le cadre n'a plus de sens dans une autre résolution
@@ -1186,6 +1370,12 @@ void MainWindow::onFrame(const QVideoFrame &frame)
             m_tracker.update(image, m_clock.elapsed(), &m_floor);
             if (m_tracker.state().found != wasFound)
                 updateTrackStatus();
+            frameEvents = m_tracker.takeEvents();
+            // Heure réelle de chaque événement, à partir de l'horloge du suivi.
+            const qint64 nowWall = QDateTime::currentMSecsSinceEpoch(), nowClock = m_clock.elapsed();
+            for (MotionEvent &e : frameEvents)
+                e.wallTimeMs = nowWall - (nowClock - e.timeMs);
+            logEvents(frameEvents);
         }
     }
     if (m_smoothBox->isChecked()) {
@@ -1229,7 +1419,7 @@ void MainWindow::onFrame(const QVideoFrame &frame)
     if (m_udpBox->isChecked() && m_sender.hasTarget()) {
         m_sender.send(image.size(), squaresOn ? &squares : nullptr, markersOn ? &markers : nullptr,
                       m_tracker.isActive() ? &m_tracker.state() : nullptr,
-                      m_smoothBox->isChecked() ? &tracks : nullptr);
+                      m_smoothBox->isChecked() ? &tracks : nullptr, frameEvents.empty() ? nullptr : &frameEvents);
         QString text = tr("Destination : <b>%1</b><br>Messages envoyés : %2 (dernier : %3 octets)")
                            .arg(m_sender.targetDescription())
                            .arg(m_sender.sentCount())

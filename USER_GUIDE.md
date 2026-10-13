@@ -265,9 +265,18 @@ L'onglet **Suivi** sert aussi à lisser dans le temps les positions des carrés 
    - **CSRT (précis)** : suit mieux l'objet, y compris quand sa taille change. C'est le choix par défaut.
    - **KCF (rapide)** : environ 4 fois plus rapide, mais décroche plus facilement.
 3. Cliquez sur **Sélectionner un objet**.
-4. Dans l'image, **cliquez-glissez** pour tracer un rectangle autour de l'objet, au plus près, avec le moins de fond possible. Le rectangle s'affiche en pointillés pendant le tracé.
+4. Désignez l'objet dans l'image, au choix :
+   - **cliquez simplement dessus** : l'application délimite l'objet toute seule autour du point cliqué ;
+   - ou **cliquez-glissez** pour tracer un rectangle autour, au plus près, avec le moins de fond possible.
+5. Le cadre s'affiche en pointillés avec **8 poignées**. Ajustez-le si besoin :
+   - faites glisser une **poignée** pour le redimensionner ;
+   - faites glisser l'**intérieur** du cadre pour le déplacer ;
+   - cliquez ou tracez **ailleurs** pour recommencer.
+6. Validez, au choix, avec le bouton **Démarrer le suivi**, la touche **Entrée** ou un **double-clic** dans le cadre. Le suivi démarre.
 
-Le suivi démarre dès que vous relâchez le bouton de la souris. **Annuler** abandonne la sélection. **Arrêter le suivi** arrête de suivre l'objet. Pour suivre un autre objet, sélectionnez-le simplement : il remplace le précédent.
+La délimitation automatique fonctionne bien pour un objet qui se détache du fond. Elle cherche l'objet dans une zone autour du clic (40 % du petit côté de l'image) : un objet plus grand que cette zone, ou qui se confond avec le fond, est mal délimité. Le message « Objet mal délimité » s'affiche alors, et un carré est proposé autour du clic : ajustez-le avec les poignées.
+
+**Annuler** ou la touche **Échap** abandonnent la sélection. L'image continue de défiler pendant l'ajustement : si l'objet bouge, recadrez-le avant de valider. **Arrêter le suivi** arrête de suivre l'objet. Pour suivre un autre objet, sélectionnez-le simplement : il remplace le précédent.
 
 Le choix de la méthode s'applique à la prochaine sélection.
 
@@ -284,7 +293,7 @@ Dans le panneau **Résultat** :
 
 | Valeur | Signification |
 |---|---|
-| **en mouvement / immobile** | L'objet est « en mouvement » s'il parcourt plus de 10 % de sa taille par seconde. En dessous, on considère qu'il ne bouge pas : le cadre tremble toujours un peu. |
+| **en mouvement / immobile** | L'objet passe « en mouvement » quand il s'éloigne de sa position de repos de plus du **seuil de mouvement** (20 mm sur le sol, ou 15 px dans l'image sans repère du sol). Il redevient « immobile » quand il reste dans un rayon de la moitié du seuil pendant 0,5 s. Voir [6.5](#65-événements-de-mouvement). |
 | **Position** lissée, **vitesse, direction** | Centre du cadre en pixels (voir [9.1](#91-coordonnées-dans-limage-en-pixels)), vitesse et direction, estimés par un filtre de Kalman, avec la **Force du lissage** du groupe « Lissage des carrés et marqueurs » (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)). La direction est en degrés, de −180 à 180 : 0° vers la droite, 90° vers le bas de l'image. |
 | **Confiance** | Ressemblance du contenu du cadre avec l'objet tel qu'il était à la sélection, de 0 à 100 %. Elle suit lentement les changements progressifs (éclairage, rotation), mais chute si le cadre glisse sur le fond ou s'accroche à un autre objet passé devant. Sous 45 % pendant quelques images, l'objet est déclaré perdu, même si le tracker croit encore le suivre. |
 | **Sol, vitesse au sol** | Si le repère du sol est défini : position en mm, vitesse en mm/s et direction sur le sol, comptée de l'axe X vers l'axe Y (voir [section 8](#8-définir-le-repère-du-sol)) |
@@ -335,6 +344,33 @@ Dans le panneau **Résultat**, la vitesse s'ajoute sous chaque carré et marqueu
 Changer de résolution remet le lissage à zéro.
 
 Si vous décochez le groupe, la position de l'objet encadré redevient celle du tracker, sans prédiction. Sa vitesse reste estimée par le filtre, avec une force moyenne, car la vitesse brute est trop bruitée pour distinguer un objet immobile d'un objet en mouvement. Pour la même raison, une force de 0 rend la vitesse instable.
+
+### 6.5 Événements de mouvement
+
+L'application signale les moments où l'objet suivi **se met en mouvement**, **s'arrête**, est **perdu** ou **retrouvé**. Ces événements s'affichent dans le **Journal des événements** de l'onglet **Suivi**, le plus récent en haut :
+
+```
+20:53:16.1  Début de mouvement depuis (249, 298) px
+20:53:18.5  Fin de mouvement en (342, 299) px — déplacement 93 px, parcours 95 px, durée 2.0 s
+20:53:20.6  Objet perdu (dernière position (341, 299) px)
+20:53:23.1  Objet retrouvé en (599, 449) px
+```
+
+- **Début de mouvement** : l'objet s'est éloigné de sa position de repos de plus du **seuil de mouvement**. La position indiquée est celle d'où il est parti.
+- **Fin de mouvement** : l'objet est resté dans un rayon de la moitié du seuil pendant 0,5 s. L'événement donne la position d'arrivée, le **déplacement** (distance en ligne droite depuis le départ), le **parcours** (longueur du chemin suivi) et la **durée** du mouvement.
+- **Objet perdu** : une fois la position prédite épuisée (**Maintien après perte**).
+- **Objet retrouvé** : dès que le suivi reprend, par le tracker ou par la recherche dans toute l'image.
+
+| Réglage | Valeur par défaut | Rôle |
+|---|---|---|
+| **Seuil de mouvement (sol)** | 20 mm | Utilisé quand le repère du sol est défini : positions et distances en mm |
+| **Seuil de mouvement (image)** | 15 px | Utilisé sans repère du sol : positions et distances en pixels |
+
+Un seuil plus petit signale les moindres déplacements, mais risque de réagir au tremblement du cadre. Un seuil plus grand ne signale que les vrais déplacements.
+
+**Effacer** vide le journal. **Enregistrer...** l'exporte en **CSV** (séparateur `;`), du plus ancien au plus récent, avec les colonnes `heure`, `horodatage_ms`, `type` (`motion_start`, `motion_stop`, `lost`, `found`), `x`, `y`, `unite` (`mm` ou `px`), `deplacement`, `parcours` et `duree_s`. Le journal garde les 500 derniers événements et n'est pas conservé entre deux lancements.
+
+Les événements sont aussi envoyés en UDP, dans la liste `events` (voir [10.3](#103-format-des-messages)).
 
 ---
 
@@ -594,6 +630,7 @@ Chaque image traitée produit **un message**, sur une seule ligne. Voici un exem
 | `corners` | Les 4 coins `[x, y]`, en pixels. Pour un marqueur, le premier est le coin d'origine (point rouge à l'écran). |
 | `id` | Identifiant du marqueur |
 | `floor` | Uniquement si le repère du sol est défini : `position_mm` `[X, Y]` sur le sol, et `heading_deg` (cap d'un marqueur) ou `angle_deg` (angle d'un carré, de 0 à 90), voir [8.3](#83-lire-les-positions-au-sol) |
+| `events` | Uniquement quand un événement de l'objet suivi survient à cette image (voir [6.5](#65-événements-de-mouvement)). Chaque événement n'est envoyé qu'une fois, avec `type` (`motion_start`, `motion_stop`, `lost` ou `found`), `timestamp_ms` (heure de l'événement) et `position_mm` (sur le sol) ou `position_px` (dans l'image). Pour `motion_stop` s'ajoutent `distance_mm` (ou `_px`), `travelled_mm` (ou `_px`) et `duration_s`. |
 | `tracks` | Uniquement si le lissage est actif (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)) : une entrée par carré principal ou marqueur suivi, avec `type` (`square` ou `marker`), `id` (marqueur), `predicted` (non détecté dans cette image), `position_px` lissée, `velocity_px_s`, `speed_px_s`, `angle_deg` lissé et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s`, `direction_deg` et `heading_deg` (marqueur) ou `angle_deg` (carré) |
 | `tracked` | Uniquement si un objet est suivi (voir [section 6](#6-suivre-un-objet-encadré)) : `found` (trouvé ou perdu), `predicted` (perdu depuis peu, position prédite), `confidence` (indice de confiance, de 0 à 1), `drifted` (perdu parce que le cadre ne ressemble plus à l'objet), `reacquired` (retrouvé à cette image par la recherche dans toute l'image), `reacquisitions` (nombre de reprises automatiques depuis la sélection), `center` (position lissée), `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
 | `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [9.2](#92-position-3d-dun-marqueur-en-mm-après-calibration) et [9.3](#93-rotations-dun-marqueur-en-degrés-après-calibration)) |
@@ -704,6 +741,10 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 **Les positions lissées sont en retard sur l'objet**
 - Diminuez la **Force du lissage**. Un lissage fort ralentit la réaction aux démarrages et aux virages.
 
+**Le journal signale des mouvements alors que l'objet ne bouge pas, ou l'inverse**
+- Augmentez le **seuil de mouvement** (onglet **Suivi**) si de faux départs apparaissent : le cadre tremble, surtout avec un objet peu texturé ou une image bruitée. Diminuez-le si de vrais petits déplacements ne sont pas signalés.
+- Avec un repère du sol, c'est le seuil en mm qui compte ; sans repère, le seuil en pixels.
+
 **L'objet suivi est perdu ou le cadre glisse sur le fond**
 - Resélectionnez l'objet en l'encadrant au plus près, avec le moins de fond possible : le fond compté dans la sélection abaisse la confiance quand l'objet se déplace devant un autre décor.
 - Préférez la méthode **CSRT**, plus robuste que KCF.
@@ -748,7 +789,7 @@ L'application retrouve au lancement les réglages de la fois précédente :
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
 - **Sol** : les 4 points du repère, les dimensions du rectangle et l'affichage de la zone ;
-- **Suivi** : la méthode, l'affichage et la durée de la trajectoire (l'objet sélectionné, lui, n'est pas mémorisé), et tous les réglages du lissage ;
+- **Suivi** : la méthode, l'affichage et la durée de la trajectoire, les seuils de mouvement (l'objet sélectionné et le journal des événements, eux, ne sont pas mémorisés), et tous les réglages du lissage ;
 - **Envoi UDP** : activation, adresse et port ;
 - **Fenêtre** : taille, position et onglet ouvert.
 

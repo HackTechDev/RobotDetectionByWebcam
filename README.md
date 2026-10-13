@@ -129,13 +129,15 @@ Le repère fonctionne sans calibration. Si la caméra est calibrée, la distorsi
 
 ### Suivi d'un objet encadré
 
-Dans l'onglet « Suivi », cliquer sur « Sélectionner un objet », puis tracer un rectangle autour de l'objet dans l'image (cliquer-glisser). L'objet est ensuite suivi d'image en image par un tracker OpenCV :
+Dans l'onglet « Suivi », cliquer sur « Sélectionner un objet », puis cliquer sur l'objet dans l'image ou tracer un rectangle autour. Un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ensuite ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Démarrer le suivi », touche Entrée ou double-clic. Échap annule. L'objet est ensuite suivi d'image en image par un tracker OpenCV :
 - **CSRT** : précis, environ 20 ms par image ;
 - **KCF** : rapide, environ 5 ms par image.
 
 L'application affiche le cadre, la **trajectoire** (durée réglable, 10 s par défaut) et une flèche dans le sens du déplacement. Le panneau « Résultat » donne la position, l'état (en mouvement ou immobile), la vitesse et la direction, lissées par un filtre de Kalman (mêmes réglages que le lissage des carrés et des marqueurs). Juste après une perte, la position est prédite à vitesse constante pendant le délai de maintien. Si le repère du sol est défini, il donne aussi la position, la vitesse et la direction en mm sur le sol. Ces valeurs sont envoyées en UDP (objet `tracked`).
 
 Un **indice de confiance** compare à chaque image le contenu du cadre à l'apparence de l'objet. S'il chute, l'objet est déclaré perdu, même si le tracker croit encore le suivre : cela arrive quand le cadre glisse sur le fond ou s'accroche à un autre objet passé devant. Le tracker peut aussi perdre l'objet (objet caché, sorti de l'image, trop rapide). Dans les deux cas, l'application **recherche l'objet dans toute l'image** et reprend le suivi dès qu'il réapparaît, même ailleurs. Un objet revenu très tourné ou de taille très différente peut ne pas être reconnu : il faut alors le resélectionner. Le cadre reste droit : l'orientation de l'objet n'est pas mesurée. Changer de résolution arrête le suivi.
+
+L'état « en mouvement » repose sur un **seuil de distance** réglable : 20 mm sur le sol, ou 15 px sans repère du sol. Les **débuts et fins de mouvement**, les pertes et les reprises sont inscrits dans un **journal des événements** horodaté, enregistrable en CSV, et envoyés en UDP (liste `events`).
 
 ### Lissage dans le temps
 
@@ -203,6 +205,8 @@ Le code se trouve dans `src/objecttracker.cpp`.
 5. Chaque position trouvée est ajoutée à la trajectoire, horodatée. Les points plus anciens que la durée choisie sont retirés.
 6. Le centre du cadre passe dans un filtre de Kalman à vitesse constante (`KalmanFilter2D`, le même que pour le lissage des carrés et des marqueurs). On en tire la position lissée et la vitesse. Quand le tracker perd l'objet, le filtre prédit la position pendant le délai de maintien. Sans lissage, la position est celle du tracker, mais la vitesse reste filtrée (force 50). L'objet est « en mouvement » au-delà de 10 % de la diagonale de son cadre par seconde (au moins 5 px/s).
 7. Si le repère du sol est prêt, la position est projetée sur le sol, ainsi que la position atteinte 0,1 s plus tard à la vitesse estimée, pour obtenir la vitesse et la direction en mm.
+8. **Événements de mouvement.** L'objet passe « en mouvement » quand il s'éloigne de sa position de repos de plus du seuil, en mm sur le sol si le repère est prêt, sinon en pixels. Il redevient « immobile » quand, sur la dernière demi-seconde, il est resté dans un rayon de la moitié du seuil. Ce critère de position résiste mieux au tremblement qu'un seuil de vitesse : à l'arrêt, la vitesse mesurée peut atteindre une douzaine de px/s. La fin de mouvement donne la distance nette, la longueur du chemin et la durée, sans la demi-seconde de confirmation. Une perte est signalée une fois la position prédite épuisée, une reprise dès que l'objet est retrouvé. Sur une séquence de synthèse avec bruit de capteur, il n'y a aucun faux départ à l'arrêt ni pour un déplacement de 8 px, et un déplacement de 300 px est mesuré à 304 px.
+9. **Sélection d'un clic.** `cv::grabCut` est appliqué sur une zone carrée de 40 % du petit côté de l'image, centrée sur le clic, avec une marge de fond autour (image réduite à 480 px de large). On garde la zone de premier plan qui contient le clic. Si elle est trop petite ou remplit presque toute la zone, un carré est proposé autour du clic. Sur des objets de synthèse (texturé, disque, boîte, petit objet), le cadre obtenu recouvre le vrai cadre à 92 à 100 %, en 70 à 120 ms.
 
 Sur une séquence de synthèse (objet texturé sur fond texturé, 1280 × 960, bruit de capteur simulé), la vitesse est retrouvée à 299 px/s pour 300 px/s réels. À l'arrêt, la vitesse mesurée est de 6 px/s avec le lissage par défaut, contre 30 px/s sans filtre.
 

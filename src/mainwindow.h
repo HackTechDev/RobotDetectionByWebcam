@@ -21,8 +21,10 @@ class QFormLayout;
 class QGroupBox;
 class QLabel;
 class QLineEdit;
+class QListWidget;
 class QMediaCaptureSession;
 class QPushButton;
+class QShortcut;
 class QSlider;
 class QSpinBox;
 class QTabWidget;
@@ -64,6 +66,9 @@ private slots:
     void toggleTrackSelection();
     void onRectangleSelected(const QRect &displayRect);
     void stopTracking();
+    void onSelectionPointClicked(const QPoint &displayPos);
+    void cancelCurrentInput();
+    void saveEventLog();
 
 private:
     QSlider *addSlider(QFormLayout *form, const QString &label, int min, int max, int value);
@@ -84,6 +89,7 @@ private:
     void updateFloorStatus();
     void updateTrackStatus();
     void applySmoothingToTracker();
+    void logEvents(const std::vector<MotionEvent> &events);
     void saveSettings() const;
 
     QMediaCaptureSession *m_session = nullptr;
@@ -133,6 +139,12 @@ private:
 
     QComboBox *m_trackAlgoCombo = nullptr;
     QPushButton *m_trackSelectButton = nullptr;
+    QPushButton *m_trackStartButton = nullptr;
+    QDoubleSpinBox *m_motionMmSpin = nullptr;
+    QDoubleSpinBox *m_motionPxSpin = nullptr;
+    QListWidget *m_eventList = nullptr;
+    QShortcut *m_confirmShortcut = nullptr;
+    QShortcut *m_confirmShortcutKeypad = nullptr;
     QPushButton *m_trackStopButton = nullptr;
     QCheckBox *m_trackTrailCheck = nullptr;
     QDoubleSpinBox *m_trackTrailSpin = nullptr;

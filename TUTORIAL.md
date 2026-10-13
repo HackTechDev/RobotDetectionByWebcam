@@ -174,12 +174,12 @@ ID 1 : (320, 241) px, côté 82 px, 0.0°
 1. Posez une **tasse** (ou un autre objet bien visible) devant la caméra.
 2. Ouvrez l'onglet **Suivi** et laissez la **Méthode** sur **CSRT (précis)**.
 3. Cliquez sur **Sélectionner un objet**.
-4. Dans l'image, **cliquez-glissez** pour tracer un rectangle autour de la tasse, au plus près. Relâchez le bouton : le suivi démarre.
+4. **Cliquez sur la tasse** dans l'image : l'application la délimite toute seule, et un cadre en pointillés apparaît avec des poignées. Ajustez-le si besoin (poignées, glisser), puis appuyez sur **Entrée** : le suivi démarre. Vous pouvez aussi tracer le cadre vous-même, en cliquant-glissant autour de la tasse.
 5. Déplacez lentement la tasse :
    - elle reste entourée d'un **cadre cyan**, avec sa vitesse au-dessus ;
    - une **ligne cyan** dessine sa trajectoire sur les 10 dernières secondes ;
    - une **flèche** indique le sens du déplacement.
-6. Le panneau **Résultat** affiche `Objet suivi : en mouvement`, puis `immobile` quand vous la lâchez, avec sa position, sa vitesse et sa direction.
+6. Le panneau **Résultat** affiche `Objet suivi : en mouvement`, puis `immobile` quand vous la lâchez, avec sa position, sa vitesse et sa direction. Faites défiler l'onglet **Suivi** jusqu'au **Journal des événements** : un « Début de mouvement », puis une « Fin de mouvement » avec la distance parcourue et la durée, y sont inscrits.
 7. Cachez entièrement la tasse avec la main : le cadre passe en pointillés, d'abord « Objet (prédit) », puis **rouge** avec « Objet perdu ». L'application cherche alors la tasse dans toute l'image. Retirez la main, ou reposez la tasse **ailleurs** : le suivi reprend tout seul, et le panneau indique « retrouvé automatiquement 1 fois ». Pendant le suivi, la **confiance** affichée dans **Résultat** indique à quel point le cadre ressemble encore à la tasse.
 8. Cliquez sur **Arrêter le suivi**.
 
