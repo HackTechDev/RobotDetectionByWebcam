@@ -4,6 +4,7 @@
 #include "camerasettingsdialog.h"
 #include "floormapper.h"
 #include "markerdetector.h"
+#include "motionfilter.h"
 #include "objecttracker.h"
 #include "positionsender.h"
 #include "squaredetector.h"
@@ -135,6 +136,12 @@ private:
     QCheckBox *m_trackTrailCheck = nullptr;
     QDoubleSpinBox *m_trackTrailSpin = nullptr;
     QLabel *m_trackLabel = nullptr;
+
+    QGroupBox *m_smoothBox = nullptr;
+    QSlider *m_smoothStrengthSlider = nullptr;
+    QDoubleSpinBox *m_smoothHoldSpin = nullptr;
+    QCheckBox *m_smoothTrailCheck = nullptr;
+    QDoubleSpinBox *m_smoothTrailSpin = nullptr;
     QLabel *m_statusLabel = nullptr;
 
     SquareDetector m_detector;
@@ -143,6 +150,8 @@ private:
     PositionSender m_sender;
     FloorMapper m_floor;
     ObjectTracker m_tracker;
+    MotionSmoother m_smoother;
+    QSize m_smoothImageSize;   // résolution des positions lissées
     QSize m_trackImageSize;    // résolution à laquelle l'objet a été sélectionné
     QElapsedTimer m_clock;     // horloge des points de trajectoire
     bool m_floorPicking = false;

@@ -65,7 +65,8 @@ QString PositionSender::targetDescription() const
 QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const QSize &imageSize,
                                         const std::vector<DetectedSquare> *squares,
                                         const std::vector<DetectedMarker> *markers,
-                                        const TrackedObject *tracked)
+                                        const TrackedObject *tracked,
+                                        const std::vector<const SmoothedTrack *> *tracks)
 {
     QJsonObject msg;
     msg.insert(QStringLiteral("frame"), frame);
@@ -114,6 +115,34 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
         msg.insert(QStringLiteral("markers"), list);
     }
 
+    if (tracks) {
+        QJsonArray list;
+        for (const SmoothedTrack *t : *tracks) {
+            QJsonObject o{{QStringLiteral("type"), t->kind == SmoothedTrack::Square ? QStringLiteral("square")
+                                                                                     : QStringLiteral("marker")},
+                          {QStringLiteral("predicted"), t->predicted},
+                          {QStringLiteral("position_px"), point(t->position)},
+                          {QStringLiteral("velocity_px_s"), point(t->velocity)},
+                          {QStringLiteral("speed_px_s"), round1(t->speed)},
+                          {QStringLiteral("angle_deg"), round1(t->angle)}};
+            if (t->kind == SmoothedTrack::Marker)
+                o.insert(QStringLiteral("id"), t->id);
+            if (t->hasFloor) {
+                // Même nom que dans « squares » et « markers » : angle (carré) ou cap (marqueur).
+                const QString headingKey = t->kind == SmoothedTrack::Square ? QStringLiteral("angle_deg")
+                                                                            : QStringLiteral("heading_deg");
+                o.insert(QStringLiteral("floor"),
+                         QJsonObject{{QStringLiteral("position_mm"), point(t->floorPosition)},
+                                     {QStringLiteral("velocity_mm_s"), point(t->floorVelocity)},
+                                     {QStringLiteral("speed_mm_s"), round1(t->floorSpeed)},
+                                     {QStringLiteral("direction_deg"), round1(t->floorDirection)},
+                                     {headingKey, round1(t->floorHeading)}});
+            }
+            list.append(o);
+        }
+        msg.insert(QStringLiteral("tracks"), list);
+    }
+
     if (tracked && tracked->active) {
         QJsonObject o{{QStringLiteral("found"), tracked->found},
                       {QStringLiteral("center"), point(tracked->center)},
@@ -138,13 +167,14 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
 }
 
 bool PositionSender::send(const QSize &imageSize, const std::vector<DetectedSquare> *squares,
-                          const std::vector<DetectedMarker> *markers, const TrackedObject *tracked)
+                          const std::vector<DetectedMarker> *markers, const TrackedObject *tracked,
+                          const std::vector<const SmoothedTrack *> *tracks)
 {
     if (m_address.isNull())
         return false;
 
     const QByteArray data =
-        buildMessage(m_frame++, QDateTime::currentMSecsSinceEpoch(), imageSize, squares, markers, tracked);
+        buildMessage(m_frame++, QDateTime::currentMSecsSinceEpoch(), imageSize, squares, markers, tracked, tracks);
     if (m_socket.writeDatagram(data, m_address, m_port) != data.size()) {
         m_lastError = m_socket.errorString();
         return false;

@@ -234,6 +234,34 @@ MainWindow::MainWindow(QWidget *parent)
     m_trackTrailSpin->setValue(10);
     trackForm->addRow(tr("Durée de la trajectoire"), m_trackTrailSpin);
     trackLayout->addWidget(trackBox);
+
+    // Lissage dans le temps des carrés et des marqueurs (filtre de Kalman).
+    m_smoothBox = new QGroupBox(tr("Lissage des carrés et marqueurs"), trackTab);
+    m_smoothBox->setCheckable(true);
+    m_smoothBox->setChecked(true);
+    auto *smoothForm = new QFormLayout(m_smoothBox);
+    m_smoothStrengthSlider = addSlider(smoothForm, tr("Force du lissage"), 0, 100, m_smoother.strength());
+    m_smoothStrengthSlider->setToolTip(tr("Plus fort : positions plus stables, mais en retard sur les "
+                                          "mouvements rapides."));
+    m_smoothHoldSpin = new QDoubleSpinBox(m_smoothBox);
+    m_smoothHoldSpin->setRange(0, 5);
+    m_smoothHoldSpin->setSingleStep(0.1);
+    m_smoothHoldSpin->setDecimals(1);
+    m_smoothHoldSpin->setSuffix(QStringLiteral(" s"));
+    m_smoothHoldSpin->setValue(0.5);
+    m_smoothHoldSpin->setToolTip(tr("Durée pendant laquelle un objet qui n'est plus détecté reste "
+                                    "affiché à sa position prédite."));
+    smoothForm->addRow(tr("Maintien après perte"), m_smoothHoldSpin);
+    m_smoothTrailCheck = new QCheckBox(tr("Afficher les trajectoires"), m_smoothBox);
+    m_smoothTrailCheck->setChecked(true);
+    smoothForm->addRow(m_smoothTrailCheck);
+    m_smoothTrailSpin = new QDoubleSpinBox(m_smoothBox);
+    m_smoothTrailSpin->setRange(1, 120);
+    m_smoothTrailSpin->setDecimals(0);
+    m_smoothTrailSpin->setSuffix(QStringLiteral(" s"));
+    m_smoothTrailSpin->setValue(10);
+    smoothForm->addRow(tr("Durée des trajectoires"), m_smoothTrailSpin);
+    trackLayout->addWidget(m_smoothBox);
     m_trackLabel = new QLabel(trackTab);
     m_trackLabel->setWordWrap(true);
     m_trackLabel->setTextFormat(Qt::RichText);
@@ -330,6 +358,13 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_trackTrailSpin, &QDoubleSpinBox::valueChanged, this,
             [this](double seconds) { m_tracker.setTrailDuration(seconds); });
+    connect(m_smoothBox, &QGroupBox::toggled, this, [this] { m_smoother.clear(); });
+    connect(m_smoothStrengthSlider, &QSlider::valueChanged, this,
+            [this](int value) { m_smoother.setStrength(value); });
+    connect(m_smoothHoldSpin, &QDoubleSpinBox::valueChanged, this,
+            [this](double seconds) { m_smoother.setHoldTime(seconds); });
+    connect(m_smoothTrailSpin, &QDoubleSpinBox::valueChanged, this,
+            [this](double seconds) { m_smoother.setTrailDuration(seconds); });
     connect(m_floorPickButton, &QPushButton::clicked, this, &MainWindow::toggleFloorPicking);
     connect(floorClearButton, &QPushButton::clicked, this, &MainWindow::clearFloor);
     connect(m_floorSizeXSpin, &QDoubleSpinBox::valueChanged, this, &MainWindow::onFloorSizeChanged);
@@ -556,6 +591,11 @@ void MainWindow::loadSettings()
     }
     updateFloorStatus();
 
+    m_smoothBox->setChecked(s.value(QStringLiteral("smoothing/enabled"), true).toBool());
+    m_smoothStrengthSlider->setValue(s.value(QStringLiteral("smoothing/strength"), m_smoothStrengthSlider->value()).toInt());
+    m_smoothHoldSpin->setValue(s.value(QStringLiteral("smoothing/holdSeconds"), m_smoothHoldSpin->value()).toDouble());
+    m_smoothTrailCheck->setChecked(s.value(QStringLiteral("smoothing/showTrails"), true).toBool());
+    m_smoothTrailSpin->setValue(s.value(QStringLiteral("smoothing/trailSeconds"), m_smoothTrailSpin->value()).toDouble());
     m_trackAlgoCombo->setCurrentIndex(std::clamp(s.value(QStringLiteral("tracking/algorithm"), 0).toInt(), 0, 1));
     m_trackTrailCheck->setChecked(s.value(QStringLiteral("tracking/showTrail"), true).toBool());
     m_trackTrailSpin->setValue(s.value(QStringLiteral("tracking/trailSeconds"), m_trackTrailSpin->value()).toDouble());
@@ -598,6 +638,11 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value());
 
     s.setValue(QStringLiteral("floor/show"), m_floorShowCheck->isChecked());
+    s.setValue(QStringLiteral("smoothing/enabled"), m_smoothBox->isChecked());
+    s.setValue(QStringLiteral("smoothing/strength"), m_smoothStrengthSlider->value());
+    s.setValue(QStringLiteral("smoothing/holdSeconds"), m_smoothHoldSpin->value());
+    s.setValue(QStringLiteral("smoothing/showTrails"), m_smoothTrailCheck->isChecked());
+    s.setValue(QStringLiteral("smoothing/trailSeconds"), m_smoothTrailSpin->value());
     s.setValue(QStringLiteral("tracking/algorithm"), m_trackAlgoCombo->currentIndex());
     s.setValue(QStringLiteral("tracking/showTrail"), m_trackTrailCheck->isChecked());
     s.setValue(QStringLiteral("tracking/trailSeconds"), m_trackTrailSpin->value());
@@ -944,6 +989,14 @@ void MainWindow::onFloorSizeChanged()
 
 namespace {
 
+// Vitesse lissée : en mm/s sur le sol si le repère est défini, sinon en pixels par seconde.
+QString speedText(const SmoothedTrack &t)
+{
+    if (t.hasFloor)
+        return QObject::tr("%1 mm/s, direction %2°").arg(t.floorSpeed, 0, 'f', 0).arg(t.floorDirection, 0, 'f', 0);
+    return QObject::tr("%1 px/s").arg(t.speed, 0, 'f', 0);
+}
+
 QString floorPointName(int index, const QSizeF &size)
 {
     const QString w = QString::number(size.width(), 'f', 0);
@@ -1114,6 +1167,21 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                 updateTrackStatus();
         }
     }
+    if (m_smoothBox->isChecked()) {
+        if (image.size() != m_smoothImageSize) {
+            m_smoother.clear();  // positions en pixels d'une autre résolution
+            m_smoothImageSize = image.size();
+        }
+        m_smoother.update(m_clock.elapsed(), squares, markers, &m_floor);
+    }
+    const std::vector<const SmoothedTrack *> tracks =
+        m_smoothBox->isChecked() ? m_smoother.tracks() : std::vector<const SmoothedTrack *>();
+    auto trackFor = [&tracks](SmoothedTrack::Kind kind, int id) -> const SmoothedTrack * {
+        for (const SmoothedTrack *t : tracks)
+            if (t->kind == kind && t->id == id)
+                return t;
+        return nullptr;
+    };
     if (m_floorPicking && !m_floorPicked.empty() && image.size() != m_lastFrameSizeAtPick) {
         m_floorPicked.clear();  // la résolution a changé pendant la saisie : on recommence
         updateFloorStatus();
@@ -1139,7 +1207,8 @@ void MainWindow::onFrame(const QVideoFrame &frame)
 
     if (m_udpBox->isChecked() && m_sender.hasTarget()) {
         m_sender.send(image.size(), squaresOn ? &squares : nullptr, markersOn ? &markers : nullptr,
-                      m_tracker.isActive() ? &m_tracker.state() : nullptr);
+                      m_tracker.isActive() ? &m_tracker.state() : nullptr,
+                      m_smoothBox->isChecked() ? &tracks : nullptr);
         QString text = tr("Destination : <b>%1</b><br>Messages envoyés : %2 (dernier : %3 octets)")
                            .arg(m_sender.targetDescription())
                            .arg(m_sender.sentCount())
@@ -1259,6 +1328,33 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                              .arg(floorPointName(int(m_floorPicked.size()), m_floor.size())));
     }
 
+    // Positions lissées : trajectoires, et position prédite des objets momentanément perdus.
+    for (const SmoothedTrack *t : tracks) {
+        const bool isSquare = t->kind == SmoothedTrack::Square;
+        const QColor color = isSquare ? QColor(140, 255, 140) : QColor(255, 140, 255);
+        if (m_smoothTrailCheck->isChecked() && t->trail.size() > 1) {
+            QPolygonF trail;
+            for (const QPointF &p : t->trail)
+                trail << toDisplay(p);
+            painter.setPen(QPen(color, std::max(1, penWidth / 2)));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawPolyline(trail);
+        }
+        const QPointF p = toDisplay(t->position);
+        if (t->predicted) {
+            painter.setPen(QPen(color, penWidth, Qt::DashLine));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawEllipse(p, penWidth * 4, penWidth * 4);
+            painter.setPen(color);
+            painter.drawText(p + QPointF(penWidth * 5, penWidth * 2),
+                             isSquare ? tr("carré (prédit)") : tr("%1 (prédit)").arg(t->id));
+        } else {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(color);
+            painter.drawEllipse(p, penWidth * 1.2, penWidth * 1.2);
+        }
+    }
+
     // Objet suivi : trajectoire, cadre, flèche de direction quand il bouge.
     if (m_tracker.isActive()) {
         const TrackedObject &t = m_tracker.state();
@@ -1352,6 +1448,13 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                           .arg(sq.floorPosition.y(), 0, 'f', 0)
                           .arg(sq.floorHeading, 0, 'f', 1);
         }
+        if (const SmoothedTrack *t = trackFor(SmoothedTrack::Square, -1))
+            status += tr("<br>Vitesse : %1").arg(speedText(*t));
+    }
+    if (const SmoothedTrack *t = trackFor(SmoothedTrack::Square, -1); t && t->predicted) {
+        status += tr("<br>Carré non détecté, position prédite (%1, %2) px")
+                      .arg(t->position.x(), 0, 'f', 0)
+                      .arg(t->position.y(), 0, 'f', 0);
     }
 
     status += QStringLiteral("<br><br>");
@@ -1374,6 +1477,8 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                               .arg(m.floorPosition.y(), 0, 'f', 0)
                               .arg(m.floorHeading, 0, 'f', 1);
             }
+            if (const SmoothedTrack *t = trackFor(SmoothedTrack::Marker, m.id))
+                status += tr("<br>&nbsp;&nbsp;vitesse %1").arg(speedText(*t));
             if (m.hasPose) {
                 status += tr("<br>&nbsp;&nbsp;X %1  Y %2  Z %3 mm (distance %4 mm)"
                              "<br>&nbsp;&nbsp;rotation X %5°  Y %6°  Z %7°")
@@ -1385,6 +1490,14 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                               .arg(m.rotation.y(), 0, 'f', 1)
                               .arg(m.rotation.z(), 0, 'f', 1);
             }
+        }
+    }
+    for (const SmoothedTrack *t : tracks) {
+        if (t->kind == SmoothedTrack::Marker && t->predicted) {
+            status += tr("<br>ID %1 : non détecté, position prédite (%2, %3) px")
+                          .arg(t->id)
+                          .arg(t->position.x(), 0, 'f', 0)
+                          .arg(t->position.y(), 0, 'f', 0);
         }
     }
     if (m_tracker.isActive()) {

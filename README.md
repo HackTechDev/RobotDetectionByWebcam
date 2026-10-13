@@ -71,7 +71,7 @@ Le bouton « Quitter », en bas à droite, ferme l'application après une confir
 
 Le bouton « Réglages de l'image... » ouvre une fenêtre pour régler l'**exposition** (automatique ou temps de pose manuel) et la **balance des blancs** (automatique ou température manuelle). Une pose courte donne plus d'images par seconde et moins de flou de mouvement dans une pièce peu éclairée, au prix d'une image plus sombre. Une balance des blancs manuelle empêche les couleurs de dériver. Ces réglages sont mémorisés pour chaque modèle de caméra et réappliqués au démarrage de la caméra. À la fermeture normale, l'application remet la webcam en automatique, car ces réglages sont stockés dans la webcam elle-même. Pour l'exposition automatique, l'application écrit directement le contrôle V4L2 (`V4L2_CID_EXPOSURE_AUTO`) : sur les webcams qui n'acceptent que le mode « priorité ouverture » (comme la Logitech C270), Qt ne parvient pas à rétablir l'automatique.
 
-Les réglages (caméra, résolution, exposition, balance des blancs, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, repère du sol, méthode et trajectoire du suivi, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
+Les réglages (caméra, résolution, exposition, balance des blancs, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, repère du sol, méthode et trajectoire du suivi, lissage, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. La résolution est enregistrée dès qu'on la choisit, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
 
 L'option « Effet miroir » retourne seulement l'image affichée. Les détections se font toujours sur l'image réelle de la caméra : les marqueurs ArUco et le damier restent reconnus, et toutes les mesures (coordonnées, angles, pose 3D) restent dans le repère réel de la caméra, que le miroir soit activé ou non.
 
@@ -137,11 +137,15 @@ L'application affiche le cadre, la **trajectoire** (durée réglable, 10 s par d
 
 Le tracker peut perdre l'objet (objet caché, sorti de l'image, trop rapide) ou glisser lentement sur le fond. Il faut alors le resélectionner. Le cadre reste droit : l'orientation de l'objet n'est pas mesurée. Changer de résolution arrête le suivi.
 
+### Lissage dans le temps
+
+Le groupe « Lissage des carrés et marqueurs » de l'onglet « Suivi » suit dans le temps le carré coloré principal et chaque marqueur ArUco, reconnu par son identifiant. Il calcule une position lissée et la **vitesse**, en mm/s sur le sol si le repère est défini. Quand un objet n'est plus détecté pendant un court instant (0,5 s par défaut), sa position est prédite à vitesse constante. Les trajectoires lissées sont dessinées sur l'image. La « Force du lissage » (0 à 100, 50 par défaut) règle le compromis entre la stabilité et le retard sur les mouvements rapides. Ces données sont envoyées en UDP dans la liste `tracks`. Les champs bruts existants ne changent pas.
+
 ### Envoi des positions en UDP
 
 L'onglet « Envoi UDP » envoie les résultats à un autre programme, par exemple celui qui pilote le robot : un message JSON par image traitée, en UDP, vers l'adresse et le port choisis (`127.0.0.1:5005` par défaut). Cocher « Envoyer les positions » pour l'activer.
 
-Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si un objet est suivi, l'objet `tracked` donne son cadre, sa position, sa vitesse, sa direction et son état (trouvé, en mouvement). Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
+Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si le lissage est actif, la liste `tracks` donne la position lissée, la vitesse et l'état (détecté ou prédit) de chaque carré principal ou marqueur suivi. Si un objet est suivi, l'objet `tracked` donne son cadre, sa position, sa vitesse, sa direction et son état (trouvé, en mouvement). Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
 
 Pour tester la réception :
 
@@ -196,6 +200,19 @@ Le code se trouve dans `src/objecttracker.cpp`.
 
 Sur une séquence de synthèse (objet texturé sur fond texturé, 1280 × 960), la vitesse est retrouvée à 299 px/s pour 300 px/s réels, la position à 3 px près, et l'état immobile ou en mouvement est bien distingué.
 
+### Lissage dans le temps
+
+Le code se trouve dans `src/motionfilter.cpp`.
+
+1. Chaque marqueur (par identifiant) et le carré principal ont leur propre **filtre de Kalman** à vitesse constante. L'état est la position et la vitesse sur chaque axe, avec une accélération modélisée par un bruit blanc. Le pas de temps est l'intervalle réel entre les images.
+2. La force du lissage règle le bruit d'accélération du modèle, de 10^5,5 à 10^2 px²/s³. La variance de la mesure est fixée à 1,5 px d'écart-type.
+3. Un saut plus grand que deux fois la taille de l'objet (au moins 50 px) remet le filtre à zéro, par exemple quand le plus grand carré devient un autre objet.
+4. Sans détection, le filtre ne fait que prédire. Au-delà du délai de maintien, l'objet est oublié.
+5. L'angle est lissé par une moyenne exponentielle d'un vecteur unitaire, ce qui évite le saut de ±180°. Pour un carré, défini à 90° près, c'est l'angle multiplié par 4 qui est lissé.
+6. La vitesse sur le sol est obtenue en projetant la position lissée et la position atteinte 0,1 s plus tard à la vitesse estimée.
+
+Une variante adaptative, qui lissait plus fort à l'arrêt, a été essayée. Elle réduisait le tremblement à l'arrêt, mais triplait le retard au démarrage. Le filtre simple a été conservé.
+
 ### Repère du sol
 
 Le code se trouve dans `src/floormapper.cpp`.
@@ -230,7 +247,8 @@ src/
 ├── positionsender.h/.cpp  envoi des positions en JSON sur UDP
 ├── floormapper.h/.cpp   conversion des positions de l'image en mm sur le sol
 ├── camerasettingsdialog.h/.cpp  réglages de l'image : exposition et balance des blancs
-└── objecttracker.h/.cpp  suivi d'un objet encadré, trajectoire et vitesse
+├── objecttracker.h/.cpp  suivi d'un objet encadré, trajectoire et vitesse
+└── motionfilter.h/.cpp  lissage dans le temps (filtre de Kalman) des carrés et des marqueurs
 tools/
 └── udp_receiver.py      récepteur de test des positions UDP
 ```

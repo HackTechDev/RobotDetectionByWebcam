@@ -28,6 +28,8 @@ add_executable(RobotDetectionByWebcam
     src/camerasettingsdialog.cpp
     src/objecttracker.h
     src/objecttracker.cpp
+    src/motionfilter.h
+    src/motionfilter.cpp
 )
 
 target_link_libraries(RobotDetectionByWebcam PRIVATE Qt6::Widgets Qt6::Multimedia Qt6::Network ${OpenCV_LIBS})

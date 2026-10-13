@@ -44,6 +44,13 @@ def describe(msg):
             text += f" | X {x:.0f} Y {y:.0f} Z {z:.0f} mm"
         parts.append(text)
 
+    # Vitesses issues du lissage (liste « tracks »).
+    for t in msg.get("tracks", []):
+        name = "carré" if t["type"] == "square" else f"ArUco {t['id']}"
+        floor = t.get("floor")
+        speed = f"{floor['speed_mm_s']:.0f} mm/s" if floor else f"{t['speed_px_s']:.0f} px/s"
+        parts.append(f"{name} {'prédit' if t['predicted'] else 'vitesse'} {speed}")
+
     return " | ".join(parts)
 
 

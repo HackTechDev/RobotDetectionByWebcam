@@ -1,6 +1,7 @@
 #pragma once
 
 #include "markerdetector.h"
+#include "motionfilter.h"
 #include "objecttracker.h"
 #include "squaredetector.h"
 
@@ -22,7 +23,8 @@ public:
     // Un pointeur nul signifie que la détection correspondante est désactivée (ou qu'aucun
     // objet n'est suivi) : la clé est alors absente du message.
     bool send(const QSize &imageSize, const std::vector<DetectedSquare> *squares,
-              const std::vector<DetectedMarker> *markers, const TrackedObject *tracked = nullptr);
+              const std::vector<DetectedMarker> *markers, const TrackedObject *tracked = nullptr,
+              const std::vector<const SmoothedTrack *> *tracks = nullptr);
 
     qint64 sentCount() const { return m_sentCount; }
     qint64 lastSize() const { return m_lastSize; }
@@ -32,7 +34,8 @@ public:
     static QByteArray buildMessage(qint64 frame, qint64 timestampMs, const QSize &imageSize,
                                    const std::vector<DetectedSquare> *squares,
                                    const std::vector<DetectedMarker> *markers,
-                                   const TrackedObject *tracked = nullptr);
+                                   const TrackedObject *tracked = nullptr,
+                                   const std::vector<const SmoothedTrack *> *tracks = nullptr);
 
 private:
     QUdpSocket m_socket;

@@ -256,6 +256,8 @@ Tous les marqueurs suivis doivent avoir **la même taille imprimée**, car l'app
 
 Cette méthode suit **n'importe quel objet**, sans couleur particulière ni marqueur : il suffit de l'encadrer dans l'image. L'application le suit ensuite d'image en image d'après son apparence, et donne sa **position**, sa **trajectoire**, sa **vitesse** et la **direction** de son déplacement.
 
+L'onglet **Suivi** sert aussi à lisser dans le temps les positions des carrés et des marqueurs, et à calculer leur vitesse (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)).
+
 ### 6.1 Sélectionner l'objet
 
 1. Ouvrez l'onglet **Suivi**.
@@ -299,6 +301,35 @@ Le suivi d'un objet encadré est très pratique, mais moins fiable que les marqu
 - **Vitesse de l'application** : CSRT demande environ 20 ms par image, ce qui peut réduire le nombre d'images par seconde. Choisissez KCF si l'image devient saccadée.
 
 Conseils : un objet bien contrasté et texturé (motif, logo, couleurs) se suit mieux qu'un objet uni. Un éclairage stable et une exposition courte (moins de flou, voir [Régler l'exposition et la balance des blancs](#régler-lexposition-et-la-balance-des-blancs)) aident aussi.
+
+### 6.4 Lisser les positions des carrés et des marqueurs
+
+L'onglet **Suivi** contient aussi le groupe **Lissage des carrés et marqueurs**, actif par défaut. Il suit dans le temps le **carré coloré principal** (le plus grand) et **chaque marqueur ArUco**, reconnu par son identifiant. Il apporte :
+- une **position lissée**, qui tremble moins d'une image à l'autre ;
+- la **vitesse** et la **direction** du déplacement, en mm/s sur le sol si le repère du sol est défini, sinon en pixels par seconde ;
+- une **position prédite** quand un objet n'est plus détecté pendant un court instant : il est supposé continuer à la même vitesse ;
+- une **trajectoire** dessinée sur l'image : vert clair pour le carré, rose pour les marqueurs.
+
+| Réglage | Valeur par défaut | Rôle |
+|---|---|---|
+| **Force du lissage** | 50 | De 0 (positions brutes) à 100 (très lissées). Plus fort, les positions sont plus stables, mais elles **prennent du retard** quand l'objet accélère ou tourne. |
+| **Maintien après perte** | 0,5 s | Durée pendant laquelle un objet qui n'est plus détecté reste affiché à sa position prédite, avant d'être oublié |
+| **Afficher les trajectoires**, **Durée des trajectoires** | oui, 10 s | Affichage et longueur des trajectoires |
+
+Mesures sur des données de synthèse (mesures bruitées à 1,5 px près, 30 images/s) :
+
+| Force | Tremblement à l'arrêt | Retard au démarrage (200 px/s) | Erreur de vitesse (cercle à 236 px/s) |
+|---|---|---|---|
+| 0 | 1,9 px | 4 px | 67 px/s |
+| 50 | 1,4 px | 5 px | 30 px/s |
+| 75 | 1,1 px | 9 px | 48 px/s |
+| 100 | 1,0 px | 13 px | 83 px/s |
+
+Le gain principal est donc la **vitesse** et la **position prédite**. Pour un robot lent, une force de 75 donne des positions plus stables. Pour un robot rapide ou qui tourne beaucoup, restez vers 50 ou moins.
+
+Dans le panneau **Résultat**, la vitesse s'ajoute sous chaque carré et marqueur. Un objet momentanément perdu apparaît comme `ID 7 : non détecté, position prédite (x, y) px`, et sur l'image comme un cercle en pointillés marqué « (prédit) ». Les valeurs brutes (position, angle, sol, pose 3D) restent celles de la détection. Seules la vitesse et la position prédite viennent du lissage. Le tout est envoyé en UDP dans la liste `tracks` (voir [10.3](#103-format-des-messages)).
+
+Changer de résolution remet le lissage à zéro.
 
 ---
 
@@ -558,6 +589,7 @@ Chaque image traitée produit **un message**, sur une seule ligne. Voici un exem
 | `corners` | Les 4 coins `[x, y]`, en pixels. Pour un marqueur, le premier est le coin d'origine (point rouge à l'écran). |
 | `id` | Identifiant du marqueur |
 | `floor` | Uniquement si le repère du sol est défini : `position_mm` `[X, Y]` sur le sol, et `heading_deg` (cap d'un marqueur) ou `angle_deg` (angle d'un carré, de 0 à 90), voir [8.3](#83-lire-les-positions-au-sol) |
+| `tracks` | Uniquement si le lissage est actif (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)) : une entrée par carré principal ou marqueur suivi, avec `type` (`square` ou `marker`), `id` (marqueur), `predicted` (non détecté dans cette image), `position_px` lissée, `velocity_px_s`, `speed_px_s`, `angle_deg` lissé et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s`, `direction_deg` et `heading_deg` (marqueur) ou `angle_deg` (carré) |
 | `tracked` | Uniquement si un objet est suivi (voir [section 6](#6-suivre-un-objet-encadré)) : `found` (trouvé ou perdu), `center`, `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
 | `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [9.2](#92-position-3d-dun-marqueur-en-mm-après-calibration) et [9.3](#93-rotations-dun-marqueur-en-degrés-après-calibration)) |
 
@@ -661,6 +693,12 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 **Les captures ont disparu**
 - Changer les dimensions du damier (coins ou taille des cases) efface les captures en cours. Elles sont aussi effacées si la résolution de la caméra change pendant la série.
 
+**Les positions tremblent, ou la vitesse affichée varie beaucoup**
+- Augmentez la **Force du lissage** (onglet **Suivi**). Vérifiez aussi l'éclairage : une image bruitée fait trembler les détections.
+
+**Les positions lissées sont en retard sur l'objet**
+- Diminuez la **Force du lissage**. Un lissage fort ralentit la réaction aux démarrages et aux virages.
+
 **L'objet suivi est perdu ou le cadre glisse sur le fond**
 - Resélectionnez l'objet en l'encadrant au plus près.
 - Préférez la méthode **CSRT**, plus robuste que KCF.
@@ -705,7 +743,7 @@ L'application retrouve au lancement les réglages de la fois précédente :
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
 - **Sol** : les 4 points du repère, les dimensions du rectangle et l'affichage de la zone ;
-- **Suivi** : la méthode, l'affichage et la durée de la trajectoire (l'objet sélectionné, lui, n'est pas mémorisé) ;
+- **Suivi** : la méthode, l'affichage et la durée de la trajectoire (l'objet sélectionné, lui, n'est pas mémorisé), et tous les réglages du lissage ;
 - **Envoi UDP** : activation, adresse et port ;
 - **Fenêtre** : taille, position et onglet ouvert.
 

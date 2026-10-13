@@ -14,6 +14,7 @@ Ces efforts sont des estimations.
 - Positions sur le sol en millimètres (onglet « Sol »).
 - Réglages manuels de l'exposition et de la balance des blancs (« Réglages de l'image... »).
 - Suivi d'un objet encadré à la souris, avec trajectoire et vitesse (onglet « Suivi »).
+- Lissage dans le temps des carrés et des marqueurs : position lissée, vitesse, position prédite (onglet « Suivi »).
 
 ---
 
@@ -24,18 +25,6 @@ Ces efforts sont des estimations.
 **Intérêt.** Le repère du sol est défini au niveau du sol. Un marqueur collé sur le dessus du robot est plus haut, donc décalé vers l'extérieur de l'image : environ 5 cm d'erreur pour un marqueur à 10 cm de haut, à 1 m du point situé sous une caméra placée à 2 m. C'est aujourd'hui la principale source d'erreur des positions au sol.
 
 **Piste.** Ajouter un champ « Hauteur des repères (mm) » dans l'onglet Sol. Avec une caméra calibrée, retrouver la pose de la caméra par rapport au sol à partir des 4 points (`cv::solvePnP`), puis intersecter le rayon de chaque repère avec le plan situé à cette hauteur. Sans calibration, il est possible de définir un second rectangle à la hauteur des repères.
-
-### Lissage et suivi dans le temps — M
-
-**Intérêt.** Les positions tremblent de quelques pixels d'une image à l'autre, et la détection peut manquer une image. Un programme de pilotage a besoin d'une position stable et, souvent, de la vitesse.
-
-**Piste.** Un filtre de Kalman (`cv::KalmanFilter`) par marqueur, identifié par son ID, et par carré, associé à la détection la plus proche. On obtiendrait :
-- une position lissée ;
-- la vitesse en mm/s ;
-- une position prédite pendant quelques images si la détection échoue ;
-- le tracé de la trajectoire à l'écran.
-
-La vitesse serait aussi ajoutée aux messages UDP. Un curseur réglerait la force du lissage, au prix d'un peu de retard.
 
 ### Tests automatiques — M
 
