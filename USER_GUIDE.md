@@ -84,6 +84,7 @@ Quelle que soit la méthode, l'application peut aussi :
 - **Webcam** :
   - **Caméra** : la webcam utilisée. Chaque caméra a sa **propre calibration** et son **propre repère du sol**, rechargés quand on la choisit, ainsi que sa résolution et ses réglages de l'image. Changer de caméra arrête le suivi des objets encadrés, dont les cadres ne valaient que pour l'autre caméra ; Deux caméras du même modèle, qui portent le même nom, sont distinguées par leur identifiant système (`/dev/video0`, `/dev/video2`...), ajouté à leur nom dans les réglages (`..._video2`) ; si cet identifiant change (caméras branchées dans un autre ordre), elles peuvent échanger leurs réglages.
   - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
+  - **Capture** : enregistre aussitôt l'image de la webcam en PNG (touche **F12**). Voir [Capturer une image](#capturer-une-image) ;
   - **Réglages de l'image...** : exposition, balance des blancs, luminosité, contraste, gain, fréquence du secteur... Voir [Régler l'image de la webcam](#régler-limage-de-la-webcam) ;
   - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 9.1](#91-coordonnées-dans-limage-en-pixels)).
 - **Onglets** :
@@ -111,6 +112,20 @@ Conseils :
 - Le nombre d'images par seconde affiché dans la liste est le **maximum annoncé par la caméra**. Le nombre réel, affiché dans **Résultat**, peut être plus bas, en particulier dans une pièce sombre : la caméra allonge alors son temps de pose. Une **exposition manuelle** courte permet de retrouver le débit maximal (voir ci-dessous).
 
 Certaines webcams n'envoient pas la résolution demandée dans leur format rapide (MJPEG). L'application le détecte et passe automatiquement au format non compressé de la même résolution. Le nombre d'images par seconde indiqué dans la liste est alors mis à jour, et il est souvent plus bas.
+
+### Capturer une image
+
+Le bouton **Capture**, à gauche de **Réglages de l'image...**, enregistre aussitôt l'image de la webcam, sans rien demander. Le chemin du fichier s'affiche quelques secondes en bas de la fenêtre.
+
+- **Un clic sur Capture**, ou la touche **F12** : l'image telle que filmée par la caméra, en pleine résolution, sans les détections dessinées et sans l'effet miroir.
+- **La petite flèche** à droite du bouton ouvre un menu :
+  - **Image avec les détections** (**Maj+F12**) : l'image telle qu'affichée, avec les carrés, marqueurs, objets suivis, trajectoires et repère du sol, et avec l'effet miroir s'il est coché ;
+  - **Choisir le dossier des captures...** : le dossier où les images sont enregistrées (mémorisé) ;
+  - **Ouvrir le dossier des captures** : l'ouvre dans le gestionnaire de fichiers.
+
+Par défaut, les captures vont dans `~/Images/RobotDetectionByWebcam/` (le dossier Images de votre session). Chaque fichier est nommé d'après la date et l'heure, par exemple `capture_20261014_214637_393.png`, ou `capture_20261014_214638_160_detections.png` pour une image avec les détections. Une capture ne remplace donc jamais la précédente.
+
+Utile pour garder une trace d'un essai, préparer un fond de terrain pour un jeu, ou joindre une image à un signalement de problème.
 
 ### Régler l'image de la webcam
 
@@ -814,6 +829,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 |---|---|
 | `~/.config/RobotDetectionByWebcam/settings.ini` | Réglages de l'application (voir ci-dessous) |
 | `~/.config/RobotDetectionByWebcam/calibrations/<caméra>.yml` | Calibration de chaque caméra, nommée d'après la caméra, par exemple `UVC_Camera_046d_0825.yml` (créée par **Calibrer**, relue au lancement et quand on revient à cette caméra). Peut être copiée sur une autre machine utilisant la même webcam. |
+| `~/Images/RobotDetectionByWebcam/capture_<date>.png` | Images enregistrées par **Capture** (dossier modifiable, voir [Capturer une image](#capturer-une-image)) |
 | `~/.local/share/RobotDetectionByWebcam/models/` | Modèles des méthodes de suivi Nano et Vit, téléchargés au premier choix de ces méthodes (voir [Modèles des réseaux de neurones](#modèles-des-réseaux-de-neurones)) |
 | `~/.config/RobotDetectionByWebcam/calibration.yml` | Ancienne calibration unique, des versions précédentes. Au premier lancement de la version actuelle, elle est copiée pour la caméra active ; l'original est conservé mais n'est plus utilisé. |
 | `aruco_<dictionnaire>_<id>.png` | Marqueurs générés, à l'emplacement choisi |

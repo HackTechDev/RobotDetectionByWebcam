@@ -20,6 +20,7 @@
 #include <QMessageBox>
 #include <QComboBox>
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QGroupBox>
@@ -32,6 +33,10 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QPushButton>
+#include <QStatusBar>
+#include <QToolButton>
+#include <QMenu>
+#include <QUrl>
 #include <QRegularExpression>
 #include <QScrollArea>
 #include <QSettings>
@@ -80,11 +85,36 @@ MainWindow::MainWindow(QWidget *parent)
     m_mirrorCheck = new QCheckBox(tr("Effet miroir"), camBox);
     auto *imageSettingsButton = new QPushButton(tr("Réglages de l'image..."), camBox);
     imageSettingsButton->setToolTip(tr("Exposition et balance des blancs"));
+    // Capture d'une image : un clic l'enregistre aussitôt ; la flèche propose les autres choix.
+    auto *snapshotButton = new QToolButton(camBox);
+    snapshotButton->setText(tr("Capture"));
+    snapshotButton->setToolTip(tr("Enregistre l'image de la webcam en PNG dans le dossier des captures (F12)"));
+    snapshotButton->setPopupMode(QToolButton::MenuButtonPopup);
+    auto *snapshotMenu = new QMenu(snapshotButton);
+    snapshotMenu->addAction(tr("Image de la webcam (F12)"), this, [this] { saveCapture(false); });
+    snapshotMenu->addAction(tr("Image avec les détections (Maj+F12)"), this, [this] { saveCapture(true); });
+    snapshotMenu->addSeparator();
+    snapshotMenu->addAction(tr("Choisir le dossier des captures..."), this, [this] {
+        const QString dir = QFileDialog::getExistingDirectory(this, tr("Dossier des captures"), captureFolder());
+        if (!dir.isEmpty())
+            QSettings(settingsPath(), QSettings::IniFormat).setValue(QStringLiteral("capture/folder"), dir);
+    });
+    snapshotMenu->addAction(tr("Ouvrir le dossier des captures"), this, [this] {
+        QDir().mkpath(captureFolder());
+        QDesktopServices::openUrl(QUrl::fromLocalFile(captureFolder()));
+    });
+    snapshotButton->setMenu(snapshotMenu);
+    connect(snapshotButton, &QToolButton::clicked, this, [this] { saveCapture(false); });
+    auto *captureShortcut = new QShortcut(QKeySequence(Qt::Key_F12), this);
+    connect(captureShortcut, &QShortcut::activated, this, [this] { saveCapture(false); });
+    auto *captureAllShortcut = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F12), this);
+    connect(captureAllShortcut, &QShortcut::activated, this, [this] { saveCapture(true); });
     auto *camRow = new QWidget(camBox);
     auto *camRowLayout = new QHBoxLayout(camRow);
     camRowLayout->setContentsMargins(0, 0, 0, 0);
     camRowLayout->addWidget(m_mirrorCheck);
     camRowLayout->addStretch();
+    camRowLayout->addWidget(snapshotButton);
     camRowLayout->addWidget(imageSettingsButton);
     camForm->addRow(camRow);
     m_cameraSettingsDialog = new CameraSettingsDialog(this);
@@ -1206,6 +1236,33 @@ void MainWindow::generateMarker()
         QMessageBox::warning(this, tr("Erreur"), tr("Impossible d'enregistrer %1").arg(path));
 }
 
+QString MainWindow::captureFolder() const
+{
+    const QString fallback = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+                             + QStringLiteral("/RobotDetectionByWebcam");
+    return QSettings(settingsPath(), QSettings::IniFormat).value(QStringLiteral("capture/folder"), fallback).toString();
+}
+
+void MainWindow::saveCapture(bool withDetections)
+{
+    // Image de la webcam telle que filmée (sans miroir), ou image affichée avec les détections.
+    const QImage image = withDetections ? m_lastDisplay : m_lastFrame;
+    if (image.isNull()) {
+        statusBar()->showMessage(tr("Aucune image à capturer : la webcam ne filme pas encore."), 5000);
+        return;
+    }
+    const QString folder = captureFolder();
+    QDir().mkpath(folder);
+    const QString name = QStringLiteral("capture_%1%2.png")
+                             .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss_zzz")),
+                                  withDetections ? QStringLiteral("_detections") : QString());
+    const QString path = QDir(folder).filePath(name);
+    if (image.save(path))
+        statusBar()->showMessage(tr("Capture enregistrée : %1").arg(QDir::toNativeSeparators(path)), 8000);
+    else
+        QMessageBox::warning(this, tr("Capture"), tr("Impossible d'enregistrer %1").arg(path));
+}
+
 QString MainWindow::calibrationPath() const
 {
     // Un fichier par caméra, nommé d'après son identifiant (caractères sûrs uniquement).
@@ -2156,6 +2213,7 @@ void MainWindow::presentFrame(const FrameResult &result)
     }
     painter.end();
     m_video->setImage(display);
+    m_lastDisplay = display;
 
     QString status = tr("Image : %1 x %2 — %3 i/s<br>")
                          .arg(image.width())

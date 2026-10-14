@@ -110,6 +110,9 @@ private slots:
     void onObjectRenamed(QListWidgetItem *item);
 
 private:
+    // Capture : enregistre l'image de la webcam (ou l'image affichée, avec les détections) en PNG.
+    void saveCapture(bool withDetections);
+    QString captureFolder() const;
     QSlider *addSlider(QFormLayout *form, const QString &label, int min, int max, int value);
     void setTargetColor(const QColor &color);
     void selectColorModeFor(const QColor &color);
@@ -242,6 +245,7 @@ private:
     bool m_captureRequested = false;
     QColor m_targetColor;
     QImage m_lastFrame;  // dernière image affichée (les clics portent sur elle)
+    QImage m_lastDisplay;  // même image, telle qu'affichée (détections dessinées, miroir)
     // Une entrée par résolution de m_resolutionCombo.
     struct ResolutionChoice
     {
