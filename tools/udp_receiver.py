@@ -52,14 +52,22 @@ def describe(msg):
 
     # Événements des objets suivis (liste « events »).
     names = {"motion_start": "DÉBUT DE MOUVEMENT", "motion_stop": "FIN DE MOUVEMENT",
-             "lost": "OBJET PERDU", "found": "OBJET RETROUVÉ"}
+             "lost": "OBJET PERDU", "found": "OBJET RETROUVÉ",
+             "zone_enter": "ENTRE DANS LA ZONE", "zone_exit": "SORT DE LA ZONE"}
     for e in msg.get("events", []):
         unit = "mm" if "position_mm" in e else "px"
         x, y = e.get("position_mm") or e.get("position_px")
-        text = f"*** {e.get('name', 'objet')} : {names.get(e['type'], e['type'])} ({x:.0f}, {y:.0f}) {unit}"
+        text = f"*** {e.get('name', 'objet')} : {names.get(e['type'], e['type'])}"
+        if "zone" in e:
+            text += f" « {e['zone']} »"
+        text += f" ({x:.0f}, {y:.0f}) {unit}"
         if e["type"] == "motion_stop":
             text += f", déplacement {e['distance_' + unit]:.0f} {unit} en {e['duration_s']:.1f} s"
         parts.append(text)
+
+    # Zones et leurs occupants (liste « zones »).
+    for z in msg.get("zones", []):
+        parts.append(f"zone {z['name']} : {', '.join(z['occupants']) or 'vide'}")
 
     # Vitesses issues du lissage (liste « tracks »).
     for t in msg.get("tracks", []):

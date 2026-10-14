@@ -140,6 +140,10 @@ L'onglet « Sol » définit un repère sur le sol : on saisit les dimensions d'u
 
 Le repère est propre à chaque caméra, comme la calibration. Il fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus. Il est enregistré dans `settings.ini` et reste valable pour toute résolution du même format d'image. La caméra ne doit plus bouger une fois le repère défini. Le repère est défini au niveau du sol. Un marqueur placé en hauteur sur le robot est donc décalé, jusqu'à plusieurs centimètres. Si la caméra est calibrée, le champ « Hauteur des repères » corrige ce décalage pour les carrés et les marqueurs. L'onglet affiche alors aussi la hauteur de la caméra au-dessus du sol, vérifiable au mètre ruban.
 
+### Zones
+
+L'onglet « Zones » définit des rectangles fixes de l'image, chacun avec un nom : on clique sur « Ajouter une zone », on trace le rectangle (ajustable avec ses poignées), on valide, puis on le nomme. Les zones se renomment dans la liste (double-clic) et sont mémorisées pour chaque caméra, en fraction de l'image (valables pour toute résolution du même format). L'application indique ce qui se trouve dans chaque zone (objets suivis, marqueurs ArUco, carré principal, d'après leur centre) et inscrit chaque entrée et sortie dans le journal des événements (`zone_enter`, `zone_exit`). Une sortie n'est signalée qu'après 0,3 s hors de la zone, avec une marge de 1 % de l'image : un point qui tremble sur le bord ou un marqueur manqué sur une image ne crée pas de fausses sorties. Les zones, leurs occupants et, si le repère du sol est défini, leurs coins sur le sol en mm sont envoyés en UDP (liste `zones`). Le code est dans `src/zonemanager.cpp`.
+
 ### Suivi d'objets encadrés
 
 Dans l'onglet « Suivi », cliquer sur « Ajouter des objets », puis tracer un rectangle autour de chaque objet, ou cliquer dessus : un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Valider l'objet », touche Entrée ou double-clic. On reste en mode ajout pour l'objet suivant ; Échap ou « Terminer l'ajout » termine. Chaque objet a un numéro, un nom modifiable (double-clic dans la liste des objets) et une couleur. « Retirer » arrête le suivi de l'objet sélectionné dans la liste, « Tout retirer » celui de tous les objets. Chaque objet est suivi d'image en image par son propre tracker OpenCV :
@@ -301,6 +305,7 @@ src/
 ├── camerasettingsdialog.h/.cpp  réglages de l'image : exposition, balance des blancs, autres réglages
 ├── v4l2controls.h/.cpp          accès direct aux réglages du pilote Linux des webcams (V4L2)
 ├── objecttracker.h/.cpp  suivi d'un objet (un par objet suivi) : sélection d'un clic, confiance, reprise, vitesse, événements
+├── zonemanager.h/.cpp    zones fixes nommées : occupation, entrées et sorties, mémorisation
 ├── trackermodels.h/.cpp  modèles des trackers Nano et Vit : emplacement, téléchargement vérifié
 └── motionfilter.h/.cpp  lissage dans le temps (filtre de Kalman) des carrés et des marqueurs
 tools/

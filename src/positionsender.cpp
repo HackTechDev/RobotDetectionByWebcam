@@ -67,7 +67,8 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
                                         const std::vector<DetectedMarker> *markers,
                                         const std::vector<TrackedEntry> *tracked,
                                         const std::vector<const SmoothedTrack *> *tracks,
-                                        const std::vector<MotionEvent> *events)
+                                        const std::vector<MotionEvent> *events,
+                                        const std::vector<ZoneEntry> *zones)
 {
     QJsonObject msg;
     msg.insert(QStringLiteral("frame"), frame);
@@ -179,7 +180,7 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
 
     // Événements de l'objet suivi survenus à cette image (chacun n'est envoyé qu'une fois).
     if (events && !events->empty()) {
-        static const char *types[] = {"motion_start", "motion_stop", "lost", "found"};
+        static const char *types[] = {"motion_start", "motion_stop", "lost", "found", "zone_enter", "zone_exit"};
         QJsonArray list;
         for (const MotionEvent &e : *events) {
             QJsonObject o{{QStringLiteral("type"), QString::fromLatin1(types[e.type])},
@@ -187,6 +188,10 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
                           {QStringLiteral("name"), e.objectName},
                           {QStringLiteral("timestamp_ms"), e.wallTimeMs},
                           {e.onFloor ? QStringLiteral("position_mm") : QStringLiteral("position_px"), point(e.position)}};
+            if (e.type == MotionEvent::ZoneEnter || e.type == MotionEvent::ZoneExit) {
+                o.insert(QStringLiteral("zone_id"), e.zoneId);
+                o.insert(QStringLiteral("zone"), e.zoneName);
+            }
             if (e.type == MotionEvent::MotionStop) {
                 const QString suffix = e.onFloor ? QStringLiteral("_mm") : QStringLiteral("_px");
                 o.insert(QStringLiteral("distance") + suffix, round1(e.distance));
@@ -198,19 +203,42 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
         msg.insert(QStringLiteral("events"), list);
     }
 
+    // Zones : rectangle, coins sur le sol et occupants de chacune.
+    if (zones && !zones->empty()) {
+        QJsonArray list;
+        for (const ZoneEntry &entry : *zones) {
+            QJsonArray occupants;
+            for (const QString &name : entry.zone->occupants)
+                occupants.append(name);
+            QJsonObject o{{QStringLiteral("id"), entry.zone->id},
+                          {QStringLiteral("name"), entry.zone->name},
+                          {QStringLiteral("box"), QJsonArray{round1(entry.box.x()), round1(entry.box.y()),
+                                                             round1(entry.box.width()), round1(entry.box.height())}},
+                          {QStringLiteral("occupants"), occupants}};
+            if (!entry.floorCorners.empty()) {
+                QJsonArray corners;
+                for (const QPointF &p : entry.floorCorners)
+                    corners.append(point(p));
+                o.insert(QStringLiteral("floor_corners_mm"), corners);
+            }
+            list.append(o);
+        }
+        msg.insert(QStringLiteral("zones"), list);
+    }
+
     return QJsonDocument(msg).toJson(QJsonDocument::Compact);
 }
 
 bool PositionSender::send(const QSize &imageSize, const std::vector<DetectedSquare> *squares,
                           const std::vector<DetectedMarker> *markers, const std::vector<TrackedEntry> *tracked,
                           const std::vector<const SmoothedTrack *> *tracks,
-                          const std::vector<MotionEvent> *events)
+                          const std::vector<MotionEvent> *events, const std::vector<ZoneEntry> *zones)
 {
     if (m_address.isNull())
         return false;
 
     const QByteArray data =
-        buildMessage(m_frame++, QDateTime::currentMSecsSinceEpoch(), imageSize, squares, markers, tracked, tracks, events);
+        buildMessage(m_frame++, QDateTime::currentMSecsSinceEpoch(), imageSize, squares, markers, tracked, tracks, events, zones);
     if (m_socket.writeDatagram(data, m_address, m_port) != data.size()) {
         m_lastError = m_socket.errorString();
         return false;

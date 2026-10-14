@@ -66,7 +66,7 @@ Quelle que soit la méthode, l'application peut aussi :
 │                                       │   Résolution [........... ▼]  │
 │                                       │   [ ] Effet miroir [Réglages] │
 │          Image de la webcam           ├───────────────────────────────┤
-│      (avec les détections dessinées)  │ Carré|ArUco|Cal.|Sol|Suivi|UDP│
+│      (avec les détections dessinées)  │ Carré|ArUco|Cal.|Sol|Zones|...│
 │                                       │                               │
 │                                       │   Réglages de l'onglet        │
 │    Cliquer sur l'image = choisir      │   sélectionné                 │
@@ -93,6 +93,7 @@ Quelle que soit la méthode, l'application peut aussi :
   - **ArUco** : dictionnaire et taille des marqueurs ;
   - **Calibration** : damier et calibration de la caméra ;
   - **Sol** : repère du sol, pour avoir les positions en millimètres sur le sol (voir [section 8](#8-définir-le-repère-du-sol)) ;
+  - **Zones** : rectangles fixes et nommés de l'image ; l'application indique ce qui s'y trouve et signale les entrées et sorties (voir [8.5](#85-définir-des-zones)) ;
   - **Suivi** : suivi d'un ou plusieurs objets quelconques désignés à la souris, journal de leurs mouvements, et lissage des positions des carrés et des marqueurs (voir [section 6](#6-suivre-des-objets-encadrés)). L'onglet défile s'il ne tient pas en hauteur ;
   - **Envoi UDP** : envoi des positions à un autre programme (voir [section 10](#10-envoyer-les-positions-à-un-autre-programme)).
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
@@ -429,7 +430,7 @@ L'application signale les moments où chaque objet suivi **se met en mouvement**
 
 Un seuil plus petit signale les moindres déplacements, mais risque de réagir au tremblement du cadre. Un seuil plus grand ne signale que les vrais déplacements.
 
-**Effacer** vide le journal. **Enregistrer...** l'exporte en **CSV** (séparateur `;`), du plus ancien au plus récent, avec les colonnes `heure`, `horodatage_ms`, `objet_id`, `objet` (nom), `type` (`motion_start`, `motion_stop`, `lost`, `found`), `x`, `y`, `unite` (`mm` ou `px`), `deplacement`, `parcours` et `duree_s`. Le journal garde les 500 derniers événements et n'est pas conservé entre deux lancements.
+**Effacer** vide le journal. **Enregistrer...** l'exporte en **CSV** (séparateur `;`), du plus ancien au plus récent, avec les colonnes `heure`, `horodatage_ms`, `objet_id`, `objet` (nom), `type` (`motion_start`, `motion_stop`, `lost`, `found`, `zone_enter`, `zone_exit`), `x`, `y`, `unite` (`mm` ou `px`), `deplacement`, `parcours`, `duree_s` et `zone` (nom de la zone, pour les entrées et sorties). Le journal garde les 500 derniers événements et n'est pas conservé entre deux lancements.
 
 Les événements sont aussi envoyés en UDP, dans la liste `events` (voir [10.3](#103-format-des-messages)).
 
@@ -566,6 +567,45 @@ Ces valeurs sont aussi envoyées en UDP (champ `floor`, voir [10.3](#103-format-
 - **Précision des clics** : cliquez au centre des repères. Une haute résolution (liste **Résolution**) permet de cliquer plus précisément.
 - **Effet miroir** : sans effet sur le repère, les clics sont convertis automatiquement.
 
+### 8.5 Définir des zones
+
+Une **zone** est un rectangle fixe de l'image, avec un nom : « Garage », « Départ », « But rouge »... L'application indique en permanence ce qui se trouve dans chaque zone, et signale chaque **entrée** et chaque **sortie**. Les zones ne demandent ni calibration ni repère du sol.
+
+**Ajouter une zone**
+
+1. Ouvrez l'onglet **Zones** et cliquez sur **Ajouter une zone**.
+2. **Tracez un rectangle** sur l'image (cliquer-glisser).
+3. Ajustez-le si besoin avec ses **8 poignées**, ou en faisant glisser son intérieur.
+4. Validez : **Valider la zone**, touche **Entrée** ou double-clic dans le cadre. **Échap** annule.
+5. Donnez-lui un **nom** (« Zone 1 », « Zone 2 »... est proposé), puis cliquez sur **OK**.
+
+La zone s'affiche sur l'image, teintée de sa couleur, avec son nom. La teinte se renforce et le nombre d'occupants s'ajoute au nom quand quelque chose s'y trouve.
+
+**Gérer les zones**
+- **Renommer** : double-cliquez sur la zone dans la liste.
+- **Retirer** supprime la zone sélectionnée dans la liste, **Tout retirer** toutes les zones de la caméra (après confirmation).
+- **Afficher les zones sur l'image** : décochez pour les masquer. Elles continuent de fonctionner.
+
+**Ce qui est surveillé** : les objets suivis (section 6), les marqueurs ArUco (section 5) et le carré principal (section 4). C'est leur **centre** qui compte : un objet est dans la zone quand son centre y est.
+
+**Occupation et événements**
+- Sous la liste, chaque zone est suivie de ses occupants, par exemple « **Garage** : Robot bleu, ArUco 7 », ou « vide ».
+- Chaque entrée et chaque sortie est inscrite dans le **Journal des événements** de l'onglet **Suivi**, avec la couleur de la zone :
+
+  ```
+  22:13:48.667  Robot bleu : Entre dans la zone « Garage » en (600, 450) px
+  22:13:50.486  Robot bleu : Sort de la zone « Garage » (dernière position (583, 523) px)
+  ```
+
+- Une **entrée** est signalée dès que le centre passe dans la zone. Une **sortie** l'est quand il en est resté dehors, ou n'a plus été vu, pendant **0,3 s**, avec une petite marge autour de la zone. Un objet qui tremble sur le bord, ou un marqueur qui n'est pas détecté sur une image, ne provoque donc pas une suite d'entrées et de sorties.
+- Les événements, la liste des zones et leurs occupants sont aussi **envoyés en UDP** (voir [10.3](#103-format-des-messages)).
+
+**Bon à savoir**
+- Une zone est **fixe dans l'image** : si la caméra bouge, elle ne correspond plus au même endroit du sol.
+- Les zones sont **mémorisées pour chaque caméra**, comme le repère du sol, et restent valables si vous changez de résolution dans le même format d'image (4:3, 16:9...).
+- Une zone tracée sur l'image ne suit pas la perspective du sol : vue de biais, une zone rectangulaire au sol apparaît comme un trapèze. Tracez le rectangle qui l'englobe. Si le repère du sol est défini, les coins de la zone sur le sol sont envoyés en UDP.
+- **Effet miroir** : sans effet sur les zones, le tracé est converti automatiquement.
+
 ---
 
 ## 9. Lire les résultats
@@ -695,9 +735,10 @@ Chaque image traitée produit **un message**, sur une seule ligne. Voici un exem
 | `corners` | Les 4 coins `[x, y]`, en pixels. Pour un marqueur, le premier est le coin d'origine (point rouge à l'écran). |
 | `id` | Identifiant du marqueur |
 | `floor` | Uniquement si le repère du sol est défini : `position_mm` `[X, Y]` sur le sol, et `heading_deg` (cap d'un marqueur) ou `angle_deg` (angle d'un carré, de 0 à 90), voir [8.3](#83-lire-les-positions-au-sol) |
-| `events` | Uniquement quand un événement d'un objet suivi survient à cette image (voir [6.5](#65-événements-de-mouvement)). Chaque événement n'est envoyé qu'une fois, avec `object_id` et `name` (l'objet concerné), `type` (`motion_start`, `motion_stop`, `lost` ou `found`), `timestamp_ms` (heure de l'événement) et `position_mm` (sur le sol) ou `position_px` (dans l'image). Pour `motion_stop` s'ajoutent `distance_mm` (ou `_px`), `travelled_mm` (ou `_px`) et `duration_s`. |
+| `events` | Uniquement quand un événement survient à cette image (voir [6.5](#65-événements-de-mouvement) et [8.5](#85-définir-des-zones)). Chaque événement n'est envoyé qu'une fois, avec `object_id` et `name` (l'objet concerné : numéro et nom d'un objet suivi, identifiant d'un marqueur et « ArUco 7 », ou 0 et « Carré »), `type` (`motion_start`, `motion_stop`, `lost`, `found`, `zone_enter` ou `zone_exit` ; pour ces deux derniers s'ajoutent `zone_id` et `zone`, le nom de la zone), `timestamp_ms` (heure de l'événement) et `position_mm` (sur le sol) ou `position_px` (dans l'image). Pour `motion_stop` s'ajoutent `distance_mm` (ou `_px`), `travelled_mm` (ou `_px`) et `duration_s`. |
 | `tracks` | Uniquement si le lissage est actif (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)) : une entrée par carré principal ou marqueur suivi, avec `type` (`square` ou `marker`), `id` (marqueur), `predicted` (non détecté dans cette image), `position_px` lissée, `velocity_px_s`, `speed_px_s`, `angle_deg` lissé et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s`, `direction_deg` et `heading_deg` (marqueur) ou `angle_deg` (carré) |
 | `tracked` | Uniquement si au moins un objet est suivi (voir [section 6](#6-suivre-des-objets-encadrés)) : une **liste**, avec une entrée par objet. Chaque entrée contient `id` (numéro de l'objet), `name` (son nom), `found` (trouvé ou perdu), `predicted` (perdu depuis peu, position prédite), `confidence` (indice de confiance, de 0 à 1), `drifted` (perdu parce que le cadre ne ressemble plus à l'objet ou a sauté ailleurs), `out_of_view` (sorti de l'image : recherché seulement le long des bords), `reacquired` (retrouvé à cette image par la recherche dans toute l'image), `reacquisitions` (nombre de reprises automatiques depuis la sélection), `center` (position lissée), `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
+| `zones` | Uniquement si au moins une zone est définie (voir [8.5](#85-définir-des-zones)) : une entrée par zone, avec `id`, `name`, `box` `[x, y, largeur, hauteur]` en pixels, `occupants` (noms de ce qui s'y trouve) et, si le repère du sol est défini, `floor_corners_mm` (les 4 coins sur le sol, en mm) |
 | `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [9.2](#92-position-3d-dun-marqueur-en-mm-après-calibration) et [9.3](#93-rotations-dun-marqueur-en-degrés-après-calibration)) |
 
 Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont celles de l'image réelle de la caméra, même avec l'effet miroir.
@@ -845,6 +886,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 |---|---|
 | `~/.config/RobotDetectionByWebcam/settings.ini` | Réglages de l'application (voir ci-dessous) |
 | `~/.config/RobotDetectionByWebcam/calibrations/<caméra>.yml` | Calibration de chaque caméra, nommée d'après la caméra, par exemple `UVC_Camera_046d_0825.yml` (créée par **Calibrer**, relue au lancement et quand on revient à cette caméra). Peut être copiée sur une autre machine utilisant la même webcam. |
+| `~/.config/RobotDetectionByWebcam/settings.ini`, groupe `zones` de chaque caméra | Zones de l'onglet **Zones** : nom et rectangle (`rect` = x, y, largeur, hauteur en fraction de l'image) |
 | `~/Images/RobotDetectionByWebcam/capture_<date>.png` | Images enregistrées par **Capture** (dossier modifiable, voir [Capturer une image](#capturer-une-image)) |
 | `~/Images/RobotDetectionByWebcam/video_<date>.mp4` | Vidéos enregistrées par **Vidéo** (même dossier, voir [Enregistrer une vidéo](#enregistrer-une-vidéo)) |
 | `~/.local/share/RobotDetectionByWebcam/models/` | Modèles des méthodes de suivi Nano et Vit, téléchargés au premier choix de ces méthodes (voir [Modèles des réseaux de neurones](#modèles-des-réseaux-de-neurones)) |

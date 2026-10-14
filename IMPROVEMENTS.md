@@ -42,6 +42,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - **Pose 3D des marqueurs** (si la caméra est calibrée) : position en mm, distance et rotations par rapport à la caméra. Les axes du marqueur sont dessinés sur l'image.
 - **Positions sur le sol en millimètres** : repère défini par les 4 coins d'un rectangle de dimensions connues, cliqués dans l'image. Avec la calibration, correction de la hauteur des repères (marqueurs posés sur le robot) et hauteur de la caméra au-dessus du sol affichée. Il donne la position et le cap des carrés et des marqueurs, ainsi que la position, la vitesse et la direction de déplacement des objets suivis. Il fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus.
 - **Lissage dans le temps** (filtre de Kalman) du carré principal et de chaque marqueur : position lissée, vitesse, position prédite pendant une courte perte de détection, trajectoires.
+- **Zones nommées** : rectangles fixes tracés sur l'image, avec l'occupation de chacun (objets suivis, marqueurs, carré) et les entrées et sorties dans le journal et en UDP.
 
 ### Intégration
 

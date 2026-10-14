@@ -8,6 +8,7 @@
 #include "objecttracker.h"
 #include "positionsender.h"
 #include "squaredetector.h"
+#include "zonemanager.h"
 
 #include <QCameraFormat>
 #include <QElapsedTimer>
@@ -101,6 +102,9 @@ private slots:
     void clearFloor();
     void onFloorSizeChanged();
     void toggleTrackSelection();
+    void toggleZonePicking();
+    void removeSelectedZone();
+    void clearZones();
     void onRectangleSelected(const QRect &displayRect);
     void stopTracking();
     void onSelectionPointClicked(const QPoint &displayPos);
@@ -142,6 +146,10 @@ private:
     void saveFloorSettings() const;
     void updateFloorStatus();
     void updateTrackStatus();
+    void updateZoneStatus();
+    void updateZoneList();
+    void saveZones() const;
+    void addZone(const QRect &displayRect);
     void applySmoothingToTracker();
     void configureTracker(ObjectTracker &tracker) const;
     void onTrackAlgorithmChosen(int index);
@@ -247,6 +255,16 @@ private:
     QSize m_trackImageSize;    // résolution à laquelle les objets ont été sélectionnés
     QElapsedTimer m_clock;     // horloge des points de trajectoire
     bool m_floorPicking = false;
+    bool m_zonePicking = false;  // tracé d'une zone en cours (sélection d'un rectangle)
+    ZoneManager m_zones;
+    QPushButton *m_zoneAddButton = nullptr;
+    QPushButton *m_zoneConfirmButton = nullptr;
+    QPushButton *m_zoneRemoveButton = nullptr;
+    QPushButton *m_zoneClearButton = nullptr;
+    QListWidget *m_zoneList = nullptr;
+    QCheckBox *m_zoneShowCheck = nullptr;
+    QLabel *m_zoneLabel = nullptr;
+    QLabel *m_zoneOccupancyLabel = nullptr;
     std::vector<QPointF> m_floorPicked;  // points cliqués, dans l'image réelle de la caméra
     QSize m_lastFrameSizeAtPick;
     bool m_floorPoseShown = false;  // état de la position de la caméra affiché dans l'onglet Sol

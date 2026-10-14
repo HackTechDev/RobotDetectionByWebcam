@@ -4,6 +4,7 @@
 #include "motionfilter.h"
 #include "objecttracker.h"
 #include "squaredetector.h"
+#include "zonemanager.h"
 
 #include <QHostAddress>
 #include <QSize>
@@ -17,6 +18,15 @@ struct TrackedEntry
     int id = 0;
     QString name;
     const TrackedObject *state = nullptr;
+};
+
+// Zone à envoyer : la zone, son rectangle en pixels et, si le repère du sol est prêt, ses coins
+// sur le sol en mm.
+struct ZoneEntry
+{
+    const Zone *zone = nullptr;
+    QRectF box;
+    std::vector<QPointF> floorCorners;
 };
 
 // Envoie les résultats de détection en JSON, un datagramme UDP par image.
@@ -33,7 +43,7 @@ public:
     bool send(const QSize &imageSize, const std::vector<DetectedSquare> *squares,
               const std::vector<DetectedMarker> *markers, const std::vector<TrackedEntry> *tracked = nullptr,
               const std::vector<const SmoothedTrack *> *tracks = nullptr,
-              const std::vector<MotionEvent> *events = nullptr);
+              const std::vector<MotionEvent> *events = nullptr, const std::vector<ZoneEntry> *zones = nullptr);
 
     qint64 sentCount() const { return m_sentCount; }
     qint64 lastSize() const { return m_lastSize; }
@@ -45,7 +55,7 @@ public:
                                    const std::vector<DetectedMarker> *markers,
                                    const std::vector<TrackedEntry> *tracked = nullptr,
                                    const std::vector<const SmoothedTrack *> *tracks = nullptr,
-                                   const std::vector<MotionEvent> *events = nullptr);
+                                   const std::vector<MotionEvent> *events = nullptr, const std::vector<ZoneEntry> *zones = nullptr);
 
 private:
     QUdpSocket m_socket;

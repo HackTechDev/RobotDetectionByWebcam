@@ -311,6 +311,69 @@ MainWindow::MainWindow(QWidget *parent)
     floorLayout->addStretch();
     tabs->addTab(floorTab, tr("Sol"));
 
+    // Onglet zones : rectangles fixes et nommés de l'image ; entrées et sorties signalées.
+    auto *zoneTab = new QWidget(tabs);
+    auto *zoneLayout = new QVBoxLayout(zoneTab);
+    auto *zoneBox = new QGroupBox(tr("Zones"), zoneTab);
+    auto *zoneBoxLayout = new QVBoxLayout(zoneBox);
+    m_zoneAddButton = new QPushButton(tr("Ajouter une zone"), zoneBox);
+    m_zoneAddButton->setToolTip(tr("Tracez ensuite un rectangle sur l'image, ajustez-le, puis validez"));
+    zoneBoxLayout->addWidget(m_zoneAddButton);
+    m_zoneConfirmButton = new QPushButton(tr("Valider la zone"), zoneBox);
+    m_zoneConfirmButton->setToolTip(tr("Aussi avec Entrée ou un double-clic dans le cadre"));
+    zoneBoxLayout->addWidget(m_zoneConfirmButton);
+    m_zoneList = new QListWidget(zoneBox);
+    m_zoneList->setToolTip(tr("Double-cliquez sur une zone pour la renommer"));
+    m_zoneList->setMaximumHeight(120);
+    zoneBoxLayout->addWidget(m_zoneList);
+    auto *zoneButtons = new QHBoxLayout;
+    m_zoneRemoveButton = new QPushButton(tr("Retirer"), zoneBox);
+    m_zoneClearButton = new QPushButton(tr("Tout retirer"), zoneBox);
+    zoneButtons->addWidget(m_zoneRemoveButton);
+    zoneButtons->addWidget(m_zoneClearButton);
+    zoneBoxLayout->addLayout(zoneButtons);
+    m_zoneShowCheck = new QCheckBox(tr("Afficher les zones sur l'image"), zoneBox);
+    m_zoneShowCheck->setChecked(true);
+    zoneBoxLayout->addWidget(m_zoneShowCheck);
+    m_zoneLabel = new QLabel(zoneBox);
+    m_zoneLabel->setWordWrap(true);
+    m_zoneLabel->setTextFormat(Qt::RichText);
+    zoneBoxLayout->addWidget(m_zoneLabel);
+    zoneLayout->addWidget(zoneBox);
+    m_zoneOccupancyLabel = new QLabel(zoneTab);
+    m_zoneOccupancyLabel->setWordWrap(true);
+    m_zoneOccupancyLabel->setTextFormat(Qt::RichText);
+    zoneLayout->addWidget(m_zoneOccupancyLabel);
+    auto *zoneHelp = new QLabel(tr("<i>Une zone est fixe : elle reste au même endroit de l'image. Les objets "
+                                   "suivis, les marqueurs ArUco et le carré principal qui y entrent ou en "
+                                   "sortent sont inscrits dans le journal des événements (onglet Suivi) et "
+                                   "envoyés en UDP. Chaque caméra a ses propres zones.</i>"),
+                                zoneTab);
+    zoneHelp->setWordWrap(true);
+    zoneLayout->addWidget(zoneHelp);
+    zoneLayout->addStretch();
+    tabs->addTab(zoneTab, tr("Zones"));
+    connect(m_zoneAddButton, &QPushButton::clicked, this, &MainWindow::toggleZonePicking);
+    connect(m_zoneConfirmButton, &QPushButton::clicked, m_video, &VideoWidget::confirmSelection);
+    connect(m_zoneRemoveButton, &QPushButton::clicked, this, &MainWindow::removeSelectedZone);
+    connect(m_zoneClearButton, &QPushButton::clicked, this, &MainWindow::clearZones);
+    connect(m_zoneList, &QListWidget::currentItemChanged, this, &MainWindow::updateZoneStatus);
+    connect(m_zoneList, &QListWidget::itemChanged, this, [this](QListWidgetItem *item) {
+        // Renommage dans la liste : nom vide refusé.
+        const int id = item->data(Qt::UserRole).toInt();
+        QString name = item->text().trimmed();
+        if (name.isEmpty()) {
+            for (const Zone &z : m_zones.zones())
+                if (z.id == id)
+                    name = z.name;
+            const QSignalBlocker blocker(m_zoneList);
+            item->setText(name);
+        }
+        waitForProcessing();
+        m_zones.rename(id, name);
+        saveZones();
+    });
+
     // Onglet suivi : objets désignés à la main, chacun suivi par un tracker OpenCV.
     auto *trackTab = new QWidget(tabs);
     auto *trackLayout = new QVBoxLayout(trackTab);
@@ -519,6 +582,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_trackStartButton, &QPushButton::clicked, m_video, &VideoWidget::confirmSelection);
     connect(m_video, &VideoWidget::selectionPointClicked, this, &MainWindow::onSelectionPointClicked);
     connect(m_video, &VideoWidget::pendingRectChanged, this, &MainWindow::updateTrackStatus);
+    connect(m_video, &VideoWidget::pendingRectChanged, this, &MainWindow::updateZoneStatus);
     // Échap annule la saisie en cours ; Entrée valide le cadre (raccourci actif seulement
     // quand un cadre attend, pour ne pas gêner la saisie dans les champs).
     auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
@@ -794,6 +858,7 @@ void MainWindow::loadSettings()
     // Le repère du sol est propre à chaque caméra (loadCameraReference()) ; seul son affichage
     // est un réglage général.
     m_floorShowCheck->setChecked(s.value(QStringLiteral("floor/show"), true).toBool());
+    m_zoneShowCheck->setChecked(s.value(QStringLiteral("zones/show"), true).toBool());
 
     m_smoothBox->setChecked(s.value(QStringLiteral("smoothing/enabled"), true).toBool());
     m_smoothStrengthSlider->setValue(s.value(QStringLiteral("smoothing/strength"), m_smoothStrengthSlider->value()).toInt());
@@ -851,6 +916,7 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value());
 
     s.setValue(QStringLiteral("floor/show"), m_floorShowCheck->isChecked());
+    s.setValue(QStringLiteral("zones/show"), m_zoneShowCheck->isChecked());
     s.setValue(QStringLiteral("smoothing/enabled"), m_smoothBox->isChecked());
     s.setValue(QStringLiteral("smoothing/strength"), m_smoothStrengthSlider->value());
     s.setValue(QStringLiteral("smoothing/holdSeconds"), m_smoothHoldSpin->value());
@@ -1072,6 +1138,18 @@ void MainWindow::loadCameraReference(const QString &key)
     }
     m_floorPicking = false;
     m_floorPicked.clear();
+
+    // Zones propres à cette caméra.
+    {
+        QSettings zs(settingsPath(), QSettings::IniFormat);
+        m_zones.load(zs, resolutionSettingsKey());
+    }
+    if (m_zonePicking) {
+        m_zonePicking = false;
+        m_video->setSelectionMode(false);
+    }
+    updateZoneList();
+    updateZoneStatus();
 
     // Les objets suivis et les positions lissées valaient pour l'autre caméra.
     stopTracking();
@@ -1485,7 +1563,9 @@ void MainWindow::toggleFloorPicking()
     waitForProcessing();
     if (m_video->selectionMode()) {  // une seule saisie à la fois
         m_video->setSelectionMode(false);
+        m_zonePicking = false;
         updateTrackStatus();
+        updateZoneStatus();
     }
     m_floorPicking = !m_floorPicking;
     m_floorPicked.clear();
@@ -1591,8 +1671,127 @@ void MainWindow::toggleTrackSelection()
         m_floorPicked.clear();
         updateFloorStatus();
     }
-    m_video->setSelectionMode(!m_video->selectionMode());
+    if (m_zonePicking) {  // tracé de zone abandonné : on passe à l'ajout d'objets
+        m_zonePicking = false;
+        m_video->setSelectionMode(true);
+        updateZoneStatus();
+    } else {
+        m_video->setSelectionMode(!m_video->selectionMode());
+    }
     updateTrackStatus();
+}
+
+void MainWindow::toggleZonePicking()
+{
+    if (m_floorPicking) {  // une seule saisie à la fois
+        m_floorPicking = false;
+        m_floorPicked.clear();
+        updateFloorStatus();
+    }
+    m_zonePicking = !m_zonePicking;
+    m_video->setSelectionMode(m_zonePicking);
+    updateTrackStatus();
+    updateZoneStatus();
+}
+
+void MainWindow::addZone(const QRect &displayRect)
+{
+    m_zonePicking = false;
+    if (m_lastFrame.isNull()) {
+        updateZoneStatus();
+        return;
+    }
+    // Le rectangle est tracé sur l'image affichée, éventuellement en miroir.
+    QRect rect = displayRect;
+    if (m_mirrorCheck->isChecked())
+        rect.moveLeft(m_lastFrame.width() - displayRect.right() - 1);
+    if (rect.width() < 4 || rect.height() < 4) {
+        updateZoneStatus();
+        return;
+    }
+    bool ok = false;
+    QString name = QInputDialog::getText(this, tr("Nouvelle zone"), tr("Nom de la zone :"), QLineEdit::Normal,
+                                         m_zones.nextName(), &ok)
+                       .trimmed();
+    if (!ok) {
+        updateZoneStatus();
+        return;
+    }
+    if (name.isEmpty())
+        name = m_zones.nextName();
+    waitForProcessing();
+    m_zones.add(name, rect, m_lastFrame.size());
+    saveZones();
+    updateZoneList();
+    updateZoneStatus();
+}
+
+void MainWindow::removeSelectedZone()
+{
+    QListWidgetItem *item = m_zoneList->currentItem();
+    if (!item)
+        return;
+    waitForProcessing();
+    m_zones.remove(item->data(Qt::UserRole).toInt());
+    saveZones();
+    updateZoneList();
+    updateZoneStatus();
+}
+
+void MainWindow::clearZones()
+{
+    if (m_zones.zones().empty())
+        return;
+    if (QMessageBox::question(this, tr("Zones"), tr("Retirer toutes les zones de cette caméra ?"))
+        != QMessageBox::Yes)
+        return;
+    waitForProcessing();
+    m_zones.clear();
+    saveZones();
+    updateZoneList();
+    updateZoneStatus();
+}
+
+void MainWindow::updateZoneList()
+{
+    const QSignalBlocker blocker(m_zoneList);
+    m_zoneList->clear();
+    for (const Zone &z : m_zones.zones()) {
+        QPixmap pixmap(14, 14);
+        pixmap.fill(z.color);
+        auto *item = new QListWidgetItem(QIcon(pixmap), z.name);
+        item->setData(Qt::UserRole, z.id);
+        item->setFlags(item->flags() | Qt::ItemIsEditable);
+        m_zoneList->addItem(item);
+    }
+}
+
+void MainWindow::updateZoneStatus()
+{
+    const bool pending = m_zonePicking && m_video->hasPendingRect();
+    m_zoneAddButton->setText(m_zonePicking ? tr("Annuler le tracé") : tr("Ajouter une zone"));
+    m_zoneConfirmButton->setEnabled(pending);
+    m_zoneRemoveButton->setEnabled(m_zoneList->currentItem() != nullptr);
+    m_zoneClearButton->setEnabled(!m_zones.zones().empty());
+    if (pending) {
+        m_zoneLabel->setText(tr("<b style='color:#c60'>Ajustez la zone</b> (poignées, glisser), puis validez : "
+                                "« Valider la zone », Entrée ou double-clic dans le cadre."));
+    } else if (m_zonePicking) {
+        m_zoneLabel->setText(tr("<b style='color:#c60'>Tracez un rectangle</b> sur l'image (cliquer-glisser). "
+                                "Échap pour annuler."));
+    } else {
+        m_zoneLabel->setText(m_zones.zones().empty()
+                                 ? tr("Aucune zone.")
+                                 : tr("<b style='color:#080'>%n zone(s)</b>", nullptr, int(m_zones.zones().size())));
+    }
+}
+
+void MainWindow::saveZones() const
+{
+    if (m_cameraKey.isEmpty())
+        return;
+    QSettings s(settingsPath(), QSettings::IniFormat);
+    m_zones.save(s, resolutionSettingsKey());
 }
 
 namespace {
@@ -1688,6 +1887,11 @@ bool MainWindow::ensureTrackerModels(int algorithm)
 
 void MainWindow::onRectangleSelected(const QRect &displayRect)
 {
+    if (m_zonePicking) {
+        addZone(displayRect);
+        updateTrackStatus();
+        return;
+    }
     waitForProcessing();
     if (m_lastFrame.isNull()) {
         updateTrackStatus();
@@ -1757,7 +1961,7 @@ void MainWindow::onObjectRenamed(QListWidgetItem *listItem)
 
 void MainWindow::onSelectionPointClicked(const QPoint &displayPos)
 {
-    if (m_lastFrame.isNull())
+    if (m_lastFrame.isNull() || m_zonePicking)  // une zone se trace, elle ne se délimite pas d'un clic
         return;
     // Délimitation automatique sur l'image réelle (le clic est fait sur l'image affichée).
     const bool mirror = m_mirrorCheck->isChecked();
@@ -1778,7 +1982,9 @@ void MainWindow::cancelCurrentInput()
 {
     if (m_video->selectionMode()) {
         m_video->setSelectionMode(false);
+        m_zonePicking = false;
         updateTrackStatus();
+        updateZoneStatus();
     } else if (m_floorPicking) {
         toggleFloorPicking();
     }
@@ -1805,12 +2011,14 @@ void MainWindow::applySmoothingToTracker()
 void MainWindow::updateTrackStatus()
 {
     waitForProcessing();
-    const bool selecting = m_video->selectionMode();
+    const bool selecting = m_video->selectionMode() && !m_zonePicking;
     const bool pending = selecting && m_video->hasPendingRect();
     m_trackSelectButton->setText(selecting ? tr("Terminer l'ajout") : tr("Ajouter des objets"));
     m_trackStartButton->setEnabled(pending);
-    m_confirmShortcut->setEnabled(pending);
-    m_confirmShortcutKeypad->setEnabled(pending);
+    // Entrée valide le cadre en attente, objet ou zone.
+    const bool anyPending = m_video->selectionMode() && m_video->hasPendingRect();
+    m_confirmShortcut->setEnabled(anyPending);
+    m_confirmShortcutKeypad->setEnabled(anyPending);
     m_trackStopButton->setEnabled(!m_tracked.empty());
     m_trackRemoveButton->setEnabled(m_objectList->currentItem() != nullptr);
 
@@ -1861,6 +2069,10 @@ QString eventText(const MotionEvent &e)
         return QObject::tr("Objet perdu (dernière position %1)").arg(where);
     case MotionEvent::Found:
         return QObject::tr("Objet retrouvé en %1").arg(where);
+    case MotionEvent::ZoneEnter:
+        return QObject::tr("Entre dans la zone « %1 » en %2").arg(e.zoneName, where);
+    case MotionEvent::ZoneExit:
+        return QObject::tr("Sort de la zone « %1 » (dernière position %2)").arg(e.zoneName, where);
     }
     return {};
 }
@@ -1872,6 +2084,8 @@ QString eventTypeKey(MotionEvent::Type type)
     case MotionEvent::MotionStop: return QStringLiteral("motion_stop");
     case MotionEvent::Lost: return QStringLiteral("lost");
     case MotionEvent::Found: return QStringLiteral("found");
+    case MotionEvent::ZoneEnter: return QStringLiteral("zone_enter");
+    case MotionEvent::ZoneExit: return QStringLiteral("zone_exit");
     }
     return {};
 }
@@ -1884,14 +2098,19 @@ void MainWindow::logEvents(const std::vector<MotionEvent> &events)
     for (const MotionEvent &e : events) {
         const QString time = QDateTime::fromMSecsSinceEpoch(e.wallTimeMs).toString(QStringLiteral("HH:mm:ss.z"));
         auto *item = new QListWidgetItem(QStringLiteral("%1  %2 : %3").arg(time, e.objectName, eventText(e)));
-        for (const TrackedItem &tracked : m_tracked) {
-            if (tracked.id == e.objectId)
-                item->setIcon(colorIcon(tracked.color));
+        if (e.type == MotionEvent::ZoneEnter || e.type == MotionEvent::ZoneExit) {
+            item->setIcon(colorIcon(m_zones.colorOf(e.zoneId)));
+        } else {
+            for (const TrackedItem &tracked : m_tracked) {
+                if (tracked.id == e.objectId)
+                    item->setIcon(colorIcon(tracked.color));
+            }
         }
         // Données brutes, pour l'enregistrement en CSV.
         item->setData(Qt::UserRole, QVariantList{e.wallTimeMs, eventTypeKey(e.type), e.position.x(), e.position.y(),
                                                  e.onFloor ? QStringLiteral("mm") : QStringLiteral("px"),
-                                                 e.distance, e.travelled, e.duration, e.objectId, e.objectName});
+                                                 e.distance, e.travelled, e.duration, e.objectId, e.objectName,
+                                                 e.zoneName});
         m_eventList->insertItem(0, item);
     }
     while (m_eventList->count() > 500)
@@ -1910,14 +2129,14 @@ void MainWindow::saveEventLog()
         return;
     }
     QTextStream out(&file);
-    out << "heure;horodatage_ms;objet_id;objet;type;x;y;unite;deplacement;parcours;duree_s\n";
+    out << "heure;horodatage_ms;objet_id;objet;type;x;y;unite;deplacement;parcours;duree_s;zone\n";
     for (int i = m_eventList->count() - 1; i >= 0; --i) {  // du plus ancien au plus récent
         const QVariantList d = m_eventList->item(i)->data(Qt::UserRole).toList();
         out << QDateTime::fromMSecsSinceEpoch(d[0].toLongLong()).toString(Qt::ISODateWithMs) << ';' << d[0].toLongLong()
             << ';' << d[8].toInt() << ';' << d[9].toString().replace(';', ',') << ';' << d[1].toString() << ';' << QString::number(d[2].toDouble(), 'f', 1) << ';'
             << QString::number(d[3].toDouble(), 'f', 1) << ';' << d[4].toString() << ';'
             << QString::number(d[5].toDouble(), 'f', 1) << ';' << QString::number(d[6].toDouble(), 'f', 1) << ';'
-            << QString::number(d[7].toDouble(), 'f', 2) << '\n';
+            << QString::number(d[7].toDouble(), 'f', 2) << ';' << d.value(10).toString().replace(';', ',') << '\n';
     }
 }
 
@@ -2074,6 +2293,36 @@ void MainWindow::presentFrame(const FrameResult &result)
     const std::vector<DetectedSquare> &squares = result.squares;
     const std::vector<DetectedMarker> &markers = result.markers;
     std::vector<MotionEvent> frameEvents = result.events;
+    // Zones : ce qui s'y trouve (objets suivis, marqueurs, carré principal), entrées et sorties.
+    if (!m_zones.zones().empty()) {
+        std::vector<ZoneOccupant> occupants;
+        for (const TrackedItem &item : m_tracked) {
+            const TrackedObject &t = item.tracker->state();
+            if (t.found || t.predicted)
+                occupants.push_back({QStringLiteral("tracked:%1").arg(item.id), item.name, item.id, t.center,
+                                     t.hasFloor, t.floorPosition});
+        }
+        for (const DetectedMarker &m : result.markers)
+            occupants.push_back({QStringLiteral("marker:%1").arg(m.id), tr("ArUco %1").arg(m.id), m.id, m.center,
+                                 m.hasFloor, m.floorPosition});
+        if (!result.squares.empty()) {
+            const DetectedSquare &sq = result.squares.front();
+            occupants.push_back({QStringLiteral("square"), tr("Carré"), 0, sq.center, sq.hasFloor, sq.floorPosition});
+        }
+        const std::vector<MotionEvent> zoneEvents = m_zones.update(occupants, image.size(), m_clock.elapsed());
+        frameEvents.insert(frameEvents.end(), zoneEvents.begin(), zoneEvents.end());
+        QStringList lines;
+        for (const Zone &z : m_zones.zones()) {
+            lines << tr("<b style='color:%1'>■</b> <b>%2</b> : %3")
+                         .arg(z.color.darker(130).name(), z.name.toHtmlEscaped(),
+                              z.occupants.isEmpty() ? tr("vide") : z.occupants.join(QStringLiteral(", ")).toHtmlEscaped());
+        }
+        const QString text = lines.join(QStringLiteral("<br>"));
+        if (m_zoneOccupancyLabel->text() != text)
+            m_zoneOccupancyLabel->setText(text);
+    } else if (!m_zoneOccupancyLabel->text().isEmpty()) {
+        m_zoneOccupancyLabel->clear();
+    }
     const bool calibOn = result.options.calibOn;
     const std::vector<QPointF> &boardCorners = result.boardCorners;
     const bool boardFound = result.boardFound;
@@ -2118,9 +2367,21 @@ void MainWindow::presentFrame(const FrameResult &result)
         std::vector<TrackedEntry> trackedEntries;
         for (const TrackedItem &item : m_tracked)
             trackedEntries.push_back({item.id, item.name, &item.tracker->state()});
+        std::vector<ZoneEntry> zoneEntries;
+        const bool floorReady = m_floor.isReady();
+        for (const Zone &z : m_zones.zones()) {
+            ZoneEntry entry{&z, ZoneManager::imageRect(z, image.size()), {}};
+            if (floorReady) {
+                const QRectF &b = entry.box;
+                for (const QPointF &p : {b.topLeft(), b.topRight(), b.bottomRight(), b.bottomLeft()})
+                    entry.floorCorners.push_back(m_floor.toFloor(p));
+            }
+            zoneEntries.push_back(entry);
+        }
         m_sender.send(image.size(), squaresOn ? &squares : nullptr, markersOn ? &markers : nullptr,
                       trackedEntries.empty() ? nullptr : &trackedEntries,
-                      m_smoothBox->isChecked() ? &tracks : nullptr, frameEvents.empty() ? nullptr : &frameEvents);
+                      m_smoothBox->isChecked() ? &tracks : nullptr, frameEvents.empty() ? nullptr : &frameEvents,
+                      zoneEntries.empty() ? nullptr : &zoneEntries);
         QString text = tr("Destination : <b>%1</b><br>Messages envoyés : %2 (dernier : %3 octets)")
                            .arg(m_sender.targetDescription())
                            .arg(m_sender.sentCount())
@@ -2200,6 +2461,24 @@ void MainWindow::presentFrame(const FrameResult &result)
         painter.drawText(QPointF(penWidth * 4, font.pixelSize() * 1.5),
                          boardFound ? tr("Damier détecté — %1 capture(s)").arg(m_calibration.captureCount())
                                     : tr("Damier non détecté"));
+    }
+
+    // Zones : rectangle teinté et nom (avec le nombre d'occupants).
+    if (m_zoneShowCheck->isChecked()) {
+        for (const Zone &z : m_zones.zones()) {
+            QRectF r = ZoneManager::imageRect(z, image.size());
+            if (mirror)
+                r.moveLeft(width - r.right());
+            QColor fill = z.color;
+            fill.setAlpha(z.occupants.isEmpty() ? 35 : 80);
+            painter.setPen(QPen(z.color, penWidth));
+            painter.setBrush(fill);
+            painter.drawRect(r);
+            painter.setPen(z.color);
+            const QString label = z.occupants.isEmpty() ? z.name : QStringLiteral("%1 (%2)").arg(z.name).arg(z.occupants.size());
+            painter.drawText(r.topLeft() + QPointF(penWidth * 2, font.pixelSize() + penWidth), label);
+        }
+        painter.setBrush(Qt::NoBrush);
     }
 
     // Repère du sol : contour de la zone et noms des axes, ou points en cours de saisie.

@@ -47,10 +47,10 @@ struct TrackedObject
     double floorDirection = 0;  // en degrés, de l'axe X vers l'axe Y
 };
 
-// Événement de mouvement de l'objet suivi.
+// Événement de mouvement de l'objet suivi, ou entrée et sortie d'une zone.
 struct MotionEvent
 {
-    enum Type { MotionStart, MotionStop, Lost, Found };
+    enum Type { MotionStart, MotionStop, Lost, Found, ZoneEnter, ZoneExit };
     Type type = MotionStart;
     qint64 timeMs = 0;      // horloge du suivi
     qint64 wallTimeMs = 0;  // heure réelle (ms depuis 1970), renseignée par l'application
@@ -61,6 +61,8 @@ struct MotionEvent
     double duration = 0;    // fin de mouvement : durée en secondes
     int objectId = 0;       // objet concerné (renseigné par l'application)
     QString objectName;
+    int zoneId = 0;         // entrée et sortie de zone : zone concernée
+    QString zoneName;
 };
 
 // Suivi d'un objet encadré à la main (trackers CSRT, KCF, NanoTrack ou VitTrack d'OpenCV), avec sa
