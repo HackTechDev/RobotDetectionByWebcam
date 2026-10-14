@@ -8,7 +8,9 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QColorDialog>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QFileDialog>
 #include <QtConcurrent/QtConcurrentMap>
 #include <QtConcurrent/QtConcurrentRun>
@@ -497,7 +499,6 @@ MainWindow::MainWindow(QWidget *parent)
     updateFloorStatus();
     m_clock.start();
     updateTrackStatus();
-    m_calibration.load(calibrationPath());
     m_lastCapture.start();
     updateCalibrationStatus();
 
@@ -567,8 +568,10 @@ void MainWindow::onCameraChanged(int index)
     if (m_camera && m_camera->cameraDevice() == device)
         return;
 
+    waitForProcessing();
     delete m_camera;
     m_camera = new QCamera(device, this);
+    m_cameraKey = cameraKeyFor(device);
     connect(m_camera, &QCamera::errorOccurred, this, [this](QCamera::Error, const QString &msg) {
         m_statusLabel->setText(tr("<b style='color:red'>Erreur caméra :</b> %1").arg(msg.toHtmlEscaped()));
     });
@@ -581,6 +584,7 @@ void MainWindow::onCameraChanged(int index)
     m_session->setCamera(m_camera);
     populateResolutions();
     loadCameraSettings();
+    loadCameraReference(m_cameraKey);
     m_cameraSettingsDialog->setCamera(m_camera);
     m_camera->start();
 }
@@ -699,25 +703,9 @@ void MainWindow::loadSettings()
     m_markerLengthSpin->setValue(
         s.value(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value()).toDouble());
 
-    {
-        // Sans signaux : onFloorSizeChanged() réenregistrerait le repère avant le chargement des points.
-        const QSignalBlocker bx(m_floorSizeXSpin), by(m_floorSizeYSpin);
-        m_floorSizeXSpin->setValue(s.value(QStringLiteral("floor/sizeX"), m_floorSizeXSpin->value()).toDouble());
-        m_floorSizeYSpin->setValue(s.value(QStringLiteral("floor/sizeY"), m_floorSizeYSpin->value()).toDouble());
-        m_floor.setSize(QSizeF(m_floorSizeXSpin->value(), m_floorSizeYSpin->value()));
-        const QSignalBlocker bh(m_floorHeightSpin);
-        m_floorHeightSpin->setValue(s.value(QStringLiteral("floor/objectHeight"), 0.0).toDouble());
-        m_floor.setObjectHeight(m_floorHeightSpin->value());
-    }
+    // Le repère du sol est propre à chaque caméra (loadCameraReference()) ; seul son affichage
+    // est un réglage général.
     m_floorShowCheck->setChecked(s.value(QStringLiteral("floor/show"), true).toBool());
-    const QVariantList floorPoints = s.value(QStringLiteral("floor/points")).toList();
-    if (floorPoints.size() == 8) {
-        std::vector<QPointF> pts;
-        for (int i = 0; i < 8; i += 2)
-            pts.emplace_back(floorPoints[i].toDouble(), floorPoints[i + 1].toDouble());
-        m_floor.setPoints(pts, s.value(QStringLiteral("floor/imageSize")).toSize());
-    }
-    updateFloorStatus();
 
     m_smoothBox->setChecked(s.value(QStringLiteral("smoothing/enabled"), true).toBool());
     m_smoothStrengthSlider->setValue(s.value(QStringLiteral("smoothing/strength"), m_smoothStrengthSlider->value()).toInt());
@@ -811,12 +799,87 @@ void MainWindow::closeEvent(QCloseEvent *event)
     QMainWindow::closeEvent(event);
 }
 
+QString MainWindow::cameraKeyFor(const QCameraDevice &device)
+{
+    // Une entrée par modèle de caméra (son nom). Si deux caméras branchées portent le même nom,
+    // on ajoute l'identifiant système pour les distinguer. « / » sépare les groupes de QSettings.
+    QString key = device.description();
+    for (const QCameraDevice &other : QMediaDevices::videoInputs()) {
+        if (other.id() != device.id() && other.description() == device.description()) {
+            key += QStringLiteral(" (%1)").arg(QString::fromUtf8(device.id()));
+            break;
+        }
+    }
+    return key.replace(QLatin1Char('/'), QLatin1Char('_')).replace(QLatin1Char('\\'), QLatin1Char('_'));
+}
+
 QString MainWindow::resolutionSettingsKey() const
 {
-    // Une entrée par modèle de caméra ; « / » sépare les groupes dans QSettings.
-    QString name = m_camera->cameraDevice().description();
-    name.replace(QLatin1Char('/'), QLatin1Char('_')).replace(QLatin1Char('\\'), QLatin1Char('_'));
-    return QStringLiteral("cameras/") + name;
+    return QStringLiteral("cameras/") + m_cameraKey;
+}
+
+void MainWindow::migrateLegacyReference()
+{
+    // Avant la gestion de plusieurs caméras, la calibration (calibration.yml) et le repère du sol
+    // (groupe « floor ») étaient uniques : on les rattache une fois à la caméra active.
+    QSettings s(settingsPath(), QSettings::IniFormat);
+    if (s.value(QStringLiteral("legacy/referenceMigrated")).toBool() || m_cameraKey.isEmpty())
+        return;
+    const QString legacyCalibration =
+        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + QStringLiteral("/calibration.yml");
+    if (QFileInfo::exists(legacyCalibration) && !QFileInfo::exists(calibrationPath())) {
+        QDir().mkpath(QFileInfo(calibrationPath()).absolutePath());
+        QFile::copy(legacyCalibration, calibrationPath());
+    }
+    const QString group = resolutionSettingsKey() + QStringLiteral("/floor/");
+    for (const char *key : {"points", "imageSize", "sizeX", "sizeY", "objectHeight"}) {
+        const QString legacyKey = QStringLiteral("floor/") + QLatin1String(key);
+        if (s.contains(legacyKey)) {
+            s.setValue(group + QLatin1String(key), s.value(legacyKey));
+            s.remove(legacyKey);
+        }
+    }
+    s.setValue(QStringLiteral("legacy/referenceMigrated"), true);
+}
+
+void MainWindow::loadCameraReference(const QString &key)
+{
+    waitForProcessing();
+    m_cameraKey = key;
+    migrateLegacyReference();
+
+    // Calibration propre à cette caméra (aucune : caméra non calibrée).
+    m_calibration.reset();
+    m_calibration.load(calibrationPath());
+
+    // Repère du sol propre à cette caméra.
+    const QSettings s(settingsPath(), QSettings::IniFormat);
+    const QString group = resolutionSettingsKey() + QStringLiteral("/floor/");
+    {
+        // Sans signaux : les changements réenregistreraient le repère pendant son chargement.
+        const QSignalBlocker bx(m_floorSizeXSpin), by(m_floorSizeYSpin), bh(m_floorHeightSpin);
+        m_floorSizeXSpin->setValue(s.value(group + QStringLiteral("sizeX"), 1000.0).toDouble());
+        m_floorSizeYSpin->setValue(s.value(group + QStringLiteral("sizeY"), 1000.0).toDouble());
+        m_floorHeightSpin->setValue(s.value(group + QStringLiteral("objectHeight"), 0.0).toDouble());
+    }
+    m_floor.setSize(QSizeF(m_floorSizeXSpin->value(), m_floorSizeYSpin->value()));
+    m_floor.setObjectHeight(m_floorHeightSpin->value());
+    m_floor.clearPoints();
+    const QVariantList points = s.value(group + QStringLiteral("points")).toList();
+    if (points.size() == 8) {
+        std::vector<QPointF> pts;
+        for (int i = 0; i < 8; i += 2)
+            pts.emplace_back(points[i].toDouble(), points[i + 1].toDouble());
+        m_floor.setPoints(pts, s.value(group + QStringLiteral("imageSize")).toSize());
+    }
+    m_floorPicking = false;
+    m_floorPicked.clear();
+
+    // Les objets suivis et les positions lissées valaient pour l'autre caméra.
+    stopTracking();
+    m_smoother.clear();
+    updateCalibrationStatus();
+    updateFloorStatus();
 }
 
 void MainWindow::loadCameraSettings()
@@ -1021,8 +1084,16 @@ void MainWindow::generateMarker()
 
 QString MainWindow::calibrationPath() const
 {
-    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
-           + QStringLiteral("/calibration.yml");
+    // Un fichier par caméra, nommé d'après son identifiant (caractères sûrs uniquement).
+    if (m_cameraKey.isEmpty())
+        return QString();
+    QString name = m_cameraKey;
+    for (QChar &c : name) {
+        if (!c.isLetterOrNumber() && c != QLatin1Char('-') && c != QLatin1Char('.'))
+            c = QLatin1Char('_');
+    }
+    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + QStringLiteral("/calibrations/")
+           + name + QStringLiteral(".yml");
 }
 
 void MainWindow::updateCalibrationStatus()
@@ -1192,15 +1263,18 @@ void MainWindow::updateFloorStatus()
 void MainWindow::saveFloorSettings() const
 {
     waitForProcessing();
+    if (m_cameraKey.isEmpty())
+        return;
     QSettings s(settingsPath(), QSettings::IniFormat);
+    const QString group = resolutionSettingsKey() + QStringLiteral("/floor/");
     QVariantList points;
     for (const QPointF &p : m_floor.points())
         points << p.x() << p.y();
-    s.setValue(QStringLiteral("floor/points"), points);
-    s.setValue(QStringLiteral("floor/imageSize"), m_floor.pointsImageSize());
-    s.setValue(QStringLiteral("floor/sizeX"), m_floor.size().width());
-    s.setValue(QStringLiteral("floor/sizeY"), m_floor.size().height());
-    s.setValue(QStringLiteral("floor/objectHeight"), m_floor.objectHeight());
+    s.setValue(group + QStringLiteral("points"), points);
+    s.setValue(group + QStringLiteral("imageSize"), m_floor.pointsImageSize());
+    s.setValue(group + QStringLiteral("sizeX"), m_floor.size().width());
+    s.setValue(group + QStringLiteral("sizeY"), m_floor.size().height());
+    s.setValue(group + QStringLiteral("objectHeight"), m_floor.objectHeight());
 }
 
 void MainWindow::toggleTrackSelection()

@@ -44,7 +44,7 @@ cmake --build build -j
 
 ## Utilisation
 
-Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchées, puis sa **résolution**. La liste indique pour chaque résolution son format d'image (4:3, 16:9...) et le nombre maximal d'images par seconde. La résolution choisie est mémorisée pour chaque modèle de caméra et réappliquée au lancement suivant. Au premier lancement, la caméra garde son format par défaut et la liste se cale dessus. Une résolution plus basse accélère la détection ; une résolution plus haute permet de détecter les marqueurs de plus loin.
+Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchées, puis sa **résolution**. Chaque caméra garde ses propres réglages : résolution, exposition, balance des blancs, **calibration** et **repère du sol**. On peut donc passer de l'une à l'autre sans rien refaire. Changer de caméra arrête le suivi des objets encadrés. Deux caméras du même modèle sont distinguées par leur identifiant système. La liste indique pour chaque résolution son format d'image (4:3, 16:9...) et le nombre maximal d'images par seconde. La résolution choisie est mémorisée pour chaque modèle de caméra et réappliquée au lancement suivant. Au premier lancement, la caméra garde son format par défaut et la liste se cale dessus. Une résolution plus basse accélère la détection ; une résolution plus haute permet de détecter les marqueurs de plus loin.
 
 Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution. Ce basculement est mémorisé avec la résolution.
 
@@ -108,7 +108,7 @@ La calibration mesure les caractéristiques optiques de la webcam (focale, centr
    - garder le damier immobile au moment de la capture pour éviter le flou.
 6. Cliquer sur **« Calibrer »**. L'erreur RMS s'affiche : en dessous de 0,5 px, c'est très bon ; au-dessus de 1 px, il vaut mieux recommencer.
 
-La calibration est enregistrée dans `~/.config/RobotDetectionByWebcam/calibration.yml` et rechargée automatiquement au démarrage. Elle reste valable si l'on change de résolution, tant que le format d'image (4:3, 16:9...) ne change pas. Si la résolution choisie a un autre format que la calibration, la pose 3D est désactivée et un message l'indique dans le panneau « Résultat ». Il faut la refaire si l'on change de caméra ou si l'on modifie le zoom ou la mise au point.
+La calibration est propre à chaque caméra : elle est enregistrée dans `~/.config/RobotDetectionByWebcam/calibrations/<caméra>.yml`, et rechargée au démarrage et à chaque changement de caméra. L'ancienne calibration unique (`calibration.yml`, versions précédentes) est copiée pour la caméra active au premier lancement ; l'original est conservé. Elle reste valable si l'on change de résolution, tant que le format d'image (4:3, 16:9...) ne change pas. Si la résolution choisie a un autre format que la calibration, la pose 3D est désactivée et un message l'indique dans le panneau « Résultat ». Il faut la refaire si l'on change de caméra ou si l'on modifie le zoom ou la mise au point.
 
 Changer les dimensions du damier efface les captures en cours.
 
@@ -134,7 +134,7 @@ Avec calibration, chaque marqueur a aussi :
 
 L'onglet « Sol » définit un repère sur le sol : on saisit les dimensions d'un rectangle tracé au sol (ruban adhésif, coins d'une table...), puis on clique ses 4 coins dans l'image, dans l'ordre : origine, coin sur l'axe X, coin opposé, coin sur l'axe Y. L'application donne alors la position de chaque carré et de chaque marqueur **en mm sur le sol**, avec le cap des marqueurs (direction de leur bord supérieur, de l'axe X vers l'axe Y). Ces valeurs s'affichent dans le panneau « Résultat » et sont envoyées en UDP (champ `floor`).
 
-Le repère fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus. Il est enregistré dans `settings.ini` et reste valable pour toute résolution du même format d'image. La caméra ne doit plus bouger une fois le repère défini. Le repère est défini au niveau du sol. Un marqueur placé en hauteur sur le robot est donc décalé, jusqu'à plusieurs centimètres. Si la caméra est calibrée, le champ « Hauteur des repères » corrige ce décalage pour les carrés et les marqueurs. L'onglet affiche alors aussi la hauteur de la caméra au-dessus du sol, vérifiable au mètre ruban.
+Le repère est propre à chaque caméra, comme la calibration. Il fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus. Il est enregistré dans `settings.ini` et reste valable pour toute résolution du même format d'image. La caméra ne doit plus bouger une fois le repère défini. Le repère est défini au niveau du sol. Un marqueur placé en hauteur sur le robot est donc décalé, jusqu'à plusieurs centimètres. Si la caméra est calibrée, le champ « Hauteur des repères » corrige ce décalage pour les carrés et les marqueurs. L'onglet affiche alors aussi la hauteur de la caméra au-dessus du sol, vérifiable au mètre ruban.
 
 ### Suivi d'objets encadrés
 
@@ -308,5 +308,5 @@ tools/
 - **Le damier n'est pas détecté** : il doit être entièrement visible avec sa marge blanche. Vérifier que le nombre de **coins intérieurs** saisi correspond au damier (un damier de 10 × 7 cases a 9 × 6 coins intérieurs). Éviter les reflets.
 - **Erreur RMS élevée** : damier gondolé, images floues ou vues trop semblables. Recommencer avec « Effacer les captures ».
 - **Distances fausses d'un facteur constant** : vérifier la « Taille du marqueur » et le « Côté d'une case », mesurés à la règle sur les impressions.
-- **Repartir de zéro** : supprimer `~/.config/RobotDetectionByWebcam/calibration.yml` (calibration) ou `settings.ini` (réglages).
+- **Repartir de zéro** : supprimer le fichier de la caméra dans `~/.config/RobotDetectionByWebcam/calibrations/` (calibration) ou `settings.ini` (réglages, y compris les repères du sol).
 - **Erreur de compilation sur `aruco_detector.hpp`** : la version d'OpenCV est antérieure à 4.7. Installer une version plus récente.

@@ -77,6 +77,15 @@ void CameraCalibration::addCapture(const QImage &image, const std::vector<QPoint
     m_imagePoints.push_back(std::move(pts));
 }
 
+void CameraCalibration::reset()
+{
+    clearCaptures();
+    m_cameraMatrix = cv::Mat();
+    m_distCoeffs = cv::Mat();
+    m_imageSize = QSize();
+    m_rms = 0.0;
+}
+
 void CameraCalibration::clearCaptures()
 {
     m_imagePoints.clear();

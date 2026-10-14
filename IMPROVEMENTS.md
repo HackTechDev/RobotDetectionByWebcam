@@ -8,7 +8,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 
 ### Caméra et affichage
 
-- Affichage en direct de la webcam (Qt6 Multimedia), avec choix de la caméra.
+- Affichage en direct de la webcam (Qt6 Multimedia), avec choix de la caméra. Chaque caméra garde ses propres réglages, sa **calibration** et son **repère du sol**, pour passer de l'une à l'autre sans rien refaire.
 - Choix de la **résolution**, avec le format d'image (4:3, 16:9...) et le nombre d'images par seconde. Le format vidéo le plus rapide est choisi automatiquement. Si une webcam n'envoie pas la résolution demandée en MJPEG (cas de la Logitech C270), l'application passe d'elle-même au format non compressé.
 - **Réglages de l'image** : exposition automatique ou temps de pose manuel (valeur appliquée affichée), balance des blancs automatique ou température manuelle. La webcam est remise en automatique à la fermeture.
 - **Effet miroir**, appliqué seulement à l'affichage : les détections et les mesures restent celles de l'image réelle de la caméra.

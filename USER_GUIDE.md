@@ -82,7 +82,7 @@ Quelle que soit la méthode, l'application peut aussi :
 
 - **Zone d'image** (à gauche) : l'image de la caméra, avec les détections dessinées : carrés, marqueurs, damier, repère du sol, objet suivi et trajectoires. Un clic sur l'image choisit la couleur du carré, sauf pendant l'ajout d'objets à suivre (onglet **Suivi**) ou la saisie des points du sol (onglet **Sol**). Pendant ces deux saisies, la touche **Échap** annule.
 - **Webcam** :
-  - **Caméra** : la webcam utilisée ;
+  - **Caméra** : la webcam utilisée. Chaque caméra a sa **propre calibration** et son **propre repère du sol**, rechargés quand on la choisit, ainsi que sa résolution, son exposition et sa balance des blancs. Changer de caméra arrête le suivi des objets encadrés, dont les cadres ne valaient que pour l'autre caméra ; Deux caméras du même modèle, qui portent le même nom, sont distinguées par leur identifiant système (`/dev/video0`, `/dev/video2`...) ; si cet identifiant change (caméras branchées dans un autre ordre), elles peuvent échanger leurs réglages.
   - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
   - **Réglages de l'image...** : exposition et balance des blancs. Voir [Régler l'exposition et la balance des blancs](#régler-lexposition-et-la-balance-des-blancs) ;
   - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 9.1](#91-coordonnées-dans-limage-en-pixels)).
@@ -432,14 +432,14 @@ Si vous avez déjà un damier, saisissez son nombre de coins intérieurs et la t
    | 0,5 à 1 px | Correcte |
    | plus de 1 px | À refaire : damier gondolé, images floues ou mauvaise taille de damier |
 
-3. La calibration est **enregistrée automatiquement** et rechargée à chaque lancement. Le texte `Caméra calibrée` s'affiche en vert dans l'onglet.
+3. La calibration est **enregistrée automatiquement**, pour la caméra choisie, et rechargée à chaque lancement et à chaque fois que vous revenez à cette caméra. Le texte `Caméra calibrée` s'affiche en vert dans l'onglet, avec le chemin du fichier.
 4. Décochez **Mode calibration** : il ralentit l'application et n'est plus utile.
 
 Pour recommencer, cliquez sur **Effacer les captures** puis refaites une série.
 
 ### 7.4 Quand refaire la calibration ?
 
-- Quand vous **changez de webcam**.
+- Pour chaque **nouvelle webcam** : chaque caméra a sa propre calibration, conservée quand vous passez de l'une à l'autre (liste **Caméra**). Il n'est donc pas nécessaire de recalibrer en revenant à une caméra déjà calibrée.
 - Si l'objectif a un **zoom** ou une **mise au point manuelle** et que vous les modifiez.
 - Si vous choisissez une **résolution d'un autre format d'image** (de 4:3 à 16:9, par exemple). La pose 3D est alors désactivée et le panneau **Résultat** affiche `Pas de pose 3D : calibration faite en ...`. Revenez à une résolution du format de la calibration, ou recalibrez.
 
@@ -485,7 +485,7 @@ Ordre conseillé, **tel que vous voyez la scène à l'écran** : 1 en bas à gau
 
 Une fois les 4 points cliqués, le rectangle s'affiche sur l'image en pointillés orange, avec l'**axe X en rouge** et l'**axe Y en vert**, et les lettres O, X et Y. La case **Afficher la zone sur l'image** le masque si besoin. Pendant la saisie, un clic sur l'image place un point au lieu de choisir la couleur du carré.
 
-Le repère est **enregistré immédiatement** et rechargé au lancement suivant. Changer les dimensions plus tard ne demande pas de recliquer les points. **Effacer le repère** le supprime.
+Le repère est **enregistré immédiatement**, pour la caméra choisie, et rechargé au lancement suivant. Chaque caméra a son propre repère : si vous passez à une autre caméra, définissez son repère une fois, puis chacune retrouve le sien. Changer les dimensions plus tard ne demande pas de recliquer les points. **Effacer le repère** le supprime.
 
 Si la caméra est calibrée, l'onglet indique aussi **la hauteur de la caméra au-dessus du sol**, déduite des 4 points (par exemple « Caméra à 1109 mm du sol »). Comparez-la à une mesure au mètre ruban : un écart important révèle une erreur dans les longueurs saisies, l'ordre des points ou la calibration.
 
@@ -785,7 +785,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Un seul programme peut écouter un port donné sur une machine : fermez les autres récepteurs.
 
 **Comment repartir de zéro pour la calibration ?**
-- Supprimez le fichier `~/.config/RobotDetectionByWebcam/calibration.yml`, puis relancez l'application.
+- Supprimez le fichier de calibration de la caméra, dans `~/.config/RobotDetectionByWebcam/calibrations/` (son chemin est affiché dans l'onglet **Calibration**), puis relancez l'application.
 
 ---
 
@@ -794,7 +794,8 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 | Fichier | Contenu |
 |---|---|
 | `~/.config/RobotDetectionByWebcam/settings.ini` | Réglages de l'application (voir ci-dessous) |
-| `~/.config/RobotDetectionByWebcam/calibration.yml` | Calibration de la caméra (créé par **Calibrer**, relu à chaque lancement). Peut être copié sur une autre machine utilisant la même webcam. |
+| `~/.config/RobotDetectionByWebcam/calibrations/<caméra>.yml` | Calibration de chaque caméra, nommée d'après la caméra (créée par **Calibrer**, relue au lancement et quand on revient à cette caméra). Peut être copiée sur une autre machine utilisant la même webcam. |
+| `~/.config/RobotDetectionByWebcam/calibration.yml` | Ancienne calibration unique, des versions précédentes. Au premier lancement de la version actuelle, elle est copiée pour la caméra active ; l'original est conservé mais n'est plus utilisé. |
 | `aruco_<dictionnaire>_<id>.png` | Marqueurs générés, à l'emplacement choisi |
 | `damier_<largeur>x<hauteur>.png` | Damiers générés, à l'emplacement choisi |
 | `evenements.csv` (nom proposé) | Journal des événements de mouvement, exporté avec **Enregistrer...** (onglet **Suivi**) |
@@ -803,11 +804,11 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 
 L'application retrouve au lancement les réglages de la fois précédente :
 
-- **Webcam** : caméra choisie (si elle est branchée), résolution, exposition et balance des blancs (pour chaque modèle de caméra) et effet miroir ;
+- **Webcam** : caméra choisie (si elle est branchée), résolution, exposition et balance des blancs (pour chaque caméra) et effet miroir ;
 - **Carré coloré** : activation, couleur et tous les curseurs ;
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
-- **Sol** : les 4 points du repère, les dimensions du rectangle, la hauteur des repères et l'affichage de la zone ;
+- **Sol** : les 4 points du repère, les dimensions du rectangle et la hauteur des repères (pour chaque caméra), et l'affichage de la zone ;
 - **Suivi** : la méthode, l'affichage et la durée de la trajectoire, les seuils de mouvement (les objets suivis et le journal des événements, eux, ne sont pas mémorisés), et tous les réglages du lissage ;
 - **Envoi UDP** : activation, adresse et port ;
 - **Fenêtre** : taille, position et onglet ouvert.
@@ -818,4 +819,4 @@ La résolution, l'exposition, la balance des blancs et le repère du sol sont en
 
 Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, les objets suivis et le journal des événements.
 
-Pour revenir aux réglages par défaut, fermez l'application et supprimez le fichier `settings.ini`. La calibration, enregistrée à part dans `calibration.yml`, est conservée.
+Pour revenir aux réglages par défaut, fermez l'application et supprimez le fichier `settings.ini`. Les calibrations, enregistrées à part dans le dossier `calibrations/`, sont conservées. (Les repères du sol, eux, sont dans `settings.ini` et sont donc effacés.)

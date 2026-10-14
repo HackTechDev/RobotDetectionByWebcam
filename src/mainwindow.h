@@ -19,6 +19,7 @@
 #include <vector>
 
 class QCamera;
+class QCameraDevice;
 class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
@@ -102,6 +103,8 @@ private slots:
     void onSelectionPointClicked(const QPoint &displayPos);
     void cancelCurrentInput();
     void saveEventLog();
+    // Calibration et repère du sol de la caméra identifiée par « key » (slot : invocable par les tests).
+    void loadCameraReference(const QString &key);
     void onProcessingFinished();
     void removeSelectedObject();
     void onObjectRenamed(QListWidgetItem *item);
@@ -118,6 +121,8 @@ private:
     void saveCameraSettings() const;
     void loadCameraSettings();
     QString resolutionSettingsKey() const;
+    static QString cameraKeyFor(const QCameraDevice &device);
+    void migrateLegacyReference();
     void updateCalibrationStatus();
     QString calibrationPath() const;
     void loadSettings();
@@ -138,6 +143,7 @@ private:
 
     QMediaCaptureSession *m_session = nullptr;
     QCamera *m_camera = nullptr;
+    QString m_cameraKey;  // identifiant de la caméra dans les réglages (calibration, repère du sol...)
     QVideoSink *m_sink = nullptr;
 
     VideoWidget *m_video = nullptr;

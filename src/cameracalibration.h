@@ -34,6 +34,8 @@ public:
     void addCapture(const QImage &image, const std::vector<QPointF> &corners);
     int captureCount() const { return int(m_imagePoints.size()); }
     void clearCaptures();
+    // Oublie la calibration (et les captures) : caméra non calibrée.
+    void reset();
 
     // Calcule la matrice intrinsèque et la distorsion à partir des captures.
     bool calibrate(QString *error);

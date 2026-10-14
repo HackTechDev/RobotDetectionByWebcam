@@ -222,7 +222,7 @@ La calibration se fait une seule fois par caméra. Fixez la caméra si possible.
 2. En dessous de **0,5 px**, c'est très bon. Au-dessus de 1 px, cliquez sur **Effacer les captures** et recommencez, avec un damier plus plat et des images plus nettes.
 3. Décochez **Mode calibration** : il ralentit l'application.
 
-L'onglet affiche maintenant `Caméra calibrée`. La calibration est enregistrée et rechargée à chaque lancement.
+L'onglet affiche maintenant `Caméra calibrée`. La calibration est enregistrée pour cette caméra et rechargée à chaque lancement. Si vous avez plusieurs webcams, calibrez chacune une fois : chaque caméra retrouve la sienne quand vous la choisissez dans la liste **Caméra**.
 
 ### 5.4 Lire la position 3D d'un marqueur
 
@@ -402,7 +402,7 @@ Pour envoyer les positions à un autre ordinateur ou à une carte (Raspberry Pi.
 - Fixez la caméra **au-dessus** de la zone de jeu, si possible à la verticale : sur un pied photo, une potence ou au plafond.
 - Elle doit voir **toute la zone**, avec un peu de marge.
 - Choisissez une résolution assez haute pour voir les marqueurs de loin, par exemple **1280 x 960**, dans le **même format d'image** que la calibration (4:3 ici).
-- Si la caméra a été déplacée ou changée depuis la partie 5, refaites la calibration (facultative pour les positions sur le sol, mais elle corrige la déformation de l'objectif).
+- Si vous utilisez une autre webcam que dans la partie 5, choisissez-la dans la liste **Caméra** et calibrez-la à son tour : chaque caméra a sa propre calibration et son propre repère du sol. Si la caméra a seulement été déplacée, la calibration reste valable, mais le repère du sol est à redéfinir.
 
 ### 9.2 Préparer le robot
 
