@@ -82,7 +82,7 @@ Quelle que soit la méthode, l'application peut aussi :
 
 - **Zone d'image** (à gauche) : l'image de la caméra, avec les détections dessinées : carrés, marqueurs, damier, repère du sol, objet suivi et trajectoires. Un clic sur l'image choisit la couleur du carré, sauf pendant l'ajout d'objets à suivre (onglet **Suivi**) ou la saisie des points du sol (onglet **Sol**). Pendant ces deux saisies, la touche **Échap** annule.
 - **Webcam** :
-  - **Caméra** : la webcam utilisée. Chaque caméra a sa **propre calibration** et son **propre repère du sol**, rechargés quand on la choisit, ainsi que sa résolution et ses réglages de l'image. Changer de caméra arrête le suivi des objets encadrés, dont les cadres ne valaient que pour l'autre caméra ; Deux caméras du même modèle, qui portent le même nom, sont distinguées par leur identifiant système (`/dev/video0`, `/dev/video2`...) ; si cet identifiant change (caméras branchées dans un autre ordre), elles peuvent échanger leurs réglages.
+  - **Caméra** : la webcam utilisée. Chaque caméra a sa **propre calibration** et son **propre repère du sol**, rechargés quand on la choisit, ainsi que sa résolution et ses réglages de l'image. Changer de caméra arrête le suivi des objets encadrés, dont les cadres ne valaient que pour l'autre caméra ; Deux caméras du même modèle, qui portent le même nom, sont distinguées par leur identifiant système (`/dev/video0`, `/dev/video2`...), ajouté à leur nom dans les réglages (`..._video2`) ; si cet identifiant change (caméras branchées dans un autre ordre), elles peuvent échanger leurs réglages.
   - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
   - **Réglages de l'image...** : exposition, balance des blancs, luminosité, contraste, gain, fréquence du secteur... Voir [Régler l'image de la webcam](#régler-limage-de-la-webcam) ;
   - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 9.1](#91-coordonnées-dans-limage-en-pixels)).
@@ -808,7 +808,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 | Fichier | Contenu |
 |---|---|
 | `~/.config/RobotDetectionByWebcam/settings.ini` | Réglages de l'application (voir ci-dessous) |
-| `~/.config/RobotDetectionByWebcam/calibrations/<caméra>.yml` | Calibration de chaque caméra, nommée d'après la caméra (créée par **Calibrer**, relue au lancement et quand on revient à cette caméra). Peut être copiée sur une autre machine utilisant la même webcam. |
+| `~/.config/RobotDetectionByWebcam/calibrations/<caméra>.yml` | Calibration de chaque caméra, nommée d'après la caméra, par exemple `UVC_Camera_046d_0825.yml` (créée par **Calibrer**, relue au lancement et quand on revient à cette caméra). Peut être copiée sur une autre machine utilisant la même webcam. |
 | `~/.config/RobotDetectionByWebcam/calibration.yml` | Ancienne calibration unique, des versions précédentes. Au premier lancement de la version actuelle, elle est copiée pour la caméra active ; l'original est conservé mais n'est plus utilisé. |
 | `aruco_<dictionnaire>_<id>.png` | Marqueurs générés, à l'emplacement choisi |
 | `damier_<largeur>x<hauteur>.png` | Damiers générés, à l'emplacement choisi |
@@ -826,6 +826,19 @@ L'application retrouve au lancement les réglages de la fois précédente :
 - **Suivi** : la méthode, l'affichage et la durée de la trajectoire, les seuils de mouvement (les objets suivis et le journal des événements, eux, ne sont pas mémorisés), et tous les réglages du lissage ;
 - **Envoi UDP** : activation, adresse et port ;
 - **Fenêtre** : taille, position et onglet ouvert.
+
+Le fichier peut se lire et se modifier à la main (application fermée). Les réglages propres à une caméra sont regroupés dans la section `[cameras]`, sous un nom simplifié : son nom réduit aux lettres et aux chiffres, suivi de son identifiant USB s'il y figure. Une Logitech C270, nommée « UVC Camera (046d:0825) », devient `UVC_Camera_046d_0825` :
+
+```ini
+[cameras]
+UVC_Camera_046d_0825\exposureMs=33
+UVC_Camera_046d_0825\manualExposure=false
+UVC_Camera_046d_0825\size=@Size(1280 960)
+UVC_Camera_046d_0825\controls\0x00980918=1
+UVC_Camera_046d_0825\floor\sizeX=1000
+```
+
+Les lignes `controls\0x...` sont les autres réglages de l'image modifiés, repérés par leur identifiant V4L2 (`0x00980918` = fréquence du secteur, ici 50 Hz). Les réglages des versions précédentes, enregistrés sous le nom complet de la caméra (`UVC%20Camera%20%28046d%3A0825%29`), sont renommés automatiquement au premier lancement, ainsi que le fichier de calibration.
 
 Le fichier contient aussi une option sans équivalent dans l'interface : `hideLibraryMessages`, dans la section `[logging]`. Elle vaut `true` par défaut et masque des messages techniques sans gravité dans le terminal (par exemple « Corrupt JPEG data »). Mettez-la à `false` pour les réafficher, par exemple pour signaler un problème. Ce réglage est pris en compte au lancement suivant.
 

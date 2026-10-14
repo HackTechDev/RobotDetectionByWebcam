@@ -49,7 +49,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 ### Confort
 
 - **Traitement des images dans un fil séparé**, avec la détection des marqueurs et le suivi de chaque objet en parallèle : l'interface reste réactive, et davantage d'images sont traitées (13,4 i/s au lieu de 8,1 avec 3 objets, sur images de synthèse).
-- Tous les réglages sont **mémorisés** entre deux lancements (`settings.ini`) : la résolution et les réglages de l'image pour chaque modèle de caméra, le repère du sol, etc.
+- Tous les réglages sont **mémorisés** entre deux lancements (`settings.ini`) : la résolution et les réglages de l'image pour chaque modèle de caméra, le repère du sol, etc. Les caméras y portent un nom lisible (`UVC_Camera_046d_0825`), pour modifier le fichier à la main ; les anciens noms encodés sont convertis automatiquement.
 - Bouton **Quitter**, avec une confirmation.
 - Option pour masquer les messages techniques sans gravité dans le terminal.
 - Documentation : [README](README.md) (installation et principes), [tutoriel](TUTORIAL.md) (découverte pas à pas) et [guide utilisateur](USER_GUIDE.md) (référence).
@@ -207,12 +207,6 @@ Pour l'UDP, une option pourrait n'envoyer que les images où quelque chose est d
 **Intérêt.** Rendre l'application utilisable par un public non francophone.
 
 **Piste.** Tous les textes passent déjà par `tr()`. Il reste à générer les fichiers de traduction (`lupdate`), à les traduire, puis à les charger selon la langue du système.
-
-#### Lisibilité du fichier de réglages — S
-
-**Intérêt.** Dans `settings.ini`, Qt encode le nom des caméras (`UVC%20Camera%20%28046d%3A0825%29`), ce qui rend le fichier peu lisible si on veut le modifier à la main.
-
-**Piste.** Utiliser une clé simplifiée, par exemple l'identifiant USB `046d_0825` quand il est présent dans le nom, ou le nom réduit aux lettres et aux chiffres.
 
 #### Paquet d'installation et autres systèmes — L
 

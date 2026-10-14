@@ -31,6 +31,7 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QScrollArea>
 #include <QSettings>
 #include <QTextStream>
@@ -574,6 +575,7 @@ void MainWindow::onCameraChanged(int index)
     delete m_camera;
     m_camera = new QCamera(device, this);
     m_cameraKey = cameraKeyFor(device);
+    migrateCameraKey(device);
     connect(m_camera, &QCamera::errorOccurred, this, [this](QCamera::Error, const QString &msg) {
         m_statusLabel->setText(tr("<b style='color:red'>Erreur caméra :</b> %1").arg(msg.toHtmlEscaped()));
     });
@@ -801,18 +803,114 @@ void MainWindow::closeEvent(QCloseEvent *event)
     QMainWindow::closeEvent(event);
 }
 
+namespace {
+
+// Réduit un texte aux lettres ASCII, chiffres et « _ », que QSettings écrit tels quels.
+QString readableKey(const QString &text)
+{
+    const QString plain = text.normalized(QString::NormalizationForm_D);  // é -> e + accent
+    QString out;
+    for (const QChar c : plain) {
+        if (c.unicode() < 128 && c.isLetterOrNumber())
+            out += c;
+        else if (c.category() != QChar::Mark_NonSpacing && !out.endsWith(QLatin1Char('_')))
+            out += QLatin1Char('_');
+    }
+    while (out.startsWith(QLatin1Char('_')))
+        out.remove(0, 1);
+    while (out.endsWith(QLatin1Char('_')))
+        out.chop(1);
+    return out;
+}
+
+// Nom de fichier sûr pour la calibration d'une caméra.
+QString calibrationFileName(const QString &cameraKey)
+{
+    QString name = cameraKey;
+    for (QChar &c : name) {
+        if (!c.isLetterOrNumber() && c != QLatin1Char('-') && c != QLatin1Char('.'))
+            c = QLatin1Char('_');
+    }
+    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + QStringLiteral("/calibrations/")
+           + name + QStringLiteral(".yml");
+}
+
+bool hasNamesake(const QCameraDevice &device)
+{
+    for (const QCameraDevice &other : QMediaDevices::videoInputs()) {
+        if (other.id() != device.id() && other.description() == device.description())
+            return true;
+    }
+    return false;
+}
+
+// Ancienne clé (nom complet de la caméra), que QSettings encodait : « UVC%20Camera%20%28... ».
+QString legacyCameraKeyFor(const QCameraDevice &device)
+{
+    QString key = device.description();
+    if (hasNamesake(device))
+        key += QStringLiteral(" (%1)").arg(QString::fromUtf8(device.id()));
+    return key.replace(QLatin1Char('/'), QLatin1Char('_')).replace(QLatin1Char('\\'), QLatin1Char('_'));
+}
+
+} // namespace
+
 QString MainWindow::cameraKeyFor(const QCameraDevice &device)
 {
-    // Une entrée par modèle de caméra (son nom). Si deux caméras branchées portent le même nom,
-    // on ajoute l'identifiant système pour les distinguer. « / » sépare les groupes de QSettings.
-    QString key = device.description();
-    for (const QCameraDevice &other : QMediaDevices::videoInputs()) {
-        if (other.id() != device.id() && other.description() == device.description()) {
-            key += QStringLiteral(" (%1)").arg(QString::fromUtf8(device.id()));
-            break;
-        }
+    // Une entrée par modèle de caméra, lisible dans settings.ini : le nom réduit aux lettres et
+    // aux chiffres, avec l'identifiant USB s'il y figure (« UVC Camera (046d:0825) » ->
+    // « UVC_Camera_046d_0825 »). Si deux caméras branchées portent le même nom, on ajoute
+    // l'identifiant système pour les distinguer (« ..._video2 »).
+    QString name = device.description();
+    QString usb;
+    static const QRegularExpression usbId(QStringLiteral("\\b([0-9a-fA-F]{4}):([0-9a-fA-F]{4})\\b"));
+    const QRegularExpressionMatch m = usbId.match(name);
+    if (m.hasMatch()) {
+        usb = (m.captured(1) + QLatin1Char('_') + m.captured(2)).toLower();
+        name.remove(m.capturedStart(), m.capturedLength());
     }
-    return key.replace(QLatin1Char('/'), QLatin1Char('_')).replace(QLatin1Char('\\'), QLatin1Char('_'));
+    QStringList parts;
+    for (const QString &part : {readableKey(name), usb}) {
+        if (!part.isEmpty())
+            parts << part;
+    }
+    if (parts.isEmpty())
+        parts << QStringLiteral("camera");
+    if (hasNamesake(device)) {
+        const QString id = readableKey(QString::fromUtf8(device.id()).section(QLatin1Char('/'), -1));
+        if (!id.isEmpty())
+            parts << id;
+    }
+    return parts.join(QLatin1Char('_'));
+}
+
+void MainWindow::migrateCameraKey(const QCameraDevice &device)
+{
+    // Réglages et calibration enregistrés sous l'ancienne clé (nom complet de la caméra) :
+    // déplacés une fois sous la nouvelle.
+    const QString legacy = legacyCameraKeyFor(device);
+    if (legacy == m_cameraKey)
+        return;
+    QSettings s(settingsPath(), QSettings::IniFormat);
+    const QString oldGroup = QStringLiteral("cameras/") + legacy + QLatin1Char('/');
+    const QString newGroup = resolutionSettingsKey() + QLatin1Char('/');
+    bool hasNew = false;
+    QStringList oldKeys;
+    for (const QString &key : s.allKeys()) {
+        if (key.startsWith(oldGroup))
+            oldKeys << key;
+        else if (key.startsWith(newGroup))
+            hasNew = true;
+    }
+    if (!hasNew) {
+        for (const QString &key : oldKeys)
+            s.setValue(newGroup + key.mid(oldGroup.size()), s.value(key));
+    }
+    for (const QString &key : oldKeys)
+        s.remove(key);
+    const QString oldCalibration = calibrationFileName(legacy);
+    if (QFileInfo::exists(oldCalibration) && !QFileInfo::exists(calibrationPath()))
+        QFile::rename(oldCalibration, calibrationPath());
 }
 
 QString MainWindow::resolutionSettingsKey() const
@@ -1100,15 +1198,7 @@ void MainWindow::generateMarker()
 QString MainWindow::calibrationPath() const
 {
     // Un fichier par caméra, nommé d'après son identifiant (caractères sûrs uniquement).
-    if (m_cameraKey.isEmpty())
-        return QString();
-    QString name = m_cameraKey;
-    for (QChar &c : name) {
-        if (!c.isLetterOrNumber() && c != QLatin1Char('-') && c != QLatin1Char('.'))
-            c = QLatin1Char('_');
-    }
-    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + QStringLiteral("/calibrations/")
-           + name + QStringLiteral(".yml");
+    return m_cameraKey.isEmpty() ? QString() : calibrationFileName(m_cameraKey);
 }
 
 void MainWindow::updateCalibrationStatus()

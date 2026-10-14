@@ -123,6 +123,7 @@ private:
     QString resolutionSettingsKey() const;
     static QString cameraKeyFor(const QCameraDevice &device);
     void migrateLegacyReference();
+    void migrateCameraKey(const QCameraDevice &device);
     void updateCalibrationStatus();
     QString calibrationPath() const;
     void loadSettings();
