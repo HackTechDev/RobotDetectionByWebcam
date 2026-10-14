@@ -11,6 +11,8 @@
 
 #include <QCameraFormat>
 #include <QElapsedTimer>
+#include <QFutureWatcher>
+#include <QThreadPool>
 #include <QMainWindow>
 
 #include <memory>
@@ -35,6 +37,33 @@ class QTabWidget;
 class QVideoFrame;
 class QVideoSink;
 class VideoWidget;
+
+// Réglages lus dans l'interface au lancement du traitement d'une image (le fil de traitement
+// ne doit pas accéder aux widgets).
+struct ProcessingOptions
+{
+    bool squaresOn = false;
+    bool markersOn = false;
+    bool smoothingOn = false;
+    bool calibOn = false;
+    bool captureNow = false;  // capture du damier demandée (bouton ou capture automatique)
+    qint64 timeMs = 0;        // horloge du suivi au moment de l'image
+};
+
+// Résultat du traitement d'une image, produit par le fil de traitement.
+struct FrameResult
+{
+    QImage image;
+    ProcessingOptions options;
+    std::vector<DetectedSquare> squares;
+    std::vector<DetectedMarker> markers;
+    std::vector<MotionEvent> events;
+    bool trackSizeChanged = false;   // résolution différente de celle des objets suivis
+    bool trackStateChanged = false;  // un objet suivi a été perdu ou retrouvé
+    std::vector<QPointF> boardCorners;
+    bool boardFound = false;
+    bool captured = false;
+};
 
 class MainWindow : public QMainWindow
 {
@@ -73,6 +102,7 @@ private slots:
     void onSelectionPointClicked(const QPoint &displayPos);
     void cancelCurrentInput();
     void saveEventLog();
+    void onProcessingFinished();
     void removeSelectedObject();
     void onObjectRenamed(QListWidgetItem *item);
 
@@ -98,6 +128,13 @@ private:
     void configureTracker(ObjectTracker &tracker) const;
     void logEvents(const std::vector<MotionEvent> &events);
     void saveSettings() const;
+    // Traitement d'une image dans le fil de traitement, puis affichage dans le fil principal.
+    void startProcessing(const QImage &image);
+    FrameResult processFrame(const QImage &image, const ProcessingOptions &options);
+    void presentFrame(const FrameResult &result);
+    // Attend la fin du traitement en cours : à appeler avant de modifier un objet utilisé par le
+    // fil de traitement (détecteurs, calibration, repère du sol, objets suivis, lissage).
+    void waitForProcessing() const;
 
     QMediaCaptureSession *m_session = nullptr;
     QCamera *m_camera = nullptr;
@@ -142,6 +179,7 @@ private:
     QDoubleSpinBox *m_floorSizeYSpin = nullptr;
     QPushButton *m_floorPickButton = nullptr;
     QCheckBox *m_floorShowCheck = nullptr;
+    QDoubleSpinBox *m_floorHeightSpin = nullptr;
     QLabel *m_floorLabel = nullptr;
 
     QComboBox *m_trackAlgoCombo = nullptr;
@@ -188,10 +226,11 @@ private:
     bool m_floorPicking = false;
     std::vector<QPointF> m_floorPicked;  // points cliqués, dans l'image réelle de la caméra
     QSize m_lastFrameSizeAtPick;
+    bool m_floorPoseShown = false;  // état de la position de la caméra affiché dans l'onglet Sol
     QElapsedTimer m_lastCapture;
     bool m_captureRequested = false;
     QColor m_targetColor;
-    QImage m_lastFrame;
+    QImage m_lastFrame;  // dernière image affichée (les clics portent sur elle)
     // Une entrée par résolution de m_resolutionCombo.
     struct ResolutionChoice
     {
@@ -203,6 +242,11 @@ private:
     QList<ResolutionChoice> m_resolutions;
     int m_pendingResolution = -1;  // résolution demandée, en attente de vérification
     bool m_resolutionSynced = false;
+    QFutureWatcher<FrameResult> m_watcher;
+    // Fils de calcul pour les tâches parallèles d'une image (détection des marqueurs, suivi de
+    // chaque objet) ; distincts de ceux qui exécutent processFrame, pour éviter tout blocage.
+    QThreadPool m_innerPool;
+    QImage m_pendingImage;  // image arrivée pendant un traitement (seule la plus récente est gardée)
     QElapsedTimer m_fpsTimer;
     int m_frameCount = 0;
     double m_fps = 0.0;

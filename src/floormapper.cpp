@@ -55,6 +55,7 @@ std::vector<QPointF> FloorMapper::pointsFor(const QSize &imageSize) const
 bool FloorMapper::prepare(const QSize &imageSize)
 {
     m_ready = false;
+    m_poseValid = false;
     const std::vector<QPointF> pts = pointsFor(imageSize);
     if (pts.size() != 4 || m_sizeMm.width() <= 0 || m_sizeMm.height() <= 0)
         return false;
@@ -78,6 +79,23 @@ bool FloorMapper::prepare(const QSize &imageSize)
     const std::vector<cv::Point2f> floor = {{0, 0}, {w, 0}, {w, h}, {0, h}};
     m_homography = cv::getPerspectiveTransform(image, floor);
     m_ready = !m_homography.empty();
+
+    // Avec la calibration : position de la caméra par rapport au sol, à partir des 4 points.
+    if (m_ready && m_undistort) {
+        std::vector<cv::Point2f> distorted;
+        for (const QPointF &p : pts)
+            distorted.emplace_back(float(p.x()), float(p.y()));
+        const std::vector<cv::Point3f> floor3d = {{0, 0, 0}, {w, 0, 0}, {w, h, 0}, {0, h, 0}};
+        cv::Mat rvec, tvec;
+        if (cv::solvePnP(floor3d, distorted, m_cameraMatrix, m_distCoeffs, rvec, tvec, false, cv::SOLVEPNP_IPPE)) {
+            cv::Mat r;
+            cv::Rodrigues(rvec, r);
+            m_rotation = cv::Matx33d(r);
+            const cv::Vec3d t(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2));
+            m_cameraCenter = -(m_rotation.t() * t);
+            m_poseValid = std::abs(m_cameraCenter[2]) > 1.0;
+        }
+    }
     return m_ready;
 }
 
@@ -91,19 +109,35 @@ std::vector<cv::Point2f> FloorMapper::undistort(const std::vector<cv::Point2f> &
     return out;
 }
 
-QPointF FloorMapper::toFloor(const QPointF &imagePoint) const
+QPointF FloorMapper::toFloor(const QPointF &imagePoint, double heightMm) const
 {
     if (!m_ready)
         return {};
+    if (heightMm > 0 && m_poseValid) {
+        // Rayon de vue du point (repère de la caméra, coordonnées normalisées sans distorsion),
+        // exprimé dans le repère du sol, puis intersection avec le plan situé à « heightMm » du
+        // sol, du côté de la caméra.
+        std::vector<cv::Point2f> in{cv::Point2f(float(imagePoint.x()), float(imagePoint.y()))}, normalized;
+        cv::undistortPoints(in, normalized, m_cameraMatrix, m_distCoeffs);
+        const cv::Vec3d ray = m_rotation.t() * cv::Vec3d(normalized[0].x, normalized[0].y, 1.0);
+        const double planeZ = m_cameraCenter[2] > 0 ? heightMm : -heightMm;
+        if (std::abs(ray[2]) > 1e-9) {
+            const double s = (planeZ - m_cameraCenter[2]) / ray[2];
+            if (s > 0) {
+                const cv::Vec3d p = m_cameraCenter + s * ray;
+                return QPointF(p[0], p[1]);
+            }
+        }
+    }
     std::vector<cv::Point2f> in = undistort({cv::Point2f(float(imagePoint.x()), float(imagePoint.y()))});
     std::vector<cv::Point2f> out;
     cv::perspectiveTransform(in, out, m_homography);
     return QPointF(out[0].x, out[0].y);
 }
 
-double FloorMapper::heading(const QPointF &from, const QPointF &to) const
+double FloorMapper::heading(const QPointF &from, const QPointF &to, double heightMm) const
 {
-    const QPointF d = toFloor(to) - toFloor(from);
+    const QPointF d = toFloor(to, heightMm) - toFloor(from, heightMm);
     return std::atan2(d.y(), d.x()) * kRadToDeg;
 }
 
@@ -113,15 +147,15 @@ void FloorMapper::apply(std::vector<DetectedSquare> &squares, std::vector<Detect
         return;
     for (DetectedSquare &s : squares) {
         s.hasFloor = true;
-        s.floorPosition = toFloor(s.center);
+        s.floorPosition = toFloor(s.center, m_objectHeight);
         // Un carré est symétrique : son cap n'est connu qu'à 90° près.
-        const double a = heading(s.center, midpoint(s.corners[0], s.corners[1]));
+        const double a = heading(s.center, midpoint(s.corners[0], s.corners[1]), m_objectHeight);
         s.floorHeading = std::fmod(std::fmod(a, 90.0) + 90.0, 90.0);
     }
     for (DetectedMarker &m : markers) {
         m.hasFloor = true;
-        m.floorPosition = toFloor(m.center);
+        m.floorPosition = toFloor(m.center, m_objectHeight);
         // Cap = direction du bord supérieur du marqueur (coins 0 et 1).
-        m.floorHeading = heading(m.center, midpoint(m.corners[0], m.corners[1]));
+        m.floorHeading = heading(m.center, midpoint(m.corners[0], m.corners[1]), m_objectHeight);
     }
 }

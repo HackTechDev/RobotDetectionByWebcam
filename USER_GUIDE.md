@@ -320,7 +320,7 @@ Le suivi d'objets encadrés est très pratique, mais moins fiable que les marque
 - **Le cadre peut glisser** sur le fond, ou s'accrocher à un autre objet qui passe devant. L'**indice de confiance** le détecte dans la plupart des cas, et l'objet est alors déclaré perdu avec le message « Le cadre ne ressemble plus à l'objet sélectionné ». Un objet qui change très vite d'aspect (retourné d'un coup) peut aussi faire chuter la confiance.
 - **Pas d'orientation** : le cadre reste droit. Seule la direction du déplacement est connue, pas celle vers laquelle l'objet est tourné.
 - **Changer de résolution arrête le suivi** de tous les objets : il faut les ajouter de nouveau.
-- **Vitesse de l'application** : chaque objet demande environ **25 ms par image avec CSRT** (environ 5 ms avec KCF). Avec 3 objets en CSRT, l'application ne dépasse guère 13 images par seconde. Choisissez **KCF** pour suivre plusieurs objets si l'image devient saccadée. L'onglet **Suivi** le rappelle à partir de 3 objets.
+- **Vitesse de l'application** : chaque objet demande environ **25 ms de calcul par image avec CSRT** (environ 5 ms avec KCF). Les objets sont suivis en parallèle, dans le fil de traitement : l'interface reste réactive, mais le nombre d'images traitées par seconde baisse avec le nombre d'objets (environ 13 i/s avec 3 objets en 1280 × 960 sur un processeur à 4 cœurs, d'après un test sur images de synthèse). Choisissez **KCF** pour suivre plusieurs objets si l'image devient saccadée. L'onglet **Suivi** le rappelle à partir de 3 objets.
 
 Conseils : un objet bien contrasté et texturé (motif, logo, couleurs) se suit mieux qu'un objet uni. Un éclairage stable et une exposition courte (moins de flou, voir [Régler l'exposition et la balance des blancs](#régler-lexposition-et-la-balance-des-blancs)) aident aussi.
 
@@ -487,6 +487,8 @@ Une fois les 4 points cliqués, le rectangle s'affiche sur l'image en pointillé
 
 Le repère est **enregistré immédiatement** et rechargé au lancement suivant. Changer les dimensions plus tard ne demande pas de recliquer les points. **Effacer le repère** le supprime.
 
+Si la caméra est calibrée, l'onglet indique aussi **la hauteur de la caméra au-dessus du sol**, déduite des 4 points (par exemple « Caméra à 1109 mm du sol »). Comparez-la à une mesure au mètre ruban : un écart important révèle une erreur dans les longueurs saisies, l'ordre des points ou la calibration.
+
 ### 8.3 Lire les positions au sol
 
 Dans le panneau **Résultat** apparaissent :
@@ -505,9 +507,11 @@ Ces valeurs sont aussi envoyées en UDP (champ `floor`, voir [10.3](#103-format-
 
 ### 8.4 Précision et limites
 
-- **La hauteur compte.** Le repère est défini au niveau du sol. Un marqueur collé sur le dessus du robot est plus haut, donc plus proche de la caméra, et sa position est légèrement décalée vers l'extérieur de l'image. Le décalage vaut environ *hauteur du marqueur × distance au point situé sous la caméra ÷ hauteur de la caméra*. Par exemple, avec une caméra à 2 m, un marqueur à 10 cm de haut et à 1 m du point sous la caméra, le décalage est d'environ 5 cm. Pour l'éviter :
-  - collez les marqueurs **le plus bas possible** sur le robot ;
-  - ou définissez le rectangle de référence **à la hauteur des marqueurs**, par exemple avec 4 cales de cette hauteur posées aux coins.
+- **La hauteur compte.** Le repère est défini au niveau du sol. Un marqueur collé sur le dessus du robot est plus haut, donc plus proche de la caméra, et sa position est décalée vers l'extérieur de l'image. Le décalage vaut environ *hauteur du marqueur × distance au point situé sous la caméra ÷ hauteur de la caméra*. Par exemple, avec une caméra à 2 m, un marqueur à 10 cm de haut et à 1 m du point sous la caméra, le décalage est d'environ 5 cm. Pour le corriger :
+  - **si la caméra est calibrée**, saisissez la **Hauteur des repères** (onglet **Sol**), mesurée du sol jusqu'à la surface des carrés et des marqueurs. L'application calcule la position de la caméra à partir des 4 points du repère, puis place chaque repère là où son rayon de vue traverse le plan situé à cette hauteur. L'onglet affiche alors « Positions corrigées pour des repères à ... mm du sol ». Sur une scène de synthèse, des marqueurs à 100 mm de haut sont décalés de 36 à 100 mm sans correction, et de 1 mm avec ;
+  - **sans calibration**, la hauteur saisie est ignorée (l'onglet le signale) : collez les marqueurs **le plus bas possible** sur le robot, ou définissez le rectangle de référence **à la hauteur des marqueurs**, par exemple avec 4 cales de cette hauteur posées aux coins.
+
+  La hauteur s'applique aux carrés et aux marqueurs, ainsi qu'à leurs positions lissées. Les objets encadrés (section 6) restent rapportés au niveau du sol. Tous les repères doivent être à la même hauteur.
 - **Format d'image** : comme pour la calibration, le repère reste valable si vous changez de résolution dans le même format (4:3, 16:9...). Dans un autre format, les positions au sol sont désactivées et le panneau **Résultat** affiche `Pas de position au sol : repère défini en ...`.
 - **Précision des clics** : cliquez au centre des repères. Une haute résolution (liste **Résolution**) permet de cliquer plus précisément.
 - **Effet miroir** : sans effet sur le repère, les clics sont convertis automatiquement.
@@ -685,9 +689,10 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 
 **Performances**
 - Le nombre d'images par seconde (i/s) est affiché dans **Résultat**.
+- Le traitement des images (détections, suivi, lissage) se fait dans un **fil d'exécution séparé** : l'interface reste réactive même quand le traitement est lent. Si la caméra va plus vite que le traitement, les images intermédiaires sont ignorées et l'affichage montre toujours l'image la plus récente traitée. Le nombre d'images par seconde affiché est celui des images traitées.
 - Choisissez une **résolution plus basse** (liste **Résolution**) : la détection est plus rapide.
 - Désactivez les détections inutiles (case **Activer la détection** de chaque onglet) et le **Mode calibration** pour gagner en vitesse.
-- Le suivi d'objets avec **CSRT** demande environ 25 ms par image **et par objet** : passez à **KCF** (environ 5 ms par objet), ou retirez les objets qui ne servent plus.
+- Le suivi d'objets avec **CSRT** demande environ 25 ms de calcul par image **et par objet**. Les objets sont suivis en parallèle sur les cœurs du processeur, mais leur coût s'additionne quand même : passez à **KCF** (environ 5 ms par objet), ou retirez les objets qui ne servent plus.
 
 ---
 
@@ -770,7 +775,8 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 **Les positions au sol sont décalées**
 - La caméra a bougé depuis la définition du repère : redéfinissez-le.
 - Vérifiez les **longueurs X et Y** saisies et l'**ordre des 4 points**.
-- Le décalage augmente vers les bords de l'image : les marqueurs sont plus hauts que le sol (voir [8.4](#84-précision-et-limites)), ou l'objectif déforme l'image (calibrez la caméra).
+- Le décalage augmente vers les bords de l'image : les marqueurs sont plus hauts que le sol, ou l'objectif déforme l'image. Calibrez la caméra et saisissez la **Hauteur des repères** (voir [8.4](#84-précision-et-limites)).
+- La hauteur de la caméra affichée dans l'onglet **Sol** ne correspond pas à la réalité : vérifiez les longueurs saisies, l'ordre des points et la calibration.
 
 **Le programme de réception ne reçoit rien**
 - Vérifiez que **Envoyer les positions** est coché et que le compteur **Messages envoyés** augmente.
@@ -801,7 +807,7 @@ L'application retrouve au lancement les réglages de la fois précédente :
 - **Carré coloré** : activation, couleur et tous les curseurs ;
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
-- **Sol** : les 4 points du repère, les dimensions du rectangle et l'affichage de la zone ;
+- **Sol** : les 4 points du repère, les dimensions du rectangle, la hauteur des repères et l'affichage de la zone ;
 - **Suivi** : la méthode, l'affichage et la durée de la trajectoire, les seuils de mouvement (les objets suivis et le journal des événements, eux, ne sont pas mémorisés), et tous les réglages du lissage ;
 - **Envoi UDP** : activation, adresse et port ;
 - **Fenêtre** : taille, position et onglet ouvert.

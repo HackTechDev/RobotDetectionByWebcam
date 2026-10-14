@@ -144,17 +144,17 @@ void MotionSmoother::finish(Track &track, qint64 timeMs, const FloorMapper *floo
 
     o.hasFloor = floor && floor->isReady();
     if (o.hasFloor) {
-        o.floorPosition = floor->toFloor(o.position);
+        o.floorPosition = floor->toFloor(o.position, floor->objectHeight());
         // La projection sur le sol n'est pas linéaire : vitesse calculée sur 0,1 s.
         constexpr double h = 0.1;
-        o.floorVelocity = (floor->toFloor(o.position + o.velocity * h) - o.floorPosition) / h;
+        o.floorVelocity = (floor->toFloor(o.position + o.velocity * h, floor->objectHeight()) - o.floorPosition) / h;
         o.floorSpeed = std::hypot(o.floorVelocity.x(), o.floorVelocity.y());
         o.floorDirection = std::atan2(o.floorVelocity.y(), o.floorVelocity.x()) * kRadToDeg;
         // Cap sur le sol : direction du haut du marqueur (angle du bord supérieur moins 90° dans
         // l'image), comme FloorMapper::apply(). Pour un carré, défini à 90° près.
         const double a = (o.angle - 90.0) * kDegToRad;
         const QPointF front = o.position + QPointF(std::cos(a), std::sin(a)) * 20.0;
-        double heading = floor->heading(o.position, front);
+        double heading = floor->heading(o.position, front, floor->objectHeight());
         if (o.kind == SmoothedTrack::Square)
             heading = std::fmod(std::fmod(heading, 90.0) + 90.0, 90.0);
         o.floorHeading = heading;

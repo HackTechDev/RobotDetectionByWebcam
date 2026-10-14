@@ -134,12 +134,12 @@ Avec calibration, chaque marqueur a aussi :
 
 L'onglet « Sol » définit un repère sur le sol : on saisit les dimensions d'un rectangle tracé au sol (ruban adhésif, coins d'une table...), puis on clique ses 4 coins dans l'image, dans l'ordre : origine, coin sur l'axe X, coin opposé, coin sur l'axe Y. L'application donne alors la position de chaque carré et de chaque marqueur **en mm sur le sol**, avec le cap des marqueurs (direction de leur bord supérieur, de l'axe X vers l'axe Y). Ces valeurs s'affichent dans le panneau « Résultat » et sont envoyées en UDP (champ `floor`).
 
-Le repère fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus. Il est enregistré dans `settings.ini` et reste valable pour toute résolution du même format d'image. La caméra ne doit plus bouger une fois le repère défini. Le repère est défini au niveau du sol, donc un marqueur placé en hauteur sur le robot est légèrement décalé. Le guide utilisateur détaille ce point.
+Le repère fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus. Il est enregistré dans `settings.ini` et reste valable pour toute résolution du même format d'image. La caméra ne doit plus bouger une fois le repère défini. Le repère est défini au niveau du sol. Un marqueur placé en hauteur sur le robot est donc décalé, jusqu'à plusieurs centimètres. Si la caméra est calibrée, le champ « Hauteur des repères » corrige ce décalage pour les carrés et les marqueurs. L'onglet affiche alors aussi la hauteur de la caméra au-dessus du sol, vérifiable au mètre ruban.
 
 ### Suivi d'objets encadrés
 
 Dans l'onglet « Suivi », cliquer sur « Ajouter des objets », puis tracer un rectangle autour de chaque objet, ou cliquer dessus : un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Valider l'objet », touche Entrée ou double-clic. On reste en mode ajout pour l'objet suivant ; Échap ou « Terminer l'ajout » termine. Chaque objet a un numéro, un nom modifiable (double-clic dans la liste des objets) et une couleur. « Retirer » arrête le suivi de l'objet sélectionné dans la liste, « Tout retirer » celui de tous les objets. Chaque objet est suivi d'image en image par son propre tracker OpenCV :
-- **CSRT** : précis, environ 25 ms par image et par objet (3 objets limitent l'application à environ 13 images par seconde) ;
+- **CSRT** : précis, environ 25 ms de calcul par image et par objet (avec 3 objets, environ 13 images traitées par seconde en 1280 × 960 sur 4 cœurs) ;
 - **KCF** : rapide, environ 5 ms par image et par objet.
 
 L'application affiche, dans la couleur de chaque objet, le cadre, la **trajectoire** (durée réglable, 10 s par défaut) et une flèche dans le sens du déplacement. Le panneau « Résultat » donne la position, l'état (en mouvement ou immobile), la vitesse et la direction, lissées par un filtre de Kalman (mêmes réglages que le lissage des carrés et des marqueurs). Juste après une perte, la position est prédite à vitesse constante pendant le délai de maintien. Si le repère du sol est défini, il donne aussi la position, la vitesse et la direction en mm sur le sol. Ces valeurs sont envoyées en UDP (liste `tracked`, une entrée par objet).
@@ -240,6 +240,7 @@ Le code se trouve dans `src/floormapper.cpp`.
 2. Si la caméra est calibrée pour ce format d'image, les points sont d'abord corrigés de la distorsion (`cv::undistortPoints`).
 3. `cv::getPerspectiveTransform` calcule l'homographie entre l'image et le plan du sol.
 4. Le centre de chaque carré ou marqueur est projeté sur le sol (`cv::perspectiveTransform`). Le cap est la direction, sur le sol, du centre vers le milieu du bord supérieur.
+5. **Correction de hauteur** (caméra calibrée). La pose de la caméra par rapport au sol est calculée à partir des 4 points (`cv::solvePnP`, méthode `SOLVEPNP_IPPE` pour un plan), ce qui donne sa position dans le repère du sol. Pour un repère à la hauteur *h*, le point de l'image est converti en rayon de vue (`cv::undistortPoints`, puis rotation dans le repère du sol). Sa position est l'intersection de ce rayon avec le plan *z = h*, du côté de la caméra. Sur une scène de synthèse (caméra inclinée à 1,1 m du sol, marqueurs à 100 mm de haut), l'erreur passe de 36 à 100 mm sans correction à 1 mm avec, et la hauteur de la caméra est retrouvée exactement.
 
 Sur une image de synthèse (caméra inclinée filmant un sol de 1000 × 700 mm), les positions sont retrouvées à 1 à 2 mm près et les caps à moins d'1° près.
 
@@ -251,6 +252,24 @@ Le code se trouve dans `src/cameracalibration.cpp`.
 2. À la capture, les coins sont affinés au sous-pixel sur l'image pleine résolution (`cv::cornerSubPix`).
 3. `cv::calibrateCamera` calcule la matrice intrinsèque (fx, fy, cx, cy) et les coefficients de distorsion. Le coefficient radial k3 est bloqué à 0 (`CALIB_FIX_K3`). Laissé libre, il compense k2 dans la zone couverte par le damier, et la correction de distorsion diverge près des bords de l'image.
 4. Le résultat est enregistré au format YAML d'OpenCV (`cv::FileStorage`). Si la résolution de la caméra change, la matrice est mise à l'échelle.
+
+### Traitement dans un fil séparé
+
+Le traitement de chaque image se fait hors du fil de l'interface (`QtConcurrent::run`) : détection des carrés et des marqueurs, repère du sol, suivi des objets, lissage, recherche du damier. Le fil principal reçoit les images, puis affiche le résultat : dessin, panneau « Résultat », journal, envoi UDP.
+
+- **Une image à la fois.** Si une image arrive pendant un traitement, elle est mise de côté. Seule la plus récente est gardée, et elle est traitée dès que le traitement en cours se termine.
+- **Parallélisme dans l'image.** La détection des marqueurs et le suivi de chaque objet tournent en parallèle, sur un groupe de fils dédié (`QThreadPool`), pendant que le fil de traitement détecte les carrés. Ce groupe est distinct de celui qui exécute le traitement, pour éviter tout blocage.
+- **Sécurité des données.** Le fil de traitement n'accède à aucun widget : les réglages dont il a besoin sont lus dans l'interface au lancement du traitement. Toute action de l'interface qui modifie un objet utilisé par le traitement (détecteurs, calibration, repère du sol, objets suivis, lissage) attend d'abord la fin du traitement en cours, ce qui prend au plus une image (`waitForProcessing()`). L'affichage n'a lieu que lorsque le traitement est à l'arrêt, et le traitement suivant ne démarre qu'après lui.
+- **Les clics portent sur l'image affichée**, et non sur la dernière image reçue, pour que la couleur, le cadre d'un objet ou un point du sol correspondent à ce que l'utilisateur voit.
+
+Mesures sur des images de synthèse 1280 × 960 envoyées à 30 i/s, avec 3 objets suivis en CSRT, un marqueur et un carré, sur un processeur à 4 cœurs :
+
+| | Avant (tout dans l'interface) | Après |
+|---|---|---|
+| Images traitées par seconde | 8,1 | 13,4 |
+| Retard moyen d'un minuteur de 10 ms (blocage de l'interface) | 140 ms | 14 ms |
+
+La détection des marqueurs ArUco est déjà répartie sur les cœurs par OpenCV : son coût dépend beaucoup du contenu de l'image (environ 9 ms sur une image peu texturée, beaucoup plus sur un fond très texturé). Le mode de détection rapide d'OpenCV (`useAruco3Detection`) a été essayé, mais il manque les petits marqueurs (24 à 32 px de côté dans le test, alors que le mode normal les trouve) : il n'est pas utilisé.
 
 ## Structure du projet
 

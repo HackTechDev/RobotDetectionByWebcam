@@ -407,7 +407,7 @@ Pour envoyer les positions à un autre ordinateur ou à une carte (Raspberry Pi.
 ### 9.2 Préparer le robot
 
 - Collez un **marqueur ArUco** sur le dessus du robot, **bien à plat**, avec son **bord supérieur vers l'avant** du robot. Plus il est grand, plus il est détecté de loin : au moins 30 pixels de côté dans l'image.
-- Collez-le **le plus bas possible** : le repère du sol est défini au niveau du sol, et un marqueur en hauteur est légèrement décalé.
+- Mesurez la **hauteur du marqueur** au-dessus du sol. Le repère du sol est défini au niveau du sol, et un marqueur en hauteur est décalé : si la caméra est calibrée, saisissez cette hauteur dans **Hauteur des repères** (onglet **Sol**) pour corriger le décalage. Sinon, collez le marqueur le plus bas possible.
 - Pour plusieurs robots, utilisez un identifiant différent pour chacun.
 
 ### 9.3 Définir la zone et régler l'image

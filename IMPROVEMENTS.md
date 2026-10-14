@@ -38,7 +38,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
   - calibration enregistrée et rechargée au lancement ;
   - adaptation aux résolutions du même format d'image.
 - **Pose 3D des marqueurs** (si la caméra est calibrée) : position en mm, distance et rotations par rapport à la caméra. Les axes du marqueur sont dessinés sur l'image.
-- **Positions sur le sol en millimètres** : repère défini par les 4 coins d'un rectangle de dimensions connues, cliqués dans l'image. Il donne la position et le cap des carrés et des marqueurs, ainsi que la position, la vitesse et la direction de déplacement des objets suivis. Il fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus.
+- **Positions sur le sol en millimètres** : repère défini par les 4 coins d'un rectangle de dimensions connues, cliqués dans l'image. Avec la calibration, correction de la hauteur des repères (marqueurs posés sur le robot) et hauteur de la caméra au-dessus du sol affichée. Il donne la position et le cap des carrés et des marqueurs, ainsi que la position, la vitesse et la direction de déplacement des objets suivis. Il fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus.
 - **Lissage dans le temps** (filtre de Kalman) du carré principal et de chaque marqueur : position lissée, vitesse, position prédite pendant une courte perte de détection, trajectoires.
 
 ### Intégration
@@ -48,6 +48,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 
 ### Confort
 
+- **Traitement des images dans un fil séparé**, avec la détection des marqueurs et le suivi de chaque objet en parallèle : l'interface reste réactive, et davantage d'images sont traitées (13,4 i/s au lieu de 8,1 avec 3 objets, sur images de synthèse).
 - Tous les réglages sont **mémorisés** entre deux lancements (`settings.ini`) : la résolution, l'exposition et la balance des blancs pour chaque modèle de caméra, le repère du sol, etc.
 - Bouton **Quitter**, avec une confirmation.
 - Option pour masquer les messages techniques sans gravité dans le terminal.
@@ -66,12 +67,6 @@ Chaque entrée indique l'intérêt, une piste de réalisation et un ordre de gra
 Ces efforts sont des estimations.
 
 ### Priorité haute
-
-#### Correction de la hauteur des repères sur le sol — M
-
-**Intérêt.** Le repère du sol est défini au niveau du sol. Un marqueur collé sur le dessus du robot est plus haut, donc décalé vers l'extérieur de l'image : environ 5 cm d'erreur pour un marqueur à 10 cm de haut, à 1 m du point situé sous une caméra placée à 2 m. C'est aujourd'hui la principale source d'erreur des positions au sol.
-
-**Piste.** Ajouter un champ « Hauteur des repères (mm) » dans l'onglet Sol. Avec une caméra calibrée, retrouver la pose de la caméra par rapport au sol à partir des 4 points (`cv::solvePnP`), puis intersecter le rayon de chaque repère avec le plan situé à cette hauteur. Sans calibration, il est possible de définir un second rectangle à la hauteur des repères.
 
 #### Tests automatiques — M
 
@@ -111,14 +106,6 @@ Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
 
 **Piste.** Choisir un ID réservé et sa taille. Ses 4 coins donnent l'homographie à chaque image. La précision baisse loin du marqueur : prévoir un grand marqueur, ou plusieurs marqueurs combinés.
 
-#### Détection dans un fil d'exécution séparé — M
-
-**Intérêt.** En haute résolution, ou avec le suivi CSRT, la détection ralentit l'interface. Un fil dédié garderait l'affichage fluide et utiliserait un second cœur du processeur.
-
-**Piste.** Déplacer la détection dans un `QThread` qui traite toujours l'image la plus récente, en ignorant celles reçues pendant le traitement, et renvoie les résultats par signal.
-
----
-
 ### Suivi d'objet
 
 Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissage de Kalman, l'indice de confiance, la reprise automatique, la sélection simplifiée, les événements de mouvement et le suivi de plusieurs objets sont réalisés. Parmi les pistes restantes, l'orientation de l'objet est la plus utile pour suivre un robot sans marqueur.
@@ -149,11 +136,11 @@ Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissag
 
 #### Suivi plus rapide — M
 
-**Intérêt.** CSRT prend environ 25 ms par image et par objet dans le fil principal de l'application : avec plusieurs objets, le nombre d'images par seconde baisse nettement (environ 13 i/s avec 3 objets).
+**Intérêt.** Le suivi tourne déjà dans un fil séparé, avec un objet par cœur, mais CSRT prend environ 25 ms de calcul par image et par objet : avec plusieurs objets, le nombre d'images traitées par seconde baisse (environ 13 i/s avec 3 objets en 1280 × 960).
 
 **Piste.**
-- Exécuter le suivi dans un fil dédié (voir « Détection dans un fil d'exécution séparé »).
 - Adapter la réduction d'image à la taille de l'objet : un grand objet peut être suivi sur une image plus petite que 640 px de large.
+- Mettre à jour les objets immobiles moins souvent (une image sur deux), en gardant toutes les images pour ceux qui bougent.
 
 #### Trackers à base de réseaux de neurones — M
 

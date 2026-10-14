@@ -10,6 +10,8 @@
 #include <QColorDialog>
 #include <QFile>
 #include <QFileDialog>
+#include <QtConcurrent/QtConcurrentMap>
+#include <QtConcurrent/QtConcurrentRun>
 #include <QIcon>
 #include <QInputDialog>
 #include <QMessageBox>
@@ -36,6 +38,7 @@
 #include <QStandardPaths>
 #include <QTabBar>
 #include <QTabWidget>
+#include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QVideoFrame>
@@ -203,6 +206,14 @@ MainWindow::MainWindow(QWidget *parent)
     m_floorShowCheck = new QCheckBox(tr("Afficher la zone sur l'image"), floorBox);
     m_floorShowCheck->setChecked(true);
     floorForm->addRow(m_floorShowCheck);
+    m_floorHeightSpin = new QDoubleSpinBox(floorBox);
+    m_floorHeightSpin->setRange(0, 2000);
+    m_floorHeightSpin->setDecimals(0);
+    m_floorHeightSpin->setSuffix(QStringLiteral(" mm"));
+    m_floorHeightSpin->setToolTip(tr("Hauteur des carrés et des marqueurs au-dessus du sol (par exemple le "
+                                     "dessus du robot). Corrige le décalage de perspective ; nécessite la "
+                                     "calibration de la caméra."));
+    floorForm->addRow(tr("Hauteur des repères"), m_floorHeightSpin);
     floorLayout->addWidget(floorBox);
     m_floorLabel = new QLabel(floorTab);
     m_floorLabel->setWordWrap(true);
@@ -389,6 +400,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_colorModeCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onColorModeChanged);
     connect(m_video, &VideoWidget::imageClicked, this, &MainWindow::onImageClicked);
     connect(m_sink, &QVideoSink::videoFrameChanged, this, &MainWindow::onFrame);
+    connect(&m_watcher, &QFutureWatcher<FrameResult>::finished, this, &MainWindow::onProcessingFinished);
+    m_innerPool.setMaxThreadCount(std::max(2, QThread::idealThreadCount()));
     connect(m_cameraCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onCameraChanged);
     connect(m_resolutionCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onResolutionChanged);
     connect(imageSettingsButton, &QPushButton::clicked, this, [this] {
@@ -401,13 +414,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_dictCombo, &QComboBox::currentIndexChanged, this, &MainWindow::onDictionaryChanged);
     connect(generateButton, &QPushButton::clicked, this, &MainWindow::generateMarker);
     connect(m_markerLengthSpin, &QDoubleSpinBox::valueChanged, this,
-            [this](double v) { m_markerDetector.setMarkerLength(v); });
+            [this](double v) {
+                waitForProcessing();
+                m_markerDetector.setMarkerLength(v);
+            });
     connect(m_boardColsSpin, &QSpinBox::valueChanged, this, &MainWindow::onBoardChanged);
     connect(m_boardRowsSpin, &QSpinBox::valueChanged, this, &MainWindow::onBoardChanged);
     connect(m_squareSizeSpin, &QDoubleSpinBox::valueChanged, this, &MainWindow::onBoardChanged);
     connect(generateBoardButton, &QPushButton::clicked, this, &MainWindow::generateBoard);
     connect(captureButton, &QPushButton::clicked, this, [this] { m_captureRequested = true; });
     connect(clearButton, &QPushButton::clicked, this, [this] {
+        waitForProcessing();
         m_calibration.clearCaptures();
         updateCalibrationStatus();
     });
@@ -430,11 +447,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_video, &VideoWidget::rectangleSelected, this, &MainWindow::onRectangleSelected);
     // La méthode s'applique aux prochains objets ; les autres réglages à tous les objets suivis.
     connect(m_trackTrailSpin, &QDoubleSpinBox::valueChanged, this, [this](double seconds) {
+        waitForProcessing();
         for (TrackedItem &item : m_tracked)
             item.tracker->setTrailDuration(seconds);
     });
     for (QDoubleSpinBox *spin : {m_motionMmSpin, m_motionPxSpin}) {
         connect(spin, &QDoubleSpinBox::valueChanged, this, [this] {
+            waitForProcessing();
             for (TrackedItem &item : m_tracked)
                 item.tracker->setMotionThresholds(m_motionMmSpin->value(), m_motionPxSpin->value());
         });
@@ -443,22 +462,33 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_objectList, &QListWidget::itemChanged, this, &MainWindow::onObjectRenamed);
     connect(m_objectList, &QListWidget::currentRowChanged, this, &MainWindow::updateTrackStatus);
     connect(m_smoothBox, &QGroupBox::toggled, this, [this] {
+        waitForProcessing();
         m_smoother.clear();
         applySmoothingToTracker();
     });
     connect(m_smoothStrengthSlider, &QSlider::valueChanged, this, [this](int value) {
+        waitForProcessing();
         m_smoother.setStrength(value);
         applySmoothingToTracker();
     });
     connect(m_smoothHoldSpin, &QDoubleSpinBox::valueChanged, this, [this](double seconds) {
+        waitForProcessing();
         m_smoother.setHoldTime(seconds);
         applySmoothingToTracker();
     });
-    connect(m_smoothTrailSpin, &QDoubleSpinBox::valueChanged, this,
-            [this](double seconds) { m_smoother.setTrailDuration(seconds); });
+    connect(m_smoothTrailSpin, &QDoubleSpinBox::valueChanged, this, [this](double seconds) {
+        waitForProcessing();
+        m_smoother.setTrailDuration(seconds);
+    });
     connect(m_floorPickButton, &QPushButton::clicked, this, &MainWindow::toggleFloorPicking);
     connect(floorClearButton, &QPushButton::clicked, this, &MainWindow::clearFloor);
     connect(m_floorSizeXSpin, &QDoubleSpinBox::valueChanged, this, &MainWindow::onFloorSizeChanged);
+    connect(m_floorHeightSpin, &QDoubleSpinBox::valueChanged, this, [this](double mm) {
+        waitForProcessing();
+        m_floor.setObjectHeight(mm);
+        saveFloorSettings();
+        updateFloorStatus();
+    });
     connect(m_floorSizeYSpin, &QDoubleSpinBox::valueChanged, this, &MainWindow::onFloorSizeChanged);
     connect(m_udpHostEdit, &QLineEdit::editingFinished, this, &MainWindow::applyUdpTarget);
     connect(m_udpPortSpin, &QSpinBox::valueChanged, this, &MainWindow::applyUdpTarget);
@@ -479,7 +509,10 @@ MainWindow::MainWindow(QWidget *parent)
     populateCameras();
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow()
+{
+    waitForProcessing();  // ne pas détruire un objet en cours d'utilisation par le traitement
+}
 
 QSlider *MainWindow::addSlider(QFormLayout *form, const QString &label, int min, int max, int value)
 {
@@ -634,6 +667,7 @@ QString MainWindow::settingsPath()
 
 void MainWindow::loadSettings()
 {
+    waitForProcessing();
     // Les widgets sont déjà connectés : chaque valeur restaurée se propage aux détecteurs.
     const QSettings s(settingsPath(), QSettings::IniFormat);
 
@@ -671,6 +705,9 @@ void MainWindow::loadSettings()
         m_floorSizeXSpin->setValue(s.value(QStringLiteral("floor/sizeX"), m_floorSizeXSpin->value()).toDouble());
         m_floorSizeYSpin->setValue(s.value(QStringLiteral("floor/sizeY"), m_floorSizeYSpin->value()).toDouble());
         m_floor.setSize(QSizeF(m_floorSizeXSpin->value(), m_floorSizeYSpin->value()));
+        const QSignalBlocker bh(m_floorHeightSpin);
+        m_floorHeightSpin->setValue(s.value(QStringLiteral("floor/objectHeight"), 0.0).toDouble());
+        m_floor.setObjectHeight(m_floorHeightSpin->value());
     }
     m_floorShowCheck->setChecked(s.value(QStringLiteral("floor/show"), true).toBool());
     const QVariantList floorPoints = s.value(QStringLiteral("floor/points")).toList();
@@ -753,6 +790,7 @@ void MainWindow::saveSettings() const
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    waitForProcessing();
     // Confirmation, que la fermeture vienne du bouton « Quitter » ou de la barre de titre.
     QMessageBox box(QMessageBox::Question, tr("Quitter"),
                     tr("Voulez-vous vraiment quitter l'application ?"), QMessageBox::NoButton, this);
@@ -865,6 +903,7 @@ void MainWindow::chooseColor()
 
 void MainWindow::onImageClicked(const QPoint &displayPos)
 {
+    waitForProcessing();
     if (m_lastFrame.isNull())
         return;
     // Le clic est fait sur l'image affichée, éventuellement en miroir.
@@ -935,6 +974,7 @@ void MainWindow::onColorModeChanged()
 
 void MainWindow::updateParams()
 {
+    waitForProcessing();
     if (!m_hueTolSlider || !m_fillSlider || !m_satMaxSlider)
         return;
     SquareDetector::Params p = m_detector.params();
@@ -953,11 +993,13 @@ void MainWindow::updateParams()
 
 void MainWindow::onDictionaryChanged(int index)
 {
+    waitForProcessing();
     m_markerDetector.setDictionary(index);
 }
 
 void MainWindow::generateMarker()
 {
+    waitForProcessing();
     const int maxId = m_markerDetector.dictionarySize() - 1;
     bool ok = false;
     const int id = QInputDialog::getInt(this, tr("Générer un marqueur"),
@@ -985,6 +1027,7 @@ QString MainWindow::calibrationPath() const
 
 void MainWindow::updateCalibrationStatus()
 {
+    waitForProcessing();
     const int n = m_calibration.captureCount();
     QString text = tr("Captures : <b>%1</b> (au moins 5, idéalement 15 à 25)").arg(n);
     if (m_calibration.isCalibrated()) {
@@ -1004,6 +1047,7 @@ void MainWindow::updateCalibrationStatus()
 
 void MainWindow::onBoardChanged()
 {
+    waitForProcessing();
     CameraCalibration::Board board;
     board.cols = m_boardColsSpin->value();
     board.rows = m_boardRowsSpin->value();
@@ -1014,6 +1058,7 @@ void MainWindow::onBoardChanged()
 
 void MainWindow::calibrate()
 {
+    waitForProcessing();
     QApplication::setOverrideCursor(Qt::WaitCursor);
     QString error;
     const bool ok = m_calibration.calibrate(&error);
@@ -1038,6 +1083,7 @@ void MainWindow::calibrate()
 
 void MainWindow::generateBoard()
 {
+    waitForProcessing();
     const CameraCalibration::Board &board = m_calibration.board();
     const QString path = QFileDialog::getSaveFileName(
         this, tr("Enregistrer le damier"),
@@ -1058,6 +1104,7 @@ void MainWindow::applyUdpTarget()
 
 void MainWindow::toggleFloorPicking()
 {
+    waitForProcessing();
     if (m_video->selectionMode()) {  // une seule saisie à la fois
         m_video->setSelectionMode(false);
         updateTrackStatus();
@@ -1069,6 +1116,7 @@ void MainWindow::toggleFloorPicking()
 
 void MainWindow::clearFloor()
 {
+    waitForProcessing();
     m_floorPicking = false;
     m_floorPicked.clear();
     m_floor.clearPoints();
@@ -1078,6 +1126,7 @@ void MainWindow::clearFloor()
 
 void MainWindow::onFloorSizeChanged()
 {
+    waitForProcessing();
     m_floor.setSize(QSizeF(m_floorSizeXSpin->value(), m_floorSizeYSpin->value()));
     saveFloorSettings();
     updateFloorStatus();
@@ -1109,6 +1158,7 @@ QString floorPointName(int index, const QSizeF &size)
 
 void MainWindow::updateFloorStatus()
 {
+    waitForProcessing();
     m_floorPickButton->setText(m_floorPicking ? tr("Annuler") : tr("Définir les 4 points"));
     if (m_floorPicking) {
         const int n = int(m_floorPicked.size());
@@ -1128,11 +1178,20 @@ void MainWindow::updateFloorStatus()
                        .arg(s.height());
     if (!m_lastFrame.isNull() && m_calibration.isValidFor(m_lastFrame.size()))
         text += tr("<br>Distorsion de l'objectif corrigée par la calibration.");
+    if (m_floor.hasCameraPose()) {
+        text += tr("<br>Caméra à <b>%1 mm</b> du sol (vérifiable au mètre ruban).").arg(m_floor.cameraHeight(), 0, 'f', 0);
+        if (m_floor.objectHeight() > 0)
+            text += tr("<br>Positions corrigées pour des repères à %1 mm du sol.").arg(m_floor.objectHeight(), 0, 'f', 0);
+    } else if (m_floor.objectHeight() > 0) {
+        text += tr("<br><b style='color:#c60'>Hauteur des repères ignorée</b> : la correction nécessite la "
+                   "calibration de la caméra (onglet Calibration), dans le même format d'image.");
+    }
     m_floorLabel->setText(text);
 }
 
 void MainWindow::saveFloorSettings() const
 {
+    waitForProcessing();
     QSettings s(settingsPath(), QSettings::IniFormat);
     QVariantList points;
     for (const QPointF &p : m_floor.points())
@@ -1141,6 +1200,7 @@ void MainWindow::saveFloorSettings() const
     s.setValue(QStringLiteral("floor/imageSize"), m_floor.pointsImageSize());
     s.setValue(QStringLiteral("floor/sizeX"), m_floor.size().width());
     s.setValue(QStringLiteral("floor/sizeY"), m_floor.size().height());
+    s.setValue(QStringLiteral("floor/objectHeight"), m_floor.objectHeight());
 }
 
 void MainWindow::toggleTrackSelection()
@@ -1193,6 +1253,7 @@ void MainWindow::configureTracker(ObjectTracker &tracker) const
 
 void MainWindow::onRectangleSelected(const QRect &displayRect)
 {
+    waitForProcessing();
     if (m_lastFrame.isNull()) {
         updateTrackStatus();
         return;
@@ -1231,6 +1292,7 @@ void MainWindow::onRectangleSelected(const QRect &displayRect)
 
 void MainWindow::removeSelectedObject()
 {
+    waitForProcessing();
     QListWidgetItem *listItem = m_objectList->currentItem();
     if (!listItem)
         return;
@@ -1244,6 +1306,7 @@ void MainWindow::removeSelectedObject()
 
 void MainWindow::onObjectRenamed(QListWidgetItem *listItem)
 {
+    waitForProcessing();
     const int id = listItem->data(Qt::UserRole).toInt();
     for (TrackedItem &item : m_tracked) {
         if (item.id == id) {
@@ -1288,6 +1351,7 @@ void MainWindow::cancelCurrentInput()
 
 void MainWindow::stopTracking()
 {
+    waitForProcessing();
     // « Tout retirer » : plus aucun objet suivi. La numérotation repart de 1.
     m_video->setSelectionMode(false);
     m_tracked.clear();
@@ -1298,12 +1362,14 @@ void MainWindow::stopTracking()
 
 void MainWindow::applySmoothingToTracker()
 {
+    waitForProcessing();
     for (TrackedItem &item : m_tracked)
         configureTracker(*item.tracker);
 }
 
 void MainWindow::updateTrackStatus()
 {
+    waitForProcessing();
     const bool selecting = m_video->selectionMode();
     const bool pending = selecting && m_video->hasPendingRect();
     m_trackSelectButton->setText(selecting ? tr("Terminer l'ajout") : tr("Ajouter des objets"));
@@ -1429,7 +1495,6 @@ void MainWindow::onFrame(const QVideoFrame &frame)
     // ArUco ou un damier vu en miroir n'est pas reconnu, et les mesures doivent rester
     // dans le repère de la caméra. Le miroir ne s'applique qu'à l'affichage.
     image = image.convertToFormat(QImage::Format_RGB32);
-    m_lastFrame = image;
 
     if (!m_resolutionSynced) {
         m_resolutionSynced = true;
@@ -1461,51 +1526,147 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         }
     }
 
-    const bool squaresOn = m_squareBox->isChecked();
-    const bool markersOn = m_arucoBox->isChecked();
-    std::vector<DetectedSquare> squares =
-        squaresOn ? m_detector.detect(image) : std::vector<DetectedSquare>();
-    std::vector<DetectedMarker> markers =
-        markersOn ? m_markerDetector.detect(image) : std::vector<DetectedMarker>();
-    if (m_floor.prepare(image.size()))
-        m_floor.apply(squares, markers);
-    std::vector<MotionEvent> frameEvents;
+    // Un traitement est en cours : on garde l'image la plus récente, traitée dès qu'il se termine.
+    if (m_watcher.isRunning()) {
+        m_pendingImage = image;
+        return;
+    }
+    startProcessing(image);
+}
+
+void MainWindow::waitForProcessing() const
+{
+    if (m_watcher.isRunning())
+        const_cast<QFutureWatcher<FrameResult> &>(m_watcher).waitForFinished();
+}
+
+void MainWindow::startProcessing(const QImage &image)
+{
+    ProcessingOptions options;
+    options.squaresOn = m_squareBox->isChecked();
+    options.markersOn = m_arucoBox->isChecked();
+    options.smoothingOn = m_smoothBox->isChecked();
+    options.calibOn = m_captureBox->isChecked();
+    options.captureNow = m_captureRequested || (m_autoCaptureCheck->isChecked() && m_lastCapture.elapsed() > 2000);
+    options.timeMs = m_clock.elapsed();
+    m_captureRequested = false;
+    m_watcher.setFuture(QtConcurrent::run([this, image, options] { return processFrame(image, options); }));
+}
+
+FrameResult MainWindow::processFrame(const QImage &image, const ProcessingOptions &options)
+{
+    // Fil de traitement : pas d'accès aux widgets. Les objets utilisés ici ne sont modifiés par
+    // l'interface qu'après waitForProcessing().
+    FrameResult r;
+    r.image = image;
+    r.options = options;
+    const bool floorReady = m_floor.prepare(image.size());
+
+    // La détection des marqueurs et le suivi de chaque objet sont indépendants : ils tournent en
+    // parallèle sur les cœurs disponibles, pendant que ce fil détecte les carrés.
+    QFuture<std::vector<DetectedMarker>> markersFuture;
+    if (options.markersOn)
+        markersFuture = QtConcurrent::run(&m_innerPool, [this, &image] { return m_markerDetector.detect(image); });
+    std::vector<char> wasFound;
+    QFuture<void> trackersFuture;
     if (!m_tracked.empty()) {
         if (image.size() != m_trackImageSize) {
-            stopTracking();  // les cadres n'ont plus de sens dans une autre résolution
-            m_trackLabel->setText(tr("<b style='color:#c60'>Suivi arrêté</b> : la résolution a changé. "
-                                     "Ajoutez de nouveau les objets."));
+            r.trackSizeChanged = true;  // les cadres n'ont plus de sens dans une autre résolution
         } else {
-            bool stateChanged = false;
-            const qint64 now = m_clock.elapsed();
-            for (TrackedItem &item : m_tracked) {
-                const bool wasFound = item.tracker->state().found;
-                item.tracker->update(image, now, &m_floor);
-                stateChanged |= item.tracker->state().found != wasFound;
-                for (MotionEvent &e : item.tracker->takeEvents()) {
-                    e.objectId = item.id;
-                    e.objectName = item.name;
-                    frameEvents.push_back(e);
-                }
-            }
-            if (stateChanged)
-                updateTrackStatus();
-            // Heure réelle de chaque événement, à partir de l'horloge du suivi.
-            const qint64 nowWall = QDateTime::currentMSecsSinceEpoch(), nowClock = m_clock.elapsed();
-            for (MotionEvent &e : frameEvents)
-                e.wallTimeMs = nowWall - (nowClock - e.timeMs);
-            logEvents(frameEvents);
+            for (const TrackedItem &item : m_tracked)
+                wasFound.push_back(item.tracker->state().found);
+            trackersFuture = QtConcurrent::map(&m_innerPool, m_tracked, [this, &image, &options](TrackedItem &item) {
+                item.tracker->update(image, options.timeMs, &m_floor);
+            });
         }
     }
-    if (m_smoothBox->isChecked()) {
+    if (options.squaresOn)
+        r.squares = m_detector.detect(image);
+    if (options.markersOn)
+        r.markers = markersFuture.result();
+    trackersFuture.waitForFinished();
+    if (floorReady)
+        m_floor.apply(r.squares, r.markers);
+    for (size_t i = 0; i < wasFound.size(); ++i) {
+        TrackedItem &item = m_tracked[i];
+        r.trackStateChanged |= bool(item.tracker->state().found) != bool(wasFound[i]);
+        for (MotionEvent &e : item.tracker->takeEvents()) {
+            e.objectId = item.id;
+            e.objectName = item.name;
+            r.events.push_back(e);
+        }
+    }
+    if (options.smoothingOn) {
         if (image.size() != m_smoothImageSize) {
             m_smoother.clear();  // positions en pixels d'une autre résolution
             m_smoothImageSize = image.size();
         }
-        m_smoother.update(m_clock.elapsed(), squares, markers, &m_floor);
+        m_smoother.update(options.timeMs, r.squares, r.markers, &m_floor);
     }
+
+    // Mode calibration : recherche du damier et capture manuelle ou automatique.
+    if (options.calibOn) {
+        r.boardFound = m_calibration.findBoard(image, r.boardCorners);
+        if (r.boardFound && options.captureNow) {
+            m_calibration.addCapture(image, r.boardCorners);
+            m_lastCapture.restart();
+            r.captured = true;
+        }
+    }
+    return r;
+}
+
+void MainWindow::onProcessingFinished()
+{
+    presentFrame(m_watcher.result());
+    // Image arrivée pendant le traitement : on la traite maintenant (après l'affichage, pour que
+    // l'affichage lise les objets partagés sans conflit).
+    if (!m_pendingImage.isNull()) {
+        const QImage next = m_pendingImage;
+        m_pendingImage = QImage();
+        startProcessing(next);
+    }
+}
+
+void MainWindow::presentFrame(const FrameResult &result)
+{
+    // Fil principal ; le fil de traitement est à l'arrêt pendant l'affichage.
+    const QImage &image = result.image;
+    // Image affichée : c'est sur elle que portent les clics (couleur, sélection, points du sol).
+    m_lastFrame = image;
+    const bool squaresOn = result.options.squaresOn;
+    const bool markersOn = result.options.markersOn;
+    const std::vector<DetectedSquare> &squares = result.squares;
+    const std::vector<DetectedMarker> &markers = result.markers;
+    std::vector<MotionEvent> frameEvents = result.events;
+    const bool calibOn = result.options.calibOn;
+    const std::vector<QPointF> &boardCorners = result.boardCorners;
+    const bool boardFound = result.boardFound;
+    const bool captured = result.captured;
+
+    if (m_floor.hasCameraPose() != m_floorPoseShown) {
+        m_floorPoseShown = m_floor.hasCameraPose();
+        updateFloorStatus();
+    }
+    if (result.trackSizeChanged) {
+        stopTracking();
+        m_trackLabel->setText(tr("<b style='color:#c60'>Suivi arrêté</b> : la résolution a changé. "
+                                 "Ajoutez de nouveau les objets."));
+    } else if (result.trackStateChanged) {
+        updateTrackStatus();
+    }
+    if (!frameEvents.empty()) {
+        // Heure réelle de chaque événement, à partir de l'horloge du suivi.
+        const qint64 nowWall = QDateTime::currentMSecsSinceEpoch(), nowClock = m_clock.elapsed();
+        for (MotionEvent &e : frameEvents)
+            e.wallTimeMs = nowWall - (nowClock - e.timeMs);
+        logEvents(frameEvents);
+    }
+    if (captured)
+        updateCalibrationStatus();
+
     const std::vector<const SmoothedTrack *> tracks =
-        m_smoothBox->isChecked() ? m_smoother.tracks() : std::vector<const SmoothedTrack *>();
+        result.options.smoothingOn ? m_smoother.tracks() : std::vector<const SmoothedTrack *>();
     auto trackFor = [&tracks](SmoothedTrack::Kind kind, int id) -> const SmoothedTrack * {
         for (const SmoothedTrack *t : tracks)
             if (t->kind == kind && t->id == id)
@@ -1517,23 +1678,6 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         updateFloorStatus();
     }
     m_lastFrameSizeAtPick = image.size();
-
-    // Mode calibration : recherche du damier et capture manuelle ou automatique.
-    const bool calibOn = m_captureBox->isChecked();
-    std::vector<QPointF> boardCorners;
-    bool boardFound = false;
-    bool captured = false;
-    if (calibOn) {
-        boardFound = m_calibration.findBoard(image, boardCorners);
-        const bool autoDue = m_autoCaptureCheck->isChecked() && m_lastCapture.elapsed() > 2000;
-        if (boardFound && (m_captureRequested || autoDue)) {
-            m_calibration.addCapture(image, boardCorners);
-            m_lastCapture.restart();
-            captured = true;
-            updateCalibrationStatus();
-        }
-    }
-    m_captureRequested = false;
 
     if (m_udpBox->isChecked() && m_sender.hasTarget()) {
         std::vector<TrackedEntry> trackedEntries;
