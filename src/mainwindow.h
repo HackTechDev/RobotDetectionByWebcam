@@ -30,6 +30,9 @@ class QLineEdit;
 class QListWidget;
 class QListWidgetItem;
 class QMediaCaptureSession;
+class QMediaRecorder;
+class QToolButton;
+class QVideoFrameInput;
 class QPushButton;
 class QShortcut;
 class QSlider;
@@ -113,6 +116,12 @@ private:
     // Capture : enregistre l'image de la webcam (ou l'image affichée, avec les détections) en PNG.
     void saveCapture(bool withDetections);
     QString captureFolder() const;
+    // Vidéo : flux de la webcam (enregistré par Qt Multimedia) ou images affichées, avec les
+    // détections (envoyées une à une à un second enregistreur).
+    void startVideo(bool withDetections);
+    void stopVideo();
+    void toggleVideo(bool withDetections);
+    void updateVideoButton();
     QSlider *addSlider(QFormLayout *form, const QString &label, int min, int max, int value);
     void setTargetColor(const QColor &color);
     void selectColorModeFor(const QColor &color);
@@ -245,6 +254,14 @@ private:
     bool m_captureRequested = false;
     QColor m_targetColor;
     QImage m_lastFrame;  // dernière image affichée (les clics portent sur elle)
+    QToolButton *m_videoButton = nullptr;
+    QMediaRecorder *m_recorder = nullptr;         // vidéo de la webcam
+    QMediaCaptureSession *m_overlaySession = nullptr;  // vidéo avec les détections
+    QVideoFrameInput *m_frameInput = nullptr;
+    QMediaRecorder *m_overlayRecorder = nullptr;
+    QElapsedTimer m_overlayClock;                 // horodatage des images envoyées
+    QString m_videoPath;
+    bool m_videoStopping = false;  // arrêt demandé, fichier en cours de finalisation
     QImage m_lastDisplay;  // même image, telle qu'affichée (détections dessinées, miroir)
     // Une entrée par résolution de m_resolutionCombo.
     struct ResolutionChoice

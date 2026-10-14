@@ -12,6 +12,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - Choix de la **résolution**, avec le format d'image (4:3, 16:9...) et le nombre d'images par seconde. Le format vidéo le plus rapide est choisi automatiquement. Si une webcam n'envoie pas la résolution demandée en MJPEG (cas de la Logitech C270), l'application passe d'elle-même au format non compressé.
 - **Réglages de l'image** : exposition automatique ou temps de pose manuel entre les vraies limites de la caméra (valeur appliquée affichée), balance des blancs automatique ou température manuelle, et tous les autres réglages fournis par le pilote V4L2 (luminosité, contraste, gain, fréquence du secteur, voyant...), avec des noms français. La webcam retrouve son état d'origine à la fermeture.
 - **Capture d'image** en un clic (F12) : image de la webcam en pleine résolution, ou image avec les détections (Maj+F12), enregistrée en PNG horodaté dans un dossier choisi.
+- **Enregistrement vidéo** en MP4 (F9) : flux de la webcam en pleine résolution, ou images affichées avec les détections (Maj+F9).
 - **Effet miroir**, appliqué seulement à l'affichage : les détections et les mesures restent celles de l'image réelle de la caméra.
 
 ### Détection
@@ -168,7 +169,7 @@ Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissag
 
 **Intérêt.** Régler la détection tranquillement, rejouer une situation difficile, comparer deux réglages sur les mêmes images, sans le robot sous la caméra.
 
-**Piste.** Un bouton d'enregistrement (`QMediaRecorder`) et une source « Fichier vidéo » à la place de la webcam (`QMediaPlayer` relié au même `QVideoSink`).
+**Piste.** Les vidéos s'enregistrent déjà (bouton **Vidéo**). Il reste à proposer une source « Fichier vidéo » à la place de la webcam (`QMediaPlayer` relié au même `QVideoSink`), avec pause et retour en arrière.
 
 #### Enregistrement des positions en CSV — S
 

@@ -29,6 +29,9 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMediaCaptureSession>
+#include <QMediaFormat>
+#include <QMediaRecorder>
+#include <QVideoFrameInput>
 #include <QMediaDevices>
 #include <QPainter>
 #include <QPixmap>
@@ -109,12 +112,57 @@ MainWindow::MainWindow(QWidget *parent)
     connect(captureShortcut, &QShortcut::activated, this, [this] { saveCapture(false); });
     auto *captureAllShortcut = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F12), this);
     connect(captureAllShortcut, &QShortcut::activated, this, [this] { saveCapture(true); });
+    // Vidéo : un clic démarre ou arrête l'enregistrement ; la flèche propose les autres choix.
+    m_videoButton = new QToolButton(camBox);
+    m_videoButton->setPopupMode(QToolButton::MenuButtonPopup);
+    auto *videoMenu = new QMenu(m_videoButton);
+    videoMenu->addAction(tr("Vidéo de la webcam (F9)"), this, [this] { toggleVideo(false); });
+    videoMenu->addAction(tr("Vidéo avec les détections (Maj+F9)"), this, [this] { toggleVideo(true); });
+    videoMenu->addSeparator();
+    videoMenu->addAction(tr("Ouvrir le dossier des captures"), this, [this] {
+        QDir().mkpath(captureFolder());
+        QDesktopServices::openUrl(QUrl::fromLocalFile(captureFolder()));
+    });
+    m_videoButton->setMenu(videoMenu);
+    connect(m_videoButton, &QToolButton::clicked, this, [this] { toggleVideo(false); });
+    auto *videoShortcut = new QShortcut(QKeySequence(Qt::Key_F9), this);
+    connect(videoShortcut, &QShortcut::activated, this, [this] { toggleVideo(false); });
+    auto *videoAllShortcut = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F9), this);
+    connect(videoAllShortcut, &QShortcut::activated, this, [this] { toggleVideo(true); });
+    m_recorder = new QMediaRecorder(this);
+    m_session->setRecorder(m_recorder);
+    m_overlaySession = new QMediaCaptureSession(this);
+    m_frameInput = new QVideoFrameInput(this);
+    m_overlaySession->setVideoFrameInput(m_frameInput);
+    m_overlayRecorder = new QMediaRecorder(this);
+    m_overlaySession->setRecorder(m_overlayRecorder);
+    for (QMediaRecorder *recorder : {m_recorder, m_overlayRecorder}) {
+        connect(recorder, &QMediaRecorder::durationChanged, this, &MainWindow::updateVideoButton);
+        connect(recorder, &QMediaRecorder::recorderStateChanged, this, [this, recorder](QMediaRecorder::RecorderState state) {
+            if (state == QMediaRecorder::StoppedState)
+                m_videoStopping = false;
+            updateVideoButton();
+            if (state == QMediaRecorder::StoppedState && !m_videoPath.isEmpty()
+                && recorder->error() == QMediaRecorder::NoError) {
+                statusBar()->showMessage(tr("Vidéo enregistrée : %1").arg(QDir::toNativeSeparators(m_videoPath)), 10000);
+                m_videoPath.clear();
+            }
+        });
+        connect(recorder, &QMediaRecorder::errorOccurred, this, [this](QMediaRecorder::Error, const QString &message) {
+            m_videoPath.clear();
+            m_videoStopping = false;
+            QMessageBox::warning(this, tr("Vidéo"), tr("L'enregistrement de la vidéo a échoué :\n%1").arg(message));
+            updateVideoButton();
+        });
+    }
+    updateVideoButton();
     auto *camRow = new QWidget(camBox);
     auto *camRowLayout = new QHBoxLayout(camRow);
     camRowLayout->setContentsMargins(0, 0, 0, 0);
     camRowLayout->addWidget(m_mirrorCheck);
     camRowLayout->addStretch();
     camRowLayout->addWidget(snapshotButton);
+    camRowLayout->addWidget(m_videoButton);
     camRowLayout->addWidget(imageSettingsButton);
     camForm->addRow(camRow);
     m_cameraSettingsDialog = new CameraSettingsDialog(this);
@@ -605,6 +653,7 @@ void MainWindow::onCameraChanged(int index)
         return;
 
     waitForProcessing();
+    stopVideo();  // la vidéo ne vaut que pour cette caméra
     // La webcam quittée retrouve ses réglages d'origine.
     m_cameraSettingsDialog->restoreCamera();
     delete m_camera;
@@ -838,6 +887,14 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 
     saveSettings();
+    // Vidéo en cours : terminée proprement, sinon le fichier serait illisible.
+    stopVideo();
+    QElapsedTimer waitStop;
+    waitStop.start();
+    while ((m_recorder->recorderState() != QMediaRecorder::StoppedState
+            || m_overlayRecorder->recorderState() != QMediaRecorder::StoppedState)
+           && waitStop.elapsed() < 5000)
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
     // Les réglages restent mémorisés dans la webcam : on la rend aux autres applications en
     // automatique, avec ses réglages d'origine. Ils seront réappliqués au prochain lancement.
     m_cameraSettingsDialog->restoreCamera();
@@ -1095,6 +1152,7 @@ void MainWindow::onResolutionChanged(int index)
 void MainWindow::applyResolution(int index)
 {
     m_pendingResolution = index;
+    stopVideo();  // la taille d'image change : la vidéo en cours est terminée
     m_camera->stop();
     m_camera->setCameraFormat(m_resolutions[index].current());
     m_camera->start();
@@ -1261,6 +1319,82 @@ void MainWindow::saveCapture(bool withDetections)
         statusBar()->showMessage(tr("Capture enregistrée : %1").arg(QDir::toNativeSeparators(path)), 8000);
     else
         QMessageBox::warning(this, tr("Capture"), tr("Impossible d'enregistrer %1").arg(path));
+}
+
+void MainWindow::toggleVideo(bool withDetections)
+{
+    if (m_videoStopping)
+        return;  // fichier précédent en cours de finalisation
+    if (m_recorder->recorderState() != QMediaRecorder::StoppedState
+        || m_overlayRecorder->recorderState() != QMediaRecorder::StoppedState)
+        stopVideo();
+    else
+        startVideo(withDetections);
+}
+
+void MainWindow::startVideo(bool withDetections)
+{
+    if (!m_camera || !m_camera->isActive() || m_lastFrame.isNull()) {
+        statusBar()->showMessage(tr("Pas de vidéo possible : la webcam ne filme pas encore."), 5000);
+        return;
+    }
+    const QString folder = captureFolder();
+    QDir().mkpath(folder);
+    m_videoPath = QDir(folder).filePath(
+        QStringLiteral("video_%1%2.mp4")
+            .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss")),
+                 withDetections ? QStringLiteral("_detections") : QString()));
+    QMediaRecorder *recorder = withDetections ? m_overlayRecorder : m_recorder;
+    QMediaFormat format(QMediaFormat::MPEG4);
+    format.setVideoCodec(QMediaFormat::VideoCodec::H264);
+    recorder->setMediaFormat(format);
+    recorder->setQuality(QMediaRecorder::HighQuality);
+    recorder->setOutputLocation(QUrl::fromLocalFile(m_videoPath));
+    if (withDetections) {
+        recorder->setVideoResolution(m_lastDisplay.size());
+        recorder->setVideoFrameRate(std::max(1.0, std::round(m_fps)));
+        m_overlayClock.start();
+    }
+    recorder->record();
+    updateVideoButton();
+}
+
+void MainWindow::stopVideo()
+{
+    for (QMediaRecorder *recorder : {m_recorder, m_overlayRecorder}) {
+        if (recorder && recorder->recorderState() != QMediaRecorder::StoppedState) {
+            m_videoStopping = true;
+            recorder->stop();
+        }
+    }
+    if (m_videoButton)
+        updateVideoButton();
+}
+
+void MainWindow::updateVideoButton()
+{
+    QMediaRecorder *recorder = m_overlayRecorder->recorderState() != QMediaRecorder::StoppedState
+                                   ? m_overlayRecorder
+                                   : m_recorder;
+    m_videoButton->setEnabled(!m_videoStopping);
+    if (m_videoStopping) {
+        // Le codeur termine les images en attente et ferme le fichier (une à deux secondes).
+        m_videoButton->setText(tr("Finalisation..."));
+        m_videoButton->setStyleSheet(QString());
+        return;
+    }
+    if (recorder->recorderState() == QMediaRecorder::StoppedState) {
+        m_videoButton->setText(tr("Vidéo"));
+        m_videoButton->setStyleSheet(QString());
+        m_videoButton->setToolTip(tr("Enregistre la vidéo de la webcam en MP4 dans le dossier des captures (F9) ; "
+                                     "un nouveau clic l'arrête"));
+        return;
+    }
+    const qint64 s = recorder->duration() / 1000;
+    m_videoButton->setText(tr("■ Arrêter %1:%2").arg(s / 60).arg(s % 60, 2, 10, QLatin1Char('0')));
+    m_videoButton->setStyleSheet(QStringLiteral("color: #c00; font-weight: bold;"));
+    m_videoButton->setToolTip(tr("Enregistrement en cours dans %1 : cliquez (ou F9) pour l'arrêter")
+                                  .arg(QDir::toNativeSeparators(m_videoPath)));
 }
 
 QString MainWindow::calibrationPath() const
@@ -2214,6 +2348,15 @@ void MainWindow::presentFrame(const FrameResult &result)
     painter.end();
     m_video->setImage(display);
     m_lastDisplay = display;
+    if (m_overlayRecorder->recorderState() == QMediaRecorder::RecordingState) {
+        // Image horodatée d'après l'heure réelle : la vidéo garde la vitesse du traitement. Si
+        // l'enregistreur est en retard, l'image est sautée.
+        QVideoFrame frame(display);
+        const qint64 us = m_overlayClock.nsecsElapsed() / 1000;
+        frame.setStartTime(us);
+        frame.setEndTime(us + qint64(1e6 / std::max(1.0, m_fps)));
+        m_frameInput->sendVideoFrame(frame);
+    }
 
     QString status = tr("Image : %1 x %2 — %3 i/s<br>")
                          .arg(image.width())
