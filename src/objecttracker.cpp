@@ -1,5 +1,6 @@
 #include "objecttracker.h"
 #include "floormapper.h"
+#include "trackermodels.h"
 
 #include <QObject>
 
@@ -38,7 +39,17 @@ ObjectTracker::~ObjectTracker() = default;
 
 QStringList ObjectTracker::algorithmNames()
 {
-    return {QObject::tr("CSRT (précis)"), QObject::tr("KCF (rapide)")};
+    return {QObject::tr("CSRT (précis)"), QObject::tr("KCF (rapide)"), QObject::tr("Nano (réseau de neurones)"),
+            QObject::tr("Vit (réseau de neurones)")};
+}
+
+bool ObjectTracker::isAvailable(Algorithm algorithm)
+{
+    if (algorithm == Nano)
+        return TrackerModels::missing(TrackerModels::Nano).empty();
+    if (algorithm == Vit)
+        return TrackerModels::missing(TrackerModels::Vit).empty();
+    return true;
 }
 
 namespace {
@@ -165,11 +176,28 @@ double ObjectTracker::appearanceScore(const cv::Mat &work, const cv::Rect &roi) 
 
 bool ObjectTracker::createTracker(const cv::Mat &work, const cv::Rect &roi)
 {
-    if (m_algorithm == Kcf)
-        m_tracker = cv::TrackerKCF::create();
-    else
-        m_tracker = cv::TrackerCSRT::create();
     try {
+        switch (m_algorithm) {
+        case Kcf:
+            m_tracker = cv::TrackerKCF::create();
+            break;
+        case Nano: {
+            cv::TrackerNano::Params params;
+            params.backbone = TrackerModels::find(QStringLiteral("nanotrack_backbone_sim.onnx")).toStdString();
+            params.neckhead = TrackerModels::find(QStringLiteral("nanotrack_head_sim.onnx")).toStdString();
+            m_tracker = cv::TrackerNano::create(params);
+            break;
+        }
+        case Vit: {
+            cv::TrackerVit::Params params;
+            params.net = TrackerModels::find(QStringLiteral("object_tracking_vittrack_2023sep.onnx")).toStdString();
+            m_tracker = cv::TrackerVit::create(params);
+            break;
+        }
+        default:
+            m_tracker = cv::TrackerCSRT::create();
+            break;
+        }
         m_tracker->init(work, roi);
     } catch (const cv::Exception &) {
         m_tracker.release();

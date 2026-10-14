@@ -132,6 +132,8 @@ private:
     void updateTrackStatus();
     void applySmoothingToTracker();
     void configureTracker(ObjectTracker &tracker) const;
+    void onTrackAlgorithmChosen(int index);
+    bool ensureTrackerModels(int algorithm);
     void logEvents(const std::vector<MotionEvent> &events);
     void saveSettings() const;
     // Traitement d'une image dans le fil de traitement, puis affichage dans le fil principal.
@@ -190,6 +192,8 @@ private:
     QLabel *m_floorLabel = nullptr;
 
     QComboBox *m_trackAlgoCombo = nullptr;
+
+    int m_trackAlgoIndex = 0;  // méthode en vigueur (rétablie si un téléchargement échoue)
     QPushButton *m_trackSelectButton = nullptr;
     QPushButton *m_trackStartButton = nullptr;
     QPushButton *m_trackRemoveButton = nullptr;

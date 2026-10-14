@@ -61,11 +61,14 @@ struct MotionEvent
     QString objectName;
 };
 
-// Suivi d'un objet encadré à la main (trackers CSRT ou KCF d'OpenCV), avec sa trajectoire.
+// Suivi d'un objet encadré à la main (trackers CSRT, KCF, NanoTrack ou VitTrack d'OpenCV), avec sa
+// trajectoire.
 class ObjectTracker
 {
 public:
-    enum Algorithm { Csrt, Kcf };
+    // Nano et Vit : réseaux de neurones, plus robustes ; leurs modèles se téléchargent à part
+    // (TrackerModels).
+    enum Algorithm { Csrt, Kcf, Nano, Vit };
 
     struct TrailPoint
     {
@@ -78,6 +81,8 @@ public:
     ~ObjectTracker();
 
     static QStringList algorithmNames();
+    // Vrai si l'algorithme est utilisable (modèles présents pour Nano et Vit).
+    static bool isAvailable(Algorithm algorithm);
 
     // Délimite automatiquement l'objet situé sous « point » (sélection d'un clic). Si la
     // délimitation échoue, retourne un carré autour du point et met « uncertain » à vrai.

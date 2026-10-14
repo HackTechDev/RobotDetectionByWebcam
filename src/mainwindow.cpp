@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "trackermodels.h"
 #include "videowidget.h"
 
 #include <QApplication>
@@ -239,8 +240,12 @@ MainWindow::MainWindow(QWidget *parent)
     auto *trackForm = new QFormLayout(trackBox);
     m_trackAlgoCombo = new QComboBox(trackBox);
     m_trackAlgoCombo->addItems(ObjectTracker::algorithmNames());
-    m_trackAlgoCombo->setToolTip(tr("CSRT suit mieux l'objet, KCF est plus rapide.\n"
+    m_trackAlgoCombo->setToolTip(tr("CSRT suit bien l'objet, KCF est plus rapide.\n"
+                                    "Nano et Vit (réseaux de neurones) résistent mieux aux changements d'aspect "
+                                    "et aux pertes momentanées ; leurs modèles (1 à 2 Mo) sont "
+                                    "téléchargés au premier choix.\n"
                                     "Le choix s'applique à la prochaine sélection."));
+    connect(m_trackAlgoCombo, &QComboBox::activated, this, &MainWindow::onTrackAlgorithmChosen);
     trackForm->addRow(tr("Méthode"), m_trackAlgoCombo);
     m_trackSelectButton = new QPushButton(trackBox);
     trackForm->addRow(m_trackSelectButton);
@@ -717,7 +722,13 @@ void MainWindow::loadSettings()
     m_smoothTrailCheck->setChecked(s.value(QStringLiteral("smoothing/showTrails"), true).toBool());
     m_smoothTrailSpin->setValue(s.value(QStringLiteral("smoothing/trailSeconds"), m_smoothTrailSpin->value()).toDouble());
     applySmoothingToTracker();
-    m_trackAlgoCombo->setCurrentIndex(std::clamp(s.value(QStringLiteral("tracking/algorithm"), 0).toInt(), 0, 1));
+    // Modèle supprimé depuis la dernière fois : retour à CSRT.
+    int algorithm = std::clamp(s.value(QStringLiteral("tracking/algorithm"), 0).toInt(), 0,
+                               int(ObjectTracker::algorithmNames().size()) - 1);
+    if (!ObjectTracker::isAvailable(ObjectTracker::Algorithm(algorithm)))
+        algorithm = ObjectTracker::Csrt;
+    m_trackAlgoCombo->setCurrentIndex(algorithm);
+    m_trackAlgoIndex = algorithm;
     m_trackTrailCheck->setChecked(s.value(QStringLiteral("tracking/showTrail"), true).toBool());
     m_trackTrailSpin->setValue(s.value(QStringLiteral("tracking/trailSeconds"), m_trackTrailSpin->value()).toDouble());
     m_motionMmSpin->setValue(s.value(QStringLiteral("tracking/motionThresholdMm"), m_motionMmSpin->value()).toDouble());
@@ -1428,6 +1439,60 @@ void MainWindow::configureTracker(ObjectTracker &tracker) const
     const bool on = m_smoothBox->isChecked();
     tracker.setSmoothing(on ? m_smoothStrengthSlider->value() : 50, on);
     tracker.setHoldTime(on ? m_smoothHoldSpin->value() : 0.0);
+}
+
+void MainWindow::onTrackAlgorithmChosen(int index)
+{
+    if (ensureTrackerModels(index)) {
+        m_trackAlgoIndex = index;
+    } else {
+        const QSignalBlocker blocker(m_trackAlgoCombo);
+        m_trackAlgoCombo->setCurrentIndex(m_trackAlgoIndex);
+    }
+}
+
+bool MainWindow::ensureTrackerModels(int algorithm)
+{
+    // Nano et Vit ont besoin de leurs modèles : on propose de les télécharger une fois.
+    if (algorithm != ObjectTracker::Nano && algorithm != ObjectTracker::Vit)
+        return true;
+    const auto model = algorithm == ObjectTracker::Nano ? TrackerModels::Nano : TrackerModels::Vit;
+    const std::vector<TrackerModels::File> missing = TrackerModels::missing(model);
+    if (missing.empty())
+        return true;
+
+    qint64 size = 0;
+    QStringList names;
+    for (const TrackerModels::File &f : missing) {
+        size += f.size;
+        names << QStringLiteral("<li><a href='%1'>%2</a></li>").arg(f.url.toString(), f.name);
+    }
+    QMessageBox box(QMessageBox::Question, tr("Modèle à télécharger"),
+                    tr("<p>La méthode <b>%1</b> utilise un réseau de neurones dont le modèle n'est pas encore "
+                       "installé (%2 ko) :</p><ul>%3</ul><p>Le télécharger maintenant dans <tt>%4</tt> ?</p>"
+                       "<p><small>Sans connexion, vous pouvez aussi placer ces fichiers vous-même dans ce dossier, "
+                       "ou dans un dossier <tt>models</tt> à côté de l'application.</small></p>")
+                        .arg(m_trackAlgoCombo->itemText(algorithm).toHtmlEscaped())
+                        .arg(size / 1024)
+                        .arg(names.join(QString()), TrackerModels::downloadDirectory().toHtmlEscaped()),
+                    QMessageBox::NoButton, this);
+    box.setTextFormat(Qt::RichText);
+    box.setTextInteractionFlags(Qt::TextBrowserInteraction);  // liens cliquables
+    QPushButton *download = box.addButton(tr("Télécharger"), QMessageBox::AcceptRole);
+    box.addButton(tr("Annuler"), QMessageBox::RejectRole);
+    box.setDefaultButton(download);
+    box.exec();
+    if (box.clickedButton() != download)
+        return false;
+
+    QString error;
+    if (!TrackerModels::download(missing, this, &error)) {
+        if (!error.isEmpty())
+            QMessageBox::warning(this, tr("Modèle à télécharger"),
+                                 tr("Le téléchargement a échoué :\n%1").arg(error));
+        return false;
+    }
+    return true;
 }
 
 void MainWindow::onRectangleSelected(const QRect &displayRect)

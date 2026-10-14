@@ -140,7 +140,11 @@ Le repère est propre à chaque caméra, comme la calibration. Il fonctionne san
 
 Dans l'onglet « Suivi », cliquer sur « Ajouter des objets », puis tracer un rectangle autour de chaque objet, ou cliquer dessus : un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Valider l'objet », touche Entrée ou double-clic. On reste en mode ajout pour l'objet suivant ; Échap ou « Terminer l'ajout » termine. Chaque objet a un numéro, un nom modifiable (double-clic dans la liste des objets) et une couleur. « Retirer » arrête le suivi de l'objet sélectionné dans la liste, « Tout retirer » celui de tous les objets. Chaque objet est suivi d'image en image par son propre tracker OpenCV :
 - **CSRT** : précis, environ 25 ms de calcul par image et par objet (avec 3 objets, environ 13 images traitées par seconde en 1280 × 960 sur 4 cœurs) ;
-- **KCF** : rapide, environ 5 ms par image et par objet.
+- **KCF** : rapide, environ 5 ms par image et par objet ;
+- **Nano** (`cv::TrackerNano`, réseau de neurones NanoTrack) : plus robuste aux changements d'aspect et aux disparitions momentanées, environ 10 ms par image et par objet ;
+- **Vit** (`cv::TrackerVit`, réseau de neurones VitTrack) : comparable, environ 15 ms.
+
+Nano et Vit demandent un modèle ONNX (1,7 Mo et 0,7 Mo), que l'application propose de télécharger au premier choix de la méthode, dans `~/.local/share/RobotDetectionByWebcam/models/`, en vérifiant son empreinte SHA-256. Les modèles sont aussi cherchés dans `models/` à côté de l'exécutable et dans le dossier parent (lancement depuis `build/`). Sur une séquence de synthèse (objet texturé qui tourne de 90°, change de taille, disparaît 12 images puis passe derrière un poteau), l'objet est trouvé sur 175 images visibles sur 187 avec Nano, 169 avec Vit, 168 avec CSRT et 147 avec KCF. Leur propre score de suivi reste élevé même sur un mauvais objet : la perte est détectée par l'indice de confiance de l'application, comme pour les autres trackers.
 
 L'application affiche, dans la couleur de chaque objet, le cadre, la **trajectoire** (durée réglable, 10 s par défaut) et une flèche dans le sens du déplacement. Le panneau « Résultat » donne la position, l'état (en mouvement ou immobile), la vitesse et la direction, lissées par un filtre de Kalman (mêmes réglages que le lissage des carrés et des marqueurs). Juste après une perte, la position est prédite à vitesse constante pendant le délai de maintien. Si le repère du sol est défini, il donne aussi la position, la vitesse et la direction en mm sur le sol. Ces valeurs sont envoyées en UDP (liste `tracked`, une entrée par objet).
 
@@ -201,11 +205,11 @@ Sur une image de synthèse, la position est retrouvée à environ 1 mm près à 
 
 ### Suivi d'objet
 
-Le code se trouve dans `src/objecttracker.cpp`. Chaque objet suivi a sa propre instance d'`ObjectTracker` (tracker, filtre, apparence de référence, événements) : les objets sont indépendants, et la fenêtre les met à jour l'un après l'autre à chaque image.
+Le code se trouve dans `src/objecttracker.cpp`. Chaque objet suivi a sa propre instance d'`ObjectTracker` (tracker, filtre, apparence de référence, événements) : les objets sont indépendants, et ils sont mis à jour en parallèle à chaque image, dans le fil de traitement.
 
 1. **Sélection d'un clic.** `cv::grabCut` est appliqué sur une zone carrée de 40 % du petit côté de l'image, centrée sur le clic, avec une marge de fond autour (image réduite à 480 px de large). On garde la zone de premier plan qui contient le clic. Si elle est trop petite ou remplit presque toute la zone, un carré est proposé autour du clic. Sur des objets de synthèse (texturé, disque, boîte, petit objet), le cadre obtenu recouvre le vrai cadre à 92 à 100 %, en 70 à 120 ms.
 2. L'image est réduite à 640 px de large au plus, ce qui garde le coût du suivi presque constant quelle que soit la résolution.
-3. Le tracker (`cv::TrackerCSRT` ou `cv::TrackerKCF`) est initialisé sur le rectangle sélectionné, puis mis à jour à chaque image. S'il perd l'objet, la dernière position est conservée et il continue de chercher aux images suivantes.
+3. Le tracker (`cv::TrackerCSRT`, `cv::TrackerKCF`, `cv::TrackerNano` ou `cv::TrackerVit`) est initialisé sur le rectangle sélectionné, puis mis à jour à chaque image. S'il perd l'objet, la dernière position est conservée et il continue de chercher aux images suivantes.
 4. **Indice de confiance.** À la sélection, l'apparence de l'objet est mémorisée sous deux formes : un histogramme teinte-saturation et un motif en niveaux de gris. À chaque image, le contenu du cadre est comparé à cette référence :
    - par la distance de Bhattacharyya entre histogrammes, peu sensible à la rotation ;
    - par une corrélation normalisée des motifs (`cv::matchTemplate`), qui distingue l'objet d'un fond ou d'un intrus aux couleurs proches.
@@ -291,6 +295,7 @@ src/
 ├── camerasettingsdialog.h/.cpp  réglages de l'image : exposition, balance des blancs, autres réglages
 ├── v4l2controls.h/.cpp          accès direct aux réglages du pilote Linux des webcams (V4L2)
 ├── objecttracker.h/.cpp  suivi d'un objet (un par objet suivi) : sélection d'un clic, confiance, reprise, vitesse, événements
+├── trackermodels.h/.cpp  modèles des trackers Nano et Vit : emplacement, téléchargement vérifié
 └── motionfilter.h/.cpp  lissage dans le temps (filtre de Kalman) des carrés et des marqueurs
 tools/
 └── udp_receiver.py      récepteur de test des positions UDP

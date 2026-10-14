@@ -21,7 +21,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
   - seuils réglables et affichage du masque ;
   - forme vérifiée par le rectangle orienté minimal, ce qui écarte les disques et les rectangles.
 - **Marqueurs ArUco et AprilTag** : six dictionnaires, coins affinés au sous-pixel, génération de marqueurs à imprimer.
-- **Suivi d'un ou plusieurs objets quelconques** désignés à la souris (trackers OpenCV CSRT ou KCF), chacun avec son nom et sa couleur :
+- **Suivi d'un ou plusieurs objets quelconques** désignés à la souris (trackers OpenCV CSRT, KCF, ou réseaux de neurones Nano et Vit dont le modèle est téléchargé au premier choix, avec vérification de l'empreinte), chacun avec son nom et sa couleur :
   - ajout par un rectangle ou d'un clic (délimitation automatique), cadre ajustable avant validation, ajout de plusieurs objets à la suite ; liste des objets (renommer, retirer) ;
   - trajectoire, position lissée, vitesse et direction (filtre de Kalman), position prédite juste après une perte ;
   - indice de confiance, qui détecte le cadre qui glisse sur le fond ou s'accroche à un autre objet ;
@@ -141,12 +141,6 @@ Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissag
 **Piste.**
 - Adapter la réduction d'image à la taille de l'objet : un grand objet peut être suivi sur une image plus petite que 640 px de large.
 - Mettre à jour les objets immobiles moins souvent (une image sur deux), en gardant toutes les images pour ceux qui bougent.
-
-#### Trackers à base de réseaux de neurones — M
-
-**Intérêt.** Les trackers `TrackerNano` et `TrackerVit` d'OpenCV 4.10 sont plus robustes aux changements d'aspect et aux pertes momentanées que CSRT et KCF.
-
-**Piste.** Les proposer dans la liste **Méthode**. Ils demandent de télécharger un modèle (quelques Mo) et une machine plus puissante : il faudra indiquer où placer le modèle et vérifier la vitesse obtenue.
 
 ### Caméra et calibration
 

@@ -28,6 +28,8 @@ add_executable(RobotDetectionByWebcam
     src/camerasettingsdialog.cpp
     src/v4l2controls.h
     src/v4l2controls.cpp
+    src/trackermodels.h
+    src/trackermodels.cpp
     src/objecttracker.h
     src/objecttracker.cpp
     src/motionfilter.h

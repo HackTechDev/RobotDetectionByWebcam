@@ -284,6 +284,10 @@ L'onglet **Suivi** sert aussi à lisser dans le temps les positions des carrés 
 2. Choisissez la **Méthode** :
    - **CSRT (précis)** : suit mieux l'objet, y compris quand sa taille change. C'est le choix par défaut.
    - **KCF (rapide)** : environ 4 fois plus rapide, mais décroche plus facilement.
+   - **Nano (réseau de neurones)** : résiste mieux aux changements d'aspect (rotation, changement de taille) et retrouve plus souvent l'objet après une disparition momentanée. Plus rapide que CSRT (environ 10 ms par image et par objet sur un processeur à 4 cœurs).
+   - **Vit (réseau de neurones)** : comparable à Nano, cadre souvent plus précis, un peu plus lent (environ 15 ms).
+
+   Nano et Vit ont besoin d'un **modèle** (fichier de réseau de neurones), téléchargé une seule fois : la première fois que vous les choisissez, l'application propose de le télécharger (1,7 Mo pour Nano, 0,7 Mo pour Vit). Voir [Modèles des réseaux de neurones](#modèles-des-réseaux-de-neurones).
 3. Cliquez sur **Ajouter des objets**.
 4. **Tracez un rectangle** autour du premier objet (cliquer-glisser), au plus près, avec le moins de fond possible. Vous pouvez aussi **cliquer simplement sur l'objet** : l'application le délimite toute seule autour du point cliqué.
 5. Le cadre s'affiche en pointillés avec **8 poignées**. Ajustez-le si besoin :
@@ -334,7 +338,7 @@ Le suivi d'objets encadrés est très pratique, mais moins fiable que les marque
 - **Le cadre peut glisser** sur le fond, ou s'accrocher à un autre objet qui passe devant. L'**indice de confiance** le détecte dans la plupart des cas, et l'objet est alors déclaré perdu avec le message « Le cadre ne ressemble plus à l'objet sélectionné ». Un objet qui change très vite d'aspect (retourné d'un coup) peut aussi faire chuter la confiance.
 - **Pas d'orientation** : le cadre reste droit. Seule la direction du déplacement est connue, pas celle vers laquelle l'objet est tourné.
 - **Changer de résolution arrête le suivi** de tous les objets : il faut les ajouter de nouveau.
-- **Vitesse de l'application** : chaque objet demande environ **25 ms de calcul par image avec CSRT** (environ 5 ms avec KCF). Les objets sont suivis en parallèle, dans le fil de traitement : l'interface reste réactive, mais le nombre d'images traitées par seconde baisse avec le nombre d'objets (environ 13 i/s avec 3 objets en 1280 × 960 sur un processeur à 4 cœurs, d'après un test sur images de synthèse). Choisissez **KCF** pour suivre plusieurs objets si l'image devient saccadée. L'onglet **Suivi** le rappelle à partir de 3 objets.
+- **Vitesse de l'application** : chaque objet demande environ **25 ms de calcul par image avec CSRT** (environ 5 ms avec KCF, 10 ms avec Nano, 15 ms avec Vit). Les objets sont suivis en parallèle, dans le fil de traitement : l'interface reste réactive, mais le nombre d'images traitées par seconde baisse avec le nombre d'objets (environ 13 i/s avec 3 objets en 1280 × 960 sur un processeur à 4 cœurs, d'après un test sur images de synthèse). Choisissez **Nano** ou **KCF** pour suivre plusieurs objets si l'image devient saccadée. L'onglet **Suivi** le rappelle à partir de 3 objets.
 
 Conseils : un objet bien contrasté et texturé (motif, logo, couleurs) se suit mieux qu'un objet uni. Un éclairage stable et une exposition courte (moins de flou, voir [Régler l'image de la webcam](#régler-limage-de-la-webcam)) aident aussi.
 
@@ -706,7 +710,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Le traitement des images (détections, suivi, lissage) se fait dans un **fil d'exécution séparé** : l'interface reste réactive même quand le traitement est lent. Si la caméra va plus vite que le traitement, les images intermédiaires sont ignorées et l'affichage montre toujours l'image la plus récente traitée. Le nombre d'images par seconde affiché est celui des images traitées.
 - Choisissez une **résolution plus basse** (liste **Résolution**) : la détection est plus rapide.
 - Désactivez les détections inutiles (case **Activer la détection** de chaque onglet) et le **Mode calibration** pour gagner en vitesse.
-- Le suivi d'objets avec **CSRT** demande environ 25 ms de calcul par image **et par objet**. Les objets sont suivis en parallèle sur les cœurs du processeur, mais leur coût s'additionne quand même : passez à **KCF** (environ 5 ms par objet), ou retirez les objets qui ne servent plus.
+- Le suivi d'objets avec **CSRT** demande environ 25 ms de calcul par image **et par objet**. Les objets sont suivis en parallèle sur les cœurs du processeur, mais leur coût s'additionne quand même : passez à **Nano** (environ 10 ms par objet) ou **KCF** (environ 5 ms), ou retirez les objets qui ne servent plus.
 
 ---
 
@@ -778,7 +782,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 
 **L'objet suivi est perdu ou le cadre glisse sur le fond**
 - Resélectionnez l'objet en l'encadrant au plus près, avec le moins de fond possible : le fond compté dans la sélection abaisse la confiance quand l'objet se déplace devant un autre décor.
-- Préférez la méthode **CSRT**, plus robuste que KCF.
+- Essayez la méthode **Nano** ou **Vit** : elles résistent mieux aux rotations, aux changements de taille et aux disparitions momentanées. À défaut, préférez **CSRT**, plus robuste que KCF.
 - Un objet uni, petit ou qui ressemble au fond se suit mal : ajoutez-lui un motif contrasté, ou utilisez un marqueur ArUco.
 - Si l'objet bouge vite, réduisez le flou avec une exposition manuelle courte (**Réglages de l'image...**).
 
@@ -809,10 +813,29 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 |---|---|
 | `~/.config/RobotDetectionByWebcam/settings.ini` | Réglages de l'application (voir ci-dessous) |
 | `~/.config/RobotDetectionByWebcam/calibrations/<caméra>.yml` | Calibration de chaque caméra, nommée d'après la caméra, par exemple `UVC_Camera_046d_0825.yml` (créée par **Calibrer**, relue au lancement et quand on revient à cette caméra). Peut être copiée sur une autre machine utilisant la même webcam. |
+| `~/.local/share/RobotDetectionByWebcam/models/` | Modèles des méthodes de suivi Nano et Vit, téléchargés au premier choix de ces méthodes (voir [Modèles des réseaux de neurones](#modèles-des-réseaux-de-neurones)) |
 | `~/.config/RobotDetectionByWebcam/calibration.yml` | Ancienne calibration unique, des versions précédentes. Au premier lancement de la version actuelle, elle est copiée pour la caméra active ; l'original est conservé mais n'est plus utilisé. |
 | `aruco_<dictionnaire>_<id>.png` | Marqueurs générés, à l'emplacement choisi |
 | `damier_<largeur>x<hauteur>.png` | Damiers générés, à l'emplacement choisi |
 | `evenements.csv` (nom proposé) | Journal des événements de mouvement, exporté avec **Enregistrer...** (onglet **Suivi**) |
+
+### Modèles des réseaux de neurones
+
+Les méthodes de suivi **Nano** et **Vit** utilisent des réseaux de neurones fournis par OpenCV. Leurs modèles ne sont pas inclus dans l'application :
+
+| Méthode | Fichiers | Taille | Origine |
+|---|---|---|---|
+| Nano | `nanotrack_backbone_sim.onnx`, `nanotrack_head_sim.onnx` | 1,7 Mo | [NanoTrack](https://github.com/HonglinChu/SiamTrackers/tree/master/NanoTrack/models/nanotrackv2) |
+| Vit | `object_tracking_vittrack_2023sep.onnx` | 0,7 Mo | [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/main/models/object_tracking_vittrack) |
+
+Quand vous choisissez l'une de ces méthodes pour la première fois, l'application propose de télécharger ses fichiers dans `~/.local/share/RobotDetectionByWebcam/models/`. L'empreinte de chaque fichier est vérifiée : un fichier tronqué ou modifié est refusé. Si vous annulez ou si le téléchargement échoue, la méthode précédente reste choisie.
+
+Sur une machine sans connexion, téléchargez les fichiers ailleurs et copiez-les dans l'un de ces dossiers, cherchés dans cet ordre :
+1. `~/.local/share/RobotDetectionByWebcam/models/` ;
+2. `models/` à côté de l'exécutable ;
+3. `models/` dans le dossier parent de l'exécutable (par exemple `RobotDetectionByWebcam/models/` quand l'application est lancée depuis `build/`).
+
+Si un modèle a été supprimé, l'application revient à **CSRT** au lancement suivant.
 
 ### Réglages mémorisés
 
