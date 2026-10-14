@@ -569,6 +569,8 @@ void MainWindow::onCameraChanged(int index)
         return;
 
     waitForProcessing();
+    // La webcam quittée retrouve ses réglages d'origine.
+    m_cameraSettingsDialog->restoreCamera();
     delete m_camera;
     m_camera = new QCamera(device, this);
     m_cameraKey = cameraKeyFor(device);
@@ -793,9 +795,9 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 
     saveSettings();
-    // Les réglages restent mémorisés dans la webcam : on la rend en automatique aux autres
-    // applications. Ils seront réappliqués au prochain lancement.
-    CameraSettingsDialog::apply(m_camera, CameraSettingsDialog::Settings());
+    // Les réglages restent mémorisés dans la webcam : on la rend aux autres applications en
+    // automatique, avec ses réglages d'origine. Ils seront réappliqués au prochain lancement.
+    m_cameraSettingsDialog->restoreCamera();
     QMainWindow::closeEvent(event);
 }
 
@@ -893,6 +895,16 @@ void MainWindow::loadCameraSettings()
     s.manualWhiteBalance =
         settings.value(key + QStringLiteral("/manualWhiteBalance"), s.manualWhiteBalance).toBool();
     s.colorTemperature = settings.value(key + QStringLiteral("/colorTemperature"), s.colorTemperature).toInt();
+    // Autres réglages modifiés (luminosité, gain...) : « controls/0x00980900=140 ».
+    const QString controlsGroup = key + QStringLiteral("/controls/");
+    for (const QString &name : settings.allKeys()) {
+        if (!name.startsWith(controlsGroup))
+            continue;
+        bool ok = false;
+        const quint32 id = name.mid(controlsGroup.size()).remove(QStringLiteral("0x")).toUInt(&ok, 16);
+        if (ok)
+            s.controls.insert(id, settings.value(name).toInt());
+    }
     m_cameraSettingsDialog->setSettings(s);
 }
 
@@ -907,6 +919,9 @@ void MainWindow::saveCameraSettings() const
     settings.setValue(key + QStringLiteral("/exposureMs"), s.exposureMs);
     settings.setValue(key + QStringLiteral("/manualWhiteBalance"), s.manualWhiteBalance);
     settings.setValue(key + QStringLiteral("/colorTemperature"), s.colorTemperature);
+    settings.remove(key + QStringLiteral("/controls"));
+    for (auto it = s.controls.cbegin(); it != s.controls.cend(); ++it)
+        settings.setValue(QStringLiteral("%1/controls/0x%2").arg(key).arg(it.key(), 8, 16, QLatin1Char('0')), it.value());
 }
 
 void MainWindow::saveResolution(int index) const

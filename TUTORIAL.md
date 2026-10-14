@@ -74,7 +74,8 @@ Dans une pièce peu éclairée, beaucoup de webcams tombent à 15 images par sec
 2. Dans **Exposition**, passez le **Mode** sur **Manuelle**.
 3. Déplacez le curseur **Temps de pose** vers **20 à 30 ms**. La ligne « Appliqué par la caméra » indique la valeur réellement utilisée : la caméra l'arrondit.
 4. Regardez le nombre d'images par seconde dans **Résultat** : il doit approcher 30. L'image devient plus sombre ; si elle l'est trop, allongez un peu la pose ou éclairez la pièce.
-5. Pour l'instant, cliquez sur **Tout en automatique**, puis sur **Fermer**. Nous reviendrons à ces réglages dans la partie 9.
+5. Dans **Autres réglages**, à droite, réglez **Fréquence du secteur** sur **50 Hz** si vous êtes en Europe (60 Hz en Amérique du Nord) : les bandes qui défilent sous un éclairage artificiel disparaissent. Les autres curseurs (luminosité, contraste, gain...) indiquent « (défaut) » à la valeur d'usine.
+6. Pour l'instant, cliquez sur **Tout en automatique**, puis sur **Fermer**. Nous reviendrons à ces réglages dans la partie 9.
 
 ### 1.4 Essayer l'effet miroir
 
@@ -415,7 +416,8 @@ Pour envoyer les positions à un autre ordinateur ou à une carte (Raspberry Pi.
 1. Marquez un **grand rectangle** au sol, qui couvre la zone de jeu, et définissez le repère (partie 6).
 2. Ouvrez **Réglages de l'image...** :
    - **Exposition** en **Manuelle**, avec un temps de pose court (20 à 30 ms) : moins de flou quand le robot roule, et 30 images par seconde ;
-   - **Balance des blancs** en **Manuelle**, si vous utilisez aussi le carré coloré : les couleurs ne dérivent plus.
+   - **Balance des blancs** en **Manuelle**, si vous utilisez aussi le carré coloré : les couleurs ne dérivent plus ;
+   - si l'image est trop sombre avec la pose courte, montez un peu le **Gain** (dans **Autres réglages**) plutôt que d'allonger la pose.
 3. Éclairez la zone de façon **homogène**.
 
 ### 9.4 Lancer le suivi
@@ -429,7 +431,7 @@ Pour envoyer les positions à un autre ordinateur ou à une carte (Raspberry Pi.
 
 ### 9.5 Quitter proprement
 
-Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, et la webcam est remise en exposition automatique pour les autres logiciels.
+Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, et la webcam retrouve son exposition automatique et ses réglages d'origine pour les autres logiciels.
 
 ✅ **Vérification finale** : le programme de pilotage reçoit en continu la position et le cap du robot, en millimètres, pendant qu'il se déplace.
 

@@ -82,9 +82,9 @@ Quelle que soit la méthode, l'application peut aussi :
 
 - **Zone d'image** (à gauche) : l'image de la caméra, avec les détections dessinées : carrés, marqueurs, damier, repère du sol, objet suivi et trajectoires. Un clic sur l'image choisit la couleur du carré, sauf pendant l'ajout d'objets à suivre (onglet **Suivi**) ou la saisie des points du sol (onglet **Sol**). Pendant ces deux saisies, la touche **Échap** annule.
 - **Webcam** :
-  - **Caméra** : la webcam utilisée. Chaque caméra a sa **propre calibration** et son **propre repère du sol**, rechargés quand on la choisit, ainsi que sa résolution, son exposition et sa balance des blancs. Changer de caméra arrête le suivi des objets encadrés, dont les cadres ne valaient que pour l'autre caméra ; Deux caméras du même modèle, qui portent le même nom, sont distinguées par leur identifiant système (`/dev/video0`, `/dev/video2`...) ; si cet identifiant change (caméras branchées dans un autre ordre), elles peuvent échanger leurs réglages.
+  - **Caméra** : la webcam utilisée. Chaque caméra a sa **propre calibration** et son **propre repère du sol**, rechargés quand on la choisit, ainsi que sa résolution et ses réglages de l'image. Changer de caméra arrête le suivi des objets encadrés, dont les cadres ne valaient que pour l'autre caméra ; Deux caméras du même modèle, qui portent le même nom, sont distinguées par leur identifiant système (`/dev/video0`, `/dev/video2`...) ; si cet identifiant change (caméras branchées dans un autre ordre), elles peuvent échanger leurs réglages.
   - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
-  - **Réglages de l'image...** : exposition et balance des blancs. Voir [Régler l'exposition et la balance des blancs](#régler-lexposition-et-la-balance-des-blancs) ;
+  - **Réglages de l'image...** : exposition, balance des blancs, luminosité, contraste, gain, fréquence du secteur... Voir [Régler l'image de la webcam](#régler-limage-de-la-webcam) ;
   - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 9.1](#91-coordonnées-dans-limage-en-pixels)).
 - **Onglets** :
   - **Carré coloré** : couleur et réglages de la détection du carré ;
@@ -112,13 +112,13 @@ Conseils :
 
 Certaines webcams n'envoient pas la résolution demandée dans leur format rapide (MJPEG). L'application le détecte et passe automatiquement au format non compressé de la même résolution. Le nombre d'images par seconde indiqué dans la liste est alors mis à jour, et il est souvent plus bas.
 
-### Régler l'exposition et la balance des blancs
+### Régler l'image de la webcam
 
 Le bouton **Réglages de l'image...**, à droite de **Effet miroir**, ouvre une petite fenêtre. Elle peut rester ouverte pendant que l'application fonctionne.
 
 **Exposition** : le temps de pose de chaque image.
 - **Automatique** (par défaut) : la caméra s'adapte à la lumière. Dans une pièce peu éclairée, elle allonge son temps de pose, ce qui **ralentit** l'image (souvent 15 images par seconde au lieu de 30) et rend le robot **flou** quand il bouge.
-- **Manuelle** : vous fixez le **temps de pose** avec le curseur, de 0,5 à 250 ms. La caméra arrondit la valeur demandée : la valeur réellement **appliquée** s'affiche sous le curseur, avec le nombre maximal d'images par seconde correspondant.
+- **Manuelle** : vous fixez le **temps de pose** avec le curseur, entre les limites de la caméra, affichées dessous (0,1 à 1 000 ms pour une Logitech C270). La caméra arrondit la valeur demandée : la valeur réellement **appliquée** s'affiche sous le curseur, avec le nombre maximal d'images par seconde correspondant.
 
   | Temps de pose | Images par seconde (au plus) | Image |
   |---|---|---|
@@ -132,11 +132,25 @@ Le bouton **Réglages de l'image...**, à droite de **Effet miroir**, ouvre une 
 - **Automatique** (par défaut) : la caméra corrige les couleurs en permanence. Elles peuvent alors **dériver** quand la lumière change ou quand un objet coloré entre dans l'image, ce qui peut faire perdre la détection du carré coloré.
 - **Manuelle** : vous fixez la **température** de la lumière, de 2000 à 7500 K : basse pour une lumière chaude (ampoule), haute pour la lumière du jour. Les couleurs ne bougent plus. La caméra limite la plage selon son modèle (par exemple 2800 à 6500 K). Réglez la température pour que le blanc paraisse blanc, puis cliquez à nouveau sur le carré pour reprendre sa couleur.
 
-**Tout en automatique** remet les deux réglages en automatique. Les réglages qu'une caméra ne prend pas en charge sont grisés.
+**Tout en automatique** remet l'exposition et la balance des blancs en automatique. Les réglages qu'une caméra ne prend pas en charge sont grisés.
 
-Les réglages sont **mémorisés pour chaque modèle de caméra** et réappliqués au lancement, ainsi qu'après un changement de résolution.
+**Autres réglages** (colonne de droite) : la liste dépend de la webcam, qui la fournit elle-même. Pour une Logitech C270 :
 
-Ces réglages sont enregistrés **dans la webcam elle-même**. Quand vous quittez l'application normalement, elle remet la webcam en automatique, pour que les autres logiciels (visioconférence...) la retrouvent dans son état habituel. Si l'application est arrêtée brutalement (Ctrl+C, plantage), la webcam garde les réglages manuels : relancez l'application puis quittez-la normalement.
+| Réglage | Effet |
+|---|---|
+| **Luminosité**, **Contraste**, **Saturation** | Traitement de l'image par la caméra. Une saturation plus forte rend le carré coloré plus facile à distinguer du décor. |
+| **Gain** | Amplification du signal : image plus claire mais plus bruitée. Utile avec une exposition manuelle courte dans une pièce sombre. En exposition automatique, la caméra le règle elle-même. |
+| **Fréquence du secteur** | Supprime le scintillement (bandes qui défilent) sous un éclairage artificiel : choisissez **50 Hz** en Europe, **60 Hz** en Amérique du Nord. |
+| **Netteté** | Renforcement des contours ; trop fort, il crée des halos. |
+| **Compensation du contre-jour** | Éclaircit le sujet devant une fenêtre. |
+| **Ralentir les images en exposition auto.** | Autorise la caméra à descendre à 15 images par seconde (ou moins) dans une pièce sombre. Décochez-la pour garder 30 images par seconde en exposition automatique, au prix d'une image plus sombre. |
+| **Voyant**, **Clignotement du voyant** | Voyant lumineux de la webcam. |
+
+La valeur d'usine est signalée par « (défaut) » à côté du curseur. **Valeurs par défaut de la webcam** les rétablit toutes.
+
+Tous ces réglages sont **mémorisés pour chaque modèle de caméra** et réappliqués au lancement, ainsi qu'après un changement de résolution.
+
+Ils sont enregistrés **dans la webcam elle-même**. Quand vous quittez l'application normalement (ou changez de caméra), elle remet la webcam en automatique et rend aux autres réglages leur valeur d'avant le lancement, pour que les autres logiciels (visioconférence...) la retrouvent dans son état habituel. Si l'application est arrêtée brutalement (Ctrl+C, plantage), la webcam garde les réglages manuels : relancez l'application puis quittez-la normalement.
 
 ---
 
@@ -322,7 +336,7 @@ Le suivi d'objets encadrés est très pratique, mais moins fiable que les marque
 - **Changer de résolution arrête le suivi** de tous les objets : il faut les ajouter de nouveau.
 - **Vitesse de l'application** : chaque objet demande environ **25 ms de calcul par image avec CSRT** (environ 5 ms avec KCF). Les objets sont suivis en parallèle, dans le fil de traitement : l'interface reste réactive, mais le nombre d'images traitées par seconde baisse avec le nombre d'objets (environ 13 i/s avec 3 objets en 1280 × 960 sur un processeur à 4 cœurs, d'après un test sur images de synthèse). Choisissez **KCF** pour suivre plusieurs objets si l'image devient saccadée. L'onglet **Suivi** le rappelle à partir de 3 objets.
 
-Conseils : un objet bien contrasté et texturé (motif, logo, couleurs) se suit mieux qu'un objet uni. Un éclairage stable et une exposition courte (moins de flou, voir [Régler l'exposition et la balance des blancs](#régler-lexposition-et-la-balance-des-blancs)) aident aussi.
+Conseils : un objet bien contrasté et texturé (motif, logo, couleurs) se suit mieux qu'un objet uni. Un éclairage stable et une exposition courte (moins de flou, voir [Régler l'image de la webcam](#régler-limage-de-la-webcam)) aident aussi.
 
 ### 6.4 Lisser les positions des carrés et des marqueurs
 
@@ -731,14 +745,14 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Le panneau **Résultat** affiche `Pas de pose 3D : calibration faite en ...` : la résolution choisie n'a pas le même format d'image que la calibration. Choisissez une résolution du format indiqué, ou recalibrez.
 
 **Le nombre d'images par seconde est faible**
-- Dans une pièce sombre, la webcam allonge son temps de pose et ralentit, quelle que soit la résolution. Passez l'**exposition en manuel** avec un temps de pose de 33 ms ou moins (**Réglages de l'image...**), et éclairez davantage la scène si l'image devient trop sombre.
+- Dans une pièce sombre, la webcam allonge son temps de pose et ralentit, quelle que soit la résolution. Décochez **Ralentir les images en exposition auto.**, ou passez l'**exposition en manuel** avec un temps de pose de 33 ms ou moins (**Réglages de l'image...**), et éclairez davantage la scène si l'image devient trop sombre.
 - Choisissez une résolution plus basse, et désactivez les détections inutiles et le **Mode calibration**.
 
 **Les couleurs changent toutes seules et le carré coloré est perdu par moments**
 - La balance des blancs automatique corrige les couleurs en permanence. Passez-la en **manuel** (**Réglages de l'image...**), puis cliquez à nouveau sur le carré.
 
 **Une autre application trouve la webcam très sombre ou très claire**
-- RobotDetectionByWebcam a probablement été arrêtée brutalement alors que l'exposition était en manuel : la webcam a gardé ce réglage. Relancez l'application puis quittez-la normalement avec **Quitter** : elle remet la webcam en automatique.
+- RobotDetectionByWebcam a probablement été arrêtée brutalement alors que l'exposition était en manuel (ou la luminosité, le gain... modifiés) : la webcam a gardé ces réglages. Relancez l'application puis quittez-la normalement avec **Quitter** : elle remet la webcam en automatique, avec ses réglages d'origine.
 
 **Les distances sont fausses**
 - **Toujours trop grandes ou trop petites dans la même proportion** → la **Taille du marqueur** est mal saisie, ou le **Côté d'une case** était faux pendant la calibration (recalibrez dans ce cas).
@@ -804,7 +818,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 
 L'application retrouve au lancement les réglages de la fois précédente :
 
-- **Webcam** : caméra choisie (si elle est branchée), résolution, exposition et balance des blancs (pour chaque caméra) et effet miroir ;
+- **Webcam** : caméra choisie (si elle est branchée), résolution, exposition, balance des blancs et autres réglages de l'image (pour chaque caméra) et effet miroir ;
 - **Carré coloré** : activation, couleur et tous les curseurs ;
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
@@ -815,7 +829,7 @@ L'application retrouve au lancement les réglages de la fois précédente :
 
 Le fichier contient aussi une option sans équivalent dans l'interface : `hideLibraryMessages`, dans la section `[logging]`. Elle vaut `true` par défaut et masque des messages techniques sans gravité dans le terminal (par exemple « Corrupt JPEG data »). Mettez-la à `false` pour les réafficher, par exemple pour signaler un problème. Ce réglage est pris en compte au lancement suivant.
 
-La résolution, l'exposition, la balance des blancs et le repère du sol sont enregistrés dès qu'on les modifie. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
+La résolution, les réglages de l'image et le repère du sol sont enregistrés dès qu'on les modifie. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
 
 Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, les objets suivis et le journal des événements.
 

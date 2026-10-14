@@ -10,7 +10,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 
 - Affichage en direct de la webcam (Qt6 Multimedia), avec choix de la caméra. Chaque caméra garde ses propres réglages, sa **calibration** et son **repère du sol**, pour passer de l'une à l'autre sans rien refaire.
 - Choix de la **résolution**, avec le format d'image (4:3, 16:9...) et le nombre d'images par seconde. Le format vidéo le plus rapide est choisi automatiquement. Si une webcam n'envoie pas la résolution demandée en MJPEG (cas de la Logitech C270), l'application passe d'elle-même au format non compressé.
-- **Réglages de l'image** : exposition automatique ou temps de pose manuel (valeur appliquée affichée), balance des blancs automatique ou température manuelle. La webcam est remise en automatique à la fermeture.
+- **Réglages de l'image** : exposition automatique ou temps de pose manuel entre les vraies limites de la caméra (valeur appliquée affichée), balance des blancs automatique ou température manuelle, et tous les autres réglages fournis par le pilote V4L2 (luminosité, contraste, gain, fréquence du secteur, voyant...), avec des noms français. La webcam retrouve son état d'origine à la fermeture.
 - **Effet miroir**, appliqué seulement à l'affichage : les détections et les mesures restent celles de l'image réelle de la caméra.
 
 ### Détection
@@ -49,7 +49,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 ### Confort
 
 - **Traitement des images dans un fil séparé**, avec la détection des marqueurs et le suivi de chaque objet en parallèle : l'interface reste réactive, et davantage d'images sont traitées (13,4 i/s au lieu de 8,1 avec 3 objets, sur images de synthèse).
-- Tous les réglages sont **mémorisés** entre deux lancements (`settings.ini`) : la résolution, l'exposition et la balance des blancs pour chaque modèle de caméra, le repère du sol, etc.
+- Tous les réglages sont **mémorisés** entre deux lancements (`settings.ini`) : la résolution et les réglages de l'image pour chaque modèle de caméra, le repère du sol, etc.
 - Bouton **Quitter**, avec une confirmation.
 - Option pour masquer les messages techniques sans gravité dans le terminal.
 - Documentation : [README](README.md) (installation et principes), [tutoriel](TUTORIAL.md) (découverte pas à pas) et [guide utilisateur](USER_GUIDE.md) (référence).
@@ -164,12 +164,6 @@ Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissag
 - afficher une carte des zones de l'image déjà couvertes par le damier ;
 - indiquer l'erreur de chaque capture et permettre de retirer les mauvaises ;
 - proposer une planche ChArUco, qui reste détectée même si elle est partiellement visible ou coupée par le bord de l'image.
-
-#### Autres réglages de la webcam — S
-
-**Intérêt.** Le gain, la luminosité, le contraste et la mise au point influencent aussi la détection. Par exemple, quand l'exposition repasse en manuel, la webcam garde le gain choisi par l'exposition automatique.
-
-**Piste.** Lire la liste des contrôles V4L2 de la webcam (`VIDIOC_QUERYCTRL`) et afficher un curseur pour chacun. Cela donnerait aussi les vraies limites du temps de pose, que Qt ne fournit pas.
 
 ---
 

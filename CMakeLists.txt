@@ -26,6 +26,8 @@ add_executable(RobotDetectionByWebcam
     src/floormapper.cpp
     src/camerasettingsdialog.h
     src/camerasettingsdialog.cpp
+    src/v4l2controls.h
+    src/v4l2controls.cpp
     src/objecttracker.h
     src/objecttracker.cpp
     src/motionfilter.h

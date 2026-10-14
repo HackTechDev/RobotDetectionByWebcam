@@ -1,11 +1,13 @@
 #include "camerasettingsdialog.h"
 
 #include <QCamera>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QLocale>
 #include <QLabel>
 #include <QPushButton>
 #include <QSignalBlocker>
@@ -16,63 +18,16 @@
 #include <algorithm>
 #include <cmath>
 
-#ifdef Q_OS_LINUX
-#include <fcntl.h>
-#include <linux/videodev2.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#endif
 
 namespace {
 
-// Curseur d'exposition logarithmique : de 0,5 ms à 250 ms. Qt ne donne pas toujours les
-// limites de la caméra, qui arrondit de toute façon la valeur demandée.
-constexpr double kMinExposureMs = 0.5;
-constexpr double kMaxExposureMs = 250.0;
+// Curseur d'exposition logarithmique, entre les limites de la caméra (0,5 à 250 ms si elle ne
+// les donne pas). La caméra arrondit de toute façon la valeur demandée.
 constexpr int kExposureSteps = 1000;
-
-double sliderToMs(int value)
-{
-    return kMinExposureMs * std::pow(kMaxExposureMs / kMinExposureMs, double(value) / kExposureSteps);
-}
-
-int msToSlider(double ms)
-{
-    const double t = std::log(ms / kMinExposureMs) / std::log(kMaxExposureMs / kMinExposureMs);
-    return int(std::lround(std::clamp(t, 0.0, 1.0) * kExposureSteps));
-}
 
 QString formatMs(double ms)
 {
-    return ms < 10 ? QString::number(ms, 'f', 1) : QString::number(ms, 'f', 0);
-}
-
-// Remet l'exposition automatique en écrivant directement le contrôle V4L2. Qt (backend FFmpeg)
-// n'y parvient pas avec les webcams qui n'acceptent que le mode « priorité ouverture » (comme la
-// Logitech C270) : la caméra garde alors le dernier temps de pose manuel.
-bool restoreAutoExposure(const QCamera *camera)
-{
-#ifdef Q_OS_LINUX
-    const QByteArray device = camera->cameraDevice().id();  // par exemple /dev/video0
-    const int fd = ::open(device.constData(), O_RDWR | O_NONBLOCK);
-    if (fd < 0)
-        return false;
-    bool ok = false;
-    for (int mode : {int(V4L2_EXPOSURE_AUTO), int(V4L2_EXPOSURE_APERTURE_PRIORITY)}) {
-        v4l2_control control{};
-        control.id = V4L2_CID_EXPOSURE_AUTO;
-        control.value = mode;
-        if (::ioctl(fd, VIDIOC_S_CTRL, &control) == 0) {
-            ok = true;
-            break;
-        }
-    }
-    ::close(fd);
-    return ok;
-#else
-    Q_UNUSED(camera);
-    return false;
-#endif
+    return ms < 10 ? QLocale().toString(ms, 'f', 1) : QLocale().toString(ms, 'f', 0);
 }
 
 QWidget *sliderRow(QSlider *slider, QLabel *value)
@@ -88,11 +43,27 @@ QWidget *sliderRow(QSlider *slider, QLabel *value)
 
 } // namespace
 
+double CameraSettingsDialog::sliderToMs(int value) const
+{
+    return m_minExposureMs * std::pow(m_maxExposureMs / m_minExposureMs, double(value) / kExposureSteps);
+}
+
+int CameraSettingsDialog::msToSlider(double ms) const
+{
+    const double t = std::log(ms / m_minExposureMs) / std::log(m_maxExposureMs / m_minExposureMs);
+    return int(std::lround(std::clamp(t, 0.0, 1.0) * kExposureSteps));
+}
+
 CameraSettingsDialog::CameraSettingsDialog(QWidget *parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Réglages de l'image"));
+    // Exposition et balance des blancs à gauche, autres réglages à droite.
     auto *layout = new QVBoxLayout(this);
+    auto *columns = new QHBoxLayout;
+    auto *left = new QVBoxLayout;
+    columns->addLayout(left);
+    layout->addLayout(columns);
 
     auto *expoBox = new QGroupBox(tr("Exposition"), this);
     auto *expoForm = new QFormLayout(expoBox);
@@ -103,6 +74,8 @@ CameraSettingsDialog::CameraSettingsDialog(QWidget *parent)
     m_exposureSlider->setRange(0, kExposureSteps);
     m_exposureValueLabel = new QLabel(expoBox);
     expoForm->addRow(tr("Temps de pose"), sliderRow(m_exposureSlider, m_exposureValueLabel));
+    m_exposureRangeLabel = new QLabel(expoBox);
+    expoForm->addRow(m_exposureRangeLabel);
     m_exposureReadout = new QLabel(expoBox);
     expoForm->addRow(m_exposureReadout);
     auto *expoHelp = new QLabel(tr("<i>Une pose courte donne plus d'images par seconde et moins de flou "
@@ -111,7 +84,7 @@ CameraSettingsDialog::CameraSettingsDialog(QWidget *parent)
                                 expoBox);
     expoHelp->setWordWrap(true);
     expoForm->addRow(expoHelp);
-    layout->addWidget(expoBox);
+    left->addWidget(expoBox);
 
     auto *wbBox = new QGroupBox(tr("Balance des blancs"), this);
     auto *wbForm = new QFormLayout(wbBox);
@@ -129,7 +102,33 @@ CameraSettingsDialog::CameraSettingsDialog(QWidget *parent)
                               wbBox);
     wbHelp->setWordWrap(true);
     wbForm->addRow(wbHelp);
-    layout->addWidget(wbBox);
+    left->addWidget(wbBox);
+    left->addStretch();
+
+    // Autres réglages du pilote, construits selon la caméra (rebuildControls()).
+    m_controlsBox = new QGroupBox(tr("Autres réglages"), this);
+    auto *controlsLayout = new QVBoxLayout(m_controlsBox);
+    m_controlsForm = new QFormLayout;
+    controlsLayout->addLayout(m_controlsForm);
+    auto *defaultsButton = new QPushButton(tr("Valeurs par défaut de la webcam"), m_controlsBox);
+    defaultsButton->setToolTip(tr("Remet les autres réglages aux valeurs d'usine de la webcam"));
+    controlsLayout->addWidget(defaultsButton);
+    m_controlsBox->setMinimumWidth(380);
+    columns->addWidget(m_controlsBox, 0, Qt::AlignTop);
+    connect(defaultsButton, &QPushButton::clicked, this, [this] {
+        if (!m_camera)
+            return;
+        const QByteArray device = m_camera->cameraDevice().id();
+        // Seules les valeurs différentes de celles de l'ouverture restent à mémoriser.
+        m_settings.controls.clear();
+        for (const V4l2::Control &c : m_controls) {
+            V4l2::setControl(device, c.id, c.defaultValue);
+            if (m_initialValues.value(c.id, c.defaultValue) != c.defaultValue)
+                m_settings.controls.insert(c.id, c.defaultValue);
+        }
+        rebuildControls();
+        emit settingsChanged();
+    });
 
     m_supportLabel = new QLabel(this);
     m_supportLabel->setWordWrap(true);
@@ -167,12 +166,117 @@ CameraSettingsDialog::CameraSettingsDialog(QWidget *parent)
 void CameraSettingsDialog::setCamera(QCamera *camera)
 {
     m_camera = camera;
+    m_initialValues.clear();
+    m_minExposureMs = 0.5;
+    m_maxExposureMs = 250.0;
+    if (m_camera) {
+        const QByteArray device = m_camera->cameraDevice().id();
+        // Vraies limites du temps de pose, si la webcam les donne.
+        double minMs = 0, maxMs = 0;
+        if (V4l2::exposureRange(device, &minMs, &maxMs)) {
+            m_minExposureMs = minMs;
+            m_maxExposureMs = maxMs;
+        }
+        // Valeurs à l'ouverture, pour rendre la webcam dans cet état à la fermeture.
+        for (const V4l2::Control &c : V4l2::listControls(device))
+            m_initialValues.insert(c.id, c.value);
+    }
+    rebuildControls();
     updateWidgets();
+}
+
+void CameraSettingsDialog::restoreCamera()
+{
+    if (!m_camera)
+        return;
+    apply(m_camera, Settings());  // exposition et balance des blancs automatiques
+    const QByteArray device = m_camera->cameraDevice().id();
+    for (auto it = m_settings.controls.cbegin(); it != m_settings.controls.cend(); ++it) {
+        if (m_initialValues.contains(it.key()))
+            V4l2::setControl(device, it.key(), m_initialValues.value(it.key()));
+    }
+}
+
+void CameraSettingsDialog::rebuildControls()
+{
+    // Un widget par réglage : curseur (entier), case à cocher (oui/non), liste (menu).
+    while (m_controlsForm->rowCount() > 0)
+        m_controlsForm->removeRow(0);
+    m_controlWidgets.clear();
+    m_controls.clear();
+    if (m_camera) {
+        for (const V4l2::Control &c : V4l2::listControls(m_camera->cameraDevice().id())) {
+            if (!V4l2::isExposureOrWhiteBalance(c.id))
+                m_controls.push_back(c);
+        }
+    }
+    for (const V4l2::Control &c : m_controls) {
+        const int value = m_settings.controls.value(c.id, c.value);
+        const QString tip = V4l2::frenchDescription(c);
+        auto changed = [this, id = c.id](int v) {
+            m_settings.controls.insert(id, v);
+            if (m_camera)
+                V4l2::setControl(m_camera->cameraDevice().id(), id, v);
+            refreshControlStates();
+            emit settingsChanged();
+        };
+        QWidget *widget = nullptr;
+        if (c.type == V4l2::Control::Boolean || (c.type == V4l2::Control::Integer && c.minimum == 0 && c.maximum == 1)) {
+            auto *check = new QCheckBox(V4l2::frenchName(c), m_controlsBox);
+            check->setChecked(value != 0);
+            connect(check, &QCheckBox::toggled, this, [changed](bool on) { changed(on ? 1 : 0); });
+            m_controlsForm->addRow(check);
+            widget = check;
+        } else if (c.type == V4l2::Control::Menu) {
+            auto *combo = new QComboBox(m_controlsBox);
+            for (const auto &[v, label] : c.menu)
+                combo->addItem(V4l2::frenchMenuItem(c, v, label), v);
+            combo->setCurrentIndex(std::max(0, combo->findData(value)));
+            connect(combo, &QComboBox::currentIndexChanged, this,
+                    [combo, changed](int index) { changed(combo->itemData(index).toInt()); });
+            m_controlsForm->addRow(V4l2::frenchName(c), combo);
+            widget = combo;
+        } else {
+            auto *slider = new QSlider(Qt::Horizontal, m_controlsBox);
+            slider->setRange(c.minimum, c.maximum);
+            slider->setSingleStep(c.step);
+            slider->setPageStep(std::max(c.step, (c.maximum - c.minimum) / 10));
+            slider->setValue(value);
+            auto *label = new QLabel(m_controlsBox);
+            label->setMinimumWidth(110);
+            auto showValue = [label, def = c.defaultValue](int v) {
+                label->setText(v == def ? tr("%1 (défaut)").arg(v) : QString::number(v));
+            };
+            showValue(value);
+            connect(slider, &QSlider::valueChanged, this, [changed, showValue](int v) {
+                showValue(v);
+                changed(v);
+            });
+            m_controlsForm->addRow(V4l2::frenchName(c), sliderRow(slider, label));
+            widget = slider;
+        }
+        widget->setToolTip(tip);
+        m_controlWidgets.insert(c.id, widget);
+    }
+    m_controlsBox->setVisible(!m_controls.empty());
+    refreshControlStates();
+}
+
+void CameraSettingsDialog::refreshControlStates()
+{
+    // Certains réglages n'ont d'effet que selon un autre (mise au point manuelle...) : grisés.
+    if (!m_camera)
+        return;
+    for (const V4l2::Control &c : V4l2::listControls(m_camera->cameraDevice().id())) {
+        if (QWidget *w = m_controlWidgets.value(c.id))
+            w->setEnabled(!c.inactive);
+    }
 }
 
 void CameraSettingsDialog::setSettings(const Settings &settings)
 {
     m_settings = settings;
+    rebuildControls();
     updateWidgets();
 }
 
@@ -185,7 +289,8 @@ void CameraSettingsDialog::apply(QCamera *camera, const Settings &s)
         camera->setManualExposureTime(float(s.exposureMs / 1000.0));
     } else if (camera->isExposureModeSupported(QCamera::ExposureAuto)) {
         camera->setExposureMode(QCamera::ExposureAuto);
-        restoreAutoExposure(camera);
+        // Qt n'y parvient pas avec les webcams limitées au mode « priorité ouverture » (C270).
+        V4l2::restoreAutoExposure(camera->cameraDevice().id());
     }
     if (s.manualWhiteBalance && camera->isWhiteBalanceModeSupported(QCamera::WhiteBalanceManual)) {
         camera->setWhiteBalanceMode(QCamera::WhiteBalanceManual);
@@ -193,6 +298,9 @@ void CameraSettingsDialog::apply(QCamera *camera, const Settings &s)
     } else if (camera->isWhiteBalanceModeSupported(QCamera::WhiteBalanceAuto)) {
         camera->setWhiteBalanceMode(QCamera::WhiteBalanceAuto);
     }
+    const QByteArray device = camera->cameraDevice().id();
+    for (auto it = s.controls.cbegin(); it != s.controls.cend(); ++it)
+        V4l2::setControl(device, it.key(), it.value());
 }
 
 void CameraSettingsDialog::updateFromWidgets()
@@ -225,6 +333,8 @@ void CameraSettingsDialog::updateWidgets()
 
     const double ms = m_settings.exposureMs;
     m_exposureValueLabel->setText(tr("%1 ms").arg(formatMs(ms)));
+    m_exposureRangeLabel->setText(tr("<small>Plage de la caméra : %1 à %2 ms</small>")
+                                      .arg(formatMs(m_minExposureMs), formatMs(m_maxExposureMs)));
     m_temperatureValueLabel->setText(tr("%1 K").arg(m_settings.colorTemperature));
 
     QStringList missing;
