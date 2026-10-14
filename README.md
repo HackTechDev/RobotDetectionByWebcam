@@ -14,7 +14,7 @@ Pour chacun, l'application donne la position dans l'image, ainsi que la taille e
 
 Pour découvrir l'application pas à pas, suivez le [tutoriel](TUTORIAL.md). Le mode d'emploi détaillé (réglages, calibration pas à pas, lecture des résultats, dépannage) se trouve dans le [guide utilisateur](USER_GUIDE.md).
 
-La liste complète des fonctionnalités et des améliorations envisagées se trouve dans [IMPROVEMENTS.md](IMPROVEMENTS.md).
+La liste complète des fonctionnalités et des améliorations envisagées se trouve dans [IMPROVEMENTS.md](IMPROVEMENTS.md). Des idées de jeux avec un petit robot sont réunies dans [GAMES.md](GAMES.md).
 
 ## Prérequis
 
@@ -284,6 +284,7 @@ README.md                installation, utilisation et principes (ce fichier)
 TUTORIAL.md              découverte pas à pas de toutes les fonctionnalités
 USER_GUIDE.md            guide utilisateur : référence de chaque réglage, dépannage
 IMPROVEMENTS.md          fonctionnalités réalisées et améliorations envisagées
+GAMES.md                 idées de jeux avec un petit robot
 src/
 ├── main.cpp             point d'entrée
 ├── mainwindow.h/.cpp    fenêtre, caméra (QCamera + QVideoSink), réglages, affichage des résultats
