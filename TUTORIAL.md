@@ -10,7 +10,7 @@ Les parties s'enchaînent, mais vous pouvez vous arrêter après n'importe laque
 | [1. Prendre en main la caméra](#1-prendre-en-main-la-caméra) | Choisir la résolution, régler l'image | 10 min |
 | [2. Détecter un carré coloré](#2-détecter-un-carré-coloré) | Repérer un carré de papier rouge, puis blanc | 15 min |
 | [3. Utiliser les marqueurs ArUco](#3-utiliser-les-marqueurs-aruco) | Imprimer et détecter des marqueurs numérotés | 15 min |
-| [4. Suivre un objet quelconque](#4-suivre-un-objet-quelconque) | Désigner une tasse d'un clic, suivre sa trajectoire et ses mouvements | 10 min |
+| [4. Suivre des objets quelconques](#4-suivre-des-objets-quelconques) | Encadrer une tasse puis un second objet, suivre leurs trajectoires et leurs mouvements | 10 min |
 | [5. Calibrer la caméra](#5-calibrer-la-caméra) | Mesurer l'objectif avec un damier, obtenir la position 3D | 20 min |
 | [6. Mesurer sur le sol en millimètres](#6-mesurer-sur-le-sol-en-millimètres) | Tracer un rectangle au ruban adhésif, lire des positions en mm | 15 min |
 | [7. Lisser les positions et mesurer la vitesse](#7-lisser-les-positions-et-mesurer-la-vitesse) | Mesurer une vitesse, voir une position prédite | 10 min |
@@ -167,25 +167,27 @@ ID 1 : (320, 241) px, côté 82 px, 0.0°
 
 ---
 
-## 4. Suivre un objet quelconque
+## 4. Suivre des objets quelconques
 
-**Objectif** : suivre un objet sans couleur particulière ni marqueur, et voir sa trajectoire.
+**Objectif** : suivre un ou plusieurs objets sans couleur particulière ni marqueur, et voir leurs trajectoires.
 
 1. Posez une **tasse** (ou un autre objet bien visible) devant la caméra.
 2. Ouvrez l'onglet **Suivi** et laissez la **Méthode** sur **CSRT (précis)**.
-3. Cliquez sur **Sélectionner un objet**.
-4. **Cliquez sur la tasse** dans l'image : l'application la délimite toute seule, et un cadre en pointillés apparaît avec des poignées. Ajustez-le si besoin (poignées, glisser), puis appuyez sur **Entrée** : le suivi démarre. Vous pouvez aussi tracer le cadre vous-même, en cliquant-glissant autour de la tasse.
-5. Déplacez lentement la tasse :
-   - elle reste entourée d'un **cadre cyan**, avec sa vitesse au-dessus ;
-   - une **ligne cyan** dessine sa trajectoire sur les 10 dernières secondes ;
+3. Cliquez sur **Ajouter des objets**.
+4. **Tracez un rectangle** autour de la tasse (cliquer-glisser) : un cadre en pointillés apparaît avec des poignées. Ajustez-le si besoin, puis appuyez sur **Entrée** : le suivi démarre, et « Objet 1 » apparaît dans la liste des objets. Vous pouvez aussi cliquer simplement sur la tasse : l'application la délimite toute seule.
+5. Posez un **second objet** (un stylo, un téléphone...) et tracez directement son rectangle, puis appuyez sur **Entrée** : il devient « Objet 2 », dans une autre couleur. Appuyez ensuite sur **Échap** pour terminer l'ajout.
+6. Dans la liste des objets, **double-cliquez sur « Objet 1 »** et renommez-le « Tasse ».
+7. Déplacez lentement la tasse :
+   - elle reste entourée d'un **cadre** de sa couleur, avec son nom et sa vitesse au-dessus ;
+   - une **ligne** de la même couleur dessine sa trajectoire sur les 10 dernières secondes ;
    - une **flèche** indique le sens du déplacement.
-6. Le panneau **Résultat** affiche `Objet suivi : en mouvement`, puis `immobile` quand vous la lâchez, avec sa position, sa vitesse et sa direction. Faites défiler l'onglet **Suivi** jusqu'au **Journal des événements** : un « Début de mouvement », puis une « Fin de mouvement » avec la distance parcourue et la durée, y sont inscrits.
-7. Cachez entièrement la tasse avec la main : le cadre passe en pointillés, d'abord « Objet (prédit) », puis **rouge** avec « Objet perdu ». L'application cherche alors la tasse dans toute l'image. Retirez la main, ou reposez la tasse **ailleurs** : le suivi reprend tout seul, et le panneau indique « retrouvé automatiquement 1 fois ». Pendant le suivi, la **confiance** affichée dans **Résultat** indique à quel point le cadre ressemble encore à la tasse.
-8. Cliquez sur **Arrêter le suivi**.
+8. Le panneau **Résultat** affiche `Tasse : en mouvement`, puis `immobile` quand vous la lâchez, avec sa position, sa vitesse et sa direction. Le second objet a son propre paragraphe. Faites défiler l'onglet **Suivi** jusqu'au **Journal des événements** : un « Début de mouvement », puis une « Fin de mouvement » avec la distance parcourue et la durée, y sont inscrits.
+9. Cachez entièrement la tasse avec la main : le cadre passe en pointillés, d'abord « Objet (prédit) », puis **rouge** avec « Objet perdu ». L'application cherche alors la tasse dans toute l'image. Retirez la main, ou reposez la tasse **ailleurs** : le suivi reprend tout seul, et le panneau indique « retrouvé automatiquement 1 fois ». Pendant le suivi, la **confiance** affichée dans **Résultat** indique à quel point le cadre ressemble encore à la tasse.
+10. Cliquez sur **Tout retirer**.
 
-✅ **Vérification** : la trajectoire de la tasse est dessinée, et l'état passe de « en mouvement » à « immobile ».
+✅ **Vérification** : les deux objets sont suivis en même temps, chacun dans sa couleur, et l'état de la tasse passe de « en mouvement » à « immobile ».
 
-**À retenir** : ce suivi ne demande aucune préparation, mais il peut perdre l'objet et ne donne pas son orientation. Pour un robot, les marqueurs ArUco restent plus fiables. Les limites sont détaillées dans le [guide](USER_GUIDE.md#63-limites).
+**À retenir** : ce suivi ne demande aucune préparation, mais il peut perdre un objet, ne donne pas son orientation, et chaque objet ralentit un peu l'application. Pour un robot, les marqueurs ArUco restent plus fiables. Les limites sont détaillées dans le [guide](USER_GUIDE.md#63-limites).
 
 ---
 
@@ -328,7 +330,7 @@ Une ligne s'affiche par image :
 image 812 | carré (310, 242) px 12° | sol X 288 Y 196 mm | ArUco 1 (402, 250) px 0° | sol X 412 Y 198 mm cap 90° | carré vitesse 0 mm/s | ArUco 1 vitesse 85 mm/s
 ```
 
-Si un objet est suivi (partie 4), ses débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
+Si des objets sont suivis (partie 4), leurs débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
 
 ### 8.3 Écrire son propre programme : aller vers une cible
 
@@ -441,7 +443,7 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, e
 | Détecter un carré de couleur | Onglet **Carré coloré** | Cliquer sur le carré dans l'image |
 | Détecter un carré blanc, gris ou noir | Onglet **Carré coloré** | Cliquer dessus : le type « Blanc, gris ou noir » est choisi |
 | Imprimer un marqueur | Onglet **ArUco** | **Générer un marqueur...** |
-| Suivre un objet quelconque | Onglet **Suivi** | **Sélectionner un objet**, cliquer sur l'objet, puis **Entrée** |
+| Suivre un ou plusieurs objets | Onglet **Suivi** | **Ajouter des objets**, tracer un rectangle par objet en validant chacun avec **Entrée**, puis **Échap** |
 | Savoir quand un objet suivi bouge | Onglet **Suivi** | **Journal des événements**, ou liste `events` en UDP |
 | La position 3D d'un marqueur | Onglet **Calibration** | Calibrer une fois avec le damier |
 | Des positions en mm sur le sol | Onglet **Sol** | **Définir les 4 points** d'un rectangle connu |

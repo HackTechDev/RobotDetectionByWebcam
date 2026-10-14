@@ -4,7 +4,7 @@ Application Qt6 qui affiche le flux d'une webcam et détecte en temps réel :
 
 - un **carré d'une couleur donnée** ;
 - des **marqueurs ArUco** (ou AprilTag), avec leur identifiant ;
-- **n'importe quel objet désigné à la souris** (d'un clic ou en l'encadrant), suivi d'image en image avec sa trajectoire, sa vitesse et ses débuts et fins de mouvement.
+- **un ou plusieurs objets quelconques**, désignés à la souris (en les encadrant ou d'un clic), suivis d'image en image avec leur trajectoire, leur vitesse et leurs débuts et fins de mouvement.
 
 Pour chacun, l'application donne la position dans l'image, ainsi que la taille et l'orientation des carrés et des marqueurs. Elle peut aussi :
 - donner les positions **en millimètres sur le sol**, après avoir cliqué les 4 coins d'un rectangle connu ;
@@ -121,7 +121,7 @@ Changer les dimensions du damier efface les captures en cours.
   - Avec calibration, les axes 3D du marqueur sont dessinés : **X en rouge** (droite), **Y en vert** (bas), **normale en bleu** (sort du marqueur vers la caméra).
 - En mode calibration, les coins du damier détecté sont reliés en bleu clair.
 - Le repère du sol est dessiné en pointillés orange, avec l'axe X en rouge et l'axe Y en vert.
-- L'objet suivi est entouré en **cyan** (orange quand la confiance baisse, pointillés quand sa position est prédite, rouge quand il est perdu), avec sa trajectoire et une flèche dans le sens du déplacement.
+- Chaque objet suivi est entouré dans **sa couleur**, avec son nom (pointillés quand sa position est prédite, rouge en pointillés quand il est perdu), sa trajectoire et une flèche dans le sens du déplacement.
 - Les trajectoires lissées du carré (vert clair) et des marqueurs (rose) sont tracées, et la position prédite d'un objet momentanément perdu est marquée d'un cercle en pointillés.
 - Le panneau « Résultat » indique le centre (en pixels de l'image d'origine), le côté, l'angle (0–90°), le nombre de carrés et les images par seconde. Pour chaque marqueur ArUco, il indique l'identifiant, le centre, le côté et l'angle : 0° quand le marqueur est droit, positif dans le sens horaire, entre −180° et 180°.
 
@@ -136,17 +136,17 @@ L'onglet « Sol » définit un repère sur le sol : on saisit les dimensions d'u
 
 Le repère fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus. Il est enregistré dans `settings.ini` et reste valable pour toute résolution du même format d'image. La caméra ne doit plus bouger une fois le repère défini. Le repère est défini au niveau du sol, donc un marqueur placé en hauteur sur le robot est légèrement décalé. Le guide utilisateur détaille ce point.
 
-### Suivi d'un objet encadré
+### Suivi d'objets encadrés
 
-Dans l'onglet « Suivi », cliquer sur « Sélectionner un objet », puis cliquer sur l'objet dans l'image ou tracer un rectangle autour. Un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ensuite ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Démarrer le suivi », touche Entrée ou double-clic. Échap annule. L'objet est ensuite suivi d'image en image par un tracker OpenCV :
-- **CSRT** : précis, environ 20 ms par image ;
-- **KCF** : rapide, environ 5 ms par image.
+Dans l'onglet « Suivi », cliquer sur « Ajouter des objets », puis tracer un rectangle autour de chaque objet, ou cliquer dessus : un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Valider l'objet », touche Entrée ou double-clic. On reste en mode ajout pour l'objet suivant ; Échap ou « Terminer l'ajout » termine. Chaque objet a un numéro, un nom modifiable (double-clic dans la liste des objets) et une couleur. « Retirer » arrête le suivi de l'objet sélectionné dans la liste, « Tout retirer » celui de tous les objets. Chaque objet est suivi d'image en image par son propre tracker OpenCV :
+- **CSRT** : précis, environ 25 ms par image et par objet (3 objets limitent l'application à environ 13 images par seconde) ;
+- **KCF** : rapide, environ 5 ms par image et par objet.
 
-L'application affiche le cadre, la **trajectoire** (durée réglable, 10 s par défaut) et une flèche dans le sens du déplacement. Le panneau « Résultat » donne la position, l'état (en mouvement ou immobile), la vitesse et la direction, lissées par un filtre de Kalman (mêmes réglages que le lissage des carrés et des marqueurs). Juste après une perte, la position est prédite à vitesse constante pendant le délai de maintien. Si le repère du sol est défini, il donne aussi la position, la vitesse et la direction en mm sur le sol. Ces valeurs sont envoyées en UDP (objet `tracked`).
+L'application affiche, dans la couleur de chaque objet, le cadre, la **trajectoire** (durée réglable, 10 s par défaut) et une flèche dans le sens du déplacement. Le panneau « Résultat » donne la position, l'état (en mouvement ou immobile), la vitesse et la direction, lissées par un filtre de Kalman (mêmes réglages que le lissage des carrés et des marqueurs). Juste après une perte, la position est prédite à vitesse constante pendant le délai de maintien. Si le repère du sol est défini, il donne aussi la position, la vitesse et la direction en mm sur le sol. Ces valeurs sont envoyées en UDP (liste `tracked`, une entrée par objet).
 
 Un **indice de confiance** compare à chaque image le contenu du cadre à l'apparence de l'objet. S'il chute, l'objet est déclaré perdu, même si le tracker croit encore le suivre : cela arrive quand le cadre glisse sur le fond ou s'accroche à un autre objet passé devant. Le tracker peut aussi perdre l'objet (objet caché, sorti de l'image, trop rapide). Dans les deux cas, l'application **recherche l'objet dans toute l'image** et reprend le suivi dès qu'il réapparaît, même ailleurs. Un objet revenu très tourné ou de taille très différente peut ne pas être reconnu : il faut alors le resélectionner. Le cadre reste droit : l'orientation de l'objet n'est pas mesurée. Changer de résolution arrête le suivi.
 
-L'état « en mouvement » repose sur un **seuil de distance** réglable : 20 mm sur le sol, ou 15 px sans repère du sol. Les **débuts et fins de mouvement**, les pertes et les reprises sont inscrits dans un **journal des événements** horodaté, enregistrable en CSV, et envoyés en UDP (liste `events`).
+L'état « en mouvement » repose sur un **seuil de distance** réglable : 20 mm sur le sol, ou 15 px sans repère du sol. Les **débuts et fins de mouvement**, les pertes et les reprises de chaque objet sont inscrits dans un **journal des événements** horodaté, avec le nom de l'objet, enregistrable en CSV, et envoyés en UDP (liste `events`).
 
 ### Lissage dans le temps
 
@@ -156,7 +156,7 @@ Le groupe « Lissage des carrés et marqueurs » de l'onglet « Suivi » suit da
 
 L'onglet « Envoi UDP » envoie les résultats à un autre programme, par exemple celui qui pilote le robot : un message JSON par image traitée, en UDP, vers l'adresse et le port choisis (`127.0.0.1:5005` par défaut). Cocher « Envoyer les positions » pour l'activer.
 
-Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si le lissage est actif, la liste `tracks` donne la position lissée, la vitesse et l'état (détecté ou prédit) de chaque carré principal ou marqueur suivi. Si un objet est suivi, l'objet `tracked` donne son cadre, sa position, sa vitesse, sa direction, son état (trouvé, prédit, en mouvement), son indice de confiance et le nombre de reprises automatiques. La liste `events` signale les débuts et fins de mouvement, les pertes et les reprises de l'objet suivi, une seule fois chacun. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
+Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si le lissage est actif, la liste `tracks` donne la position lissée, la vitesse et l'état (détecté ou prédit) de chaque carré principal ou marqueur suivi. Si des objets sont suivis, la liste `tracked` donne pour chacun son numéro (`id`), son nom (`name`), son cadre, sa position, sa vitesse, sa direction, son état (trouvé, prédit, en mouvement), son indice de confiance et le nombre de reprises automatiques. La liste `events` signale les débuts et fins de mouvement, les pertes et les reprises de chaque objet, une seule fois chacun, avec `object_id` et `name`. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
 
 Pour tester la réception :
 
@@ -201,7 +201,7 @@ Sur une image de synthèse, la position est retrouvée à environ 1 mm près à 
 
 ### Suivi d'objet
 
-Le code se trouve dans `src/objecttracker.cpp`.
+Le code se trouve dans `src/objecttracker.cpp`. Chaque objet suivi a sa propre instance d'`ObjectTracker` (tracker, filtre, apparence de référence, événements) : les objets sont indépendants, et la fenêtre les met à jour l'un après l'autre à chaque image.
 
 1. **Sélection d'un clic.** `cv::grabCut` est appliqué sur une zone carrée de 40 % du petit côté de l'image, centrée sur le clic, avec une marge de fond autour (image réduite à 480 px de large). On garde la zone de premier plan qui contient le clic. Si elle est trop petite ou remplit presque toute la zone, un carré est proposé autour du clic. Sur des objets de synthèse (texturé, disque, boîte, petit objet), le cadre obtenu recouvre le vrai cadre à 92 à 100 %, en 70 à 120 ms.
 2. L'image est réduite à 640 px de large au plus, ce qui garde le coût du suivi presque constant quelle que soit la résolution.
@@ -270,7 +270,7 @@ src/
 ├── positionsender.h/.cpp  envoi des positions en JSON sur UDP
 ├── floormapper.h/.cpp   conversion des positions de l'image en mm sur le sol
 ├── camerasettingsdialog.h/.cpp  réglages de l'image : exposition et balance des blancs
-├── objecttracker.h/.cpp  suivi d'un objet : sélection d'un clic, confiance, reprise, vitesse, événements
+├── objecttracker.h/.cpp  suivi d'un objet (un par objet suivi) : sélection d'un clic, confiance, reprise, vitesse, événements
 └── motionfilter.h/.cpp  lissage dans le temps (filtre de Kalman) des carrés et des marqueurs
 tools/
 └── udp_receiver.py      récepteur de test des positions UDP

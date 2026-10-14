@@ -11,7 +11,7 @@ Pour l'installation et la compilation, voir le [README](README.md). Pour une dé
 3. [L'écran principal](#3-lécran-principal)
 4. [Suivre un carré coloré](#4-suivre-un-carré-coloré)
 5. [Suivre des marqueurs ArUco](#5-suivre-des-marqueurs-aruco)
-6. [Suivre un objet encadré](#6-suivre-un-objet-encadré)
+6. [Suivre des objets encadrés](#6-suivre-des-objets-encadrés)
 7. [Calibrer la caméra](#7-calibrer-la-caméra)
 8. [Définir le repère du sol](#8-définir-le-repère-du-sol)
 9. [Lire les résultats](#9-lire-les-résultats)
@@ -29,10 +29,10 @@ L'application filme la scène avec une webcam et repère le robot de trois faço
 | Méthode | Ce qu'il faut sur le robot | Ce qu'on obtient | Points forts | Limites |
 |---|---|---|---|---|
 | **Carré coloré** | Un carré d'une couleur vive, ou blanc, gris ou noir (papier, gommette, pièce peinte) | Position et taille en pixels, angle de 0 à 90° | Très simple à mettre en place | Sensible à l'éclairage et aux objets de même couleur ; un seul robot facile à distinguer ; angle connu à 90° près |
-| **Objet encadré** | Rien : on désigne l'objet à la souris (d'un clic ou en l'encadrant) | Position, trajectoire, vitesse et direction du déplacement, débuts et fins de mouvement ; position et vitesse en mm sur le sol si le repère du sol est défini | Aucune préparation, fonctionne avec n'importe quel objet ; signale quand il ne le reconnaît plus et le retrouve tout seul quand il réapparaît | Moins fiable que les marqueurs (objet qui change d'aspect, qui ressemble au fond) ; pas d'orientation ; un seul objet à la fois |
+| **Objets encadrés** | Rien : on désigne chaque objet à la souris (en l'encadrant ou d'un clic) | Position, trajectoire, vitesse et direction du déplacement, débuts et fins de mouvement ; position et vitesse en mm sur le sol si le repère du sol est défini | Aucune préparation, fonctionne avec n'importe quel objet ; signale quand il ne le reconnaît plus et le retrouve tout seul quand il réapparaît | Moins fiable que les marqueurs (objet qui change d'aspect, qui ressemble au fond) ; pas d'orientation ; chaque objet ralentit l'application |
 | **Marqueur ArUco** | Un marqueur noir et blanc imprimé | Identifiant, position et angle complet (−180° à 180°) ; **position 3D en mm** si la caméra est calibrée | Fiable, plusieurs robots distingués par leur identifiant | Le marqueur doit être assez grand et bien visible |
 
-En bref : pour un essai rapide, le carré coloré suffit. Pour suivre un objet sans rien coller dessus, utilisez le suivi d'objet encadré. Pour un suivi fiable, ou pour plusieurs robots, utilisez les marqueurs ArUco.
+En bref : pour un essai rapide, le carré coloré suffit. Pour suivre un ou plusieurs objets sans rien coller dessus, utilisez le suivi d'objets encadrés. Pour un suivi fiable, ou pour plusieurs robots, utilisez les marqueurs ArUco.
 
 Quelle que soit la méthode, l'application peut aussi :
 - donner les positions **en millimètres sur le sol** (section 8) ;
@@ -80,7 +80,7 @@ Quelle que soit la méthode, l'application peut aussi :
 └───────────────────────────────────────┴───────────────────────────────┘
 ```
 
-- **Zone d'image** (à gauche) : l'image de la caméra, avec les détections dessinées : carrés, marqueurs, damier, repère du sol, objet suivi et trajectoires. Un clic sur l'image choisit la couleur du carré, sauf pendant la sélection d'un objet (onglet **Suivi**) ou la saisie des points du sol (onglet **Sol**). Pendant ces deux saisies, la touche **Échap** annule.
+- **Zone d'image** (à gauche) : l'image de la caméra, avec les détections dessinées : carrés, marqueurs, damier, repère du sol, objet suivi et trajectoires. Un clic sur l'image choisit la couleur du carré, sauf pendant l'ajout d'objets à suivre (onglet **Suivi**) ou la saisie des points du sol (onglet **Sol**). Pendant ces deux saisies, la touche **Échap** annule.
 - **Webcam** :
   - **Caméra** : la webcam utilisée ;
   - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
@@ -91,7 +91,7 @@ Quelle que soit la méthode, l'application peut aussi :
   - **ArUco** : dictionnaire et taille des marqueurs ;
   - **Calibration** : damier et calibration de la caméra ;
   - **Sol** : repère du sol, pour avoir les positions en millimètres sur le sol (voir [section 8](#8-définir-le-repère-du-sol)) ;
-  - **Suivi** : suivi d'un objet quelconque désigné à la souris, journal de ses mouvements, et lissage des positions des carrés et des marqueurs (voir [section 6](#6-suivre-un-objet-encadré)). L'onglet défile s'il ne tient pas en hauteur ;
+  - **Suivi** : suivi d'un ou plusieurs objets quelconques désignés à la souris, journal de leurs mouvements, et lissage des positions des carrés et des marqueurs (voir [section 6](#6-suivre-des-objets-encadrés)). L'onglet défile s'il ne tient pas en hauteur ;
   - **Envoi UDP** : envoi des positions à un autre programme (voir [section 10](#10-envoyer-les-positions-à-un-autre-programme)).
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
 - **Quitter** : ferme l'application. Une fenêtre demande de confirmer : cliquez sur **Quitter** pour fermer, ou sur **Annuler** (ou appuyez sur Échap) pour continuer. La même confirmation s'affiche si vous fermez la fenêtre avec la croix de la barre de titre.
@@ -258,65 +258,69 @@ Tous les marqueurs suivis doivent avoir **la même taille imprimée**, car l'app
 
 ---
 
-## 6. Suivre un objet encadré
+## 6. Suivre des objets encadrés
 
-Cette méthode suit **n'importe quel objet**, sans couleur particulière ni marqueur : il suffit de l'encadrer dans l'image. L'application le suit ensuite d'image en image d'après son apparence, et donne sa **position**, sa **trajectoire**, sa **vitesse** et la **direction** de son déplacement.
+Cette méthode suit **n'importe quel objet**, sans couleur particulière ni marqueur : il suffit de l'encadrer dans l'image. L'application le suit ensuite d'image en image d'après son apparence, et donne sa **position**, sa **trajectoire**, sa **vitesse** et la **direction** de son déplacement. **Plusieurs objets** peuvent être suivis en même temps, chacun avec son nom et sa couleur.
 
 L'onglet **Suivi** sert aussi à lisser dans le temps les positions des carrés et des marqueurs, et à calculer leur vitesse (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)).
 
-### 6.1 Sélectionner l'objet
+### 6.1 Ajouter des objets
 
 1. Ouvrez l'onglet **Suivi**.
 2. Choisissez la **Méthode** :
    - **CSRT (précis)** : suit mieux l'objet, y compris quand sa taille change. C'est le choix par défaut.
    - **KCF (rapide)** : environ 4 fois plus rapide, mais décroche plus facilement.
-3. Cliquez sur **Sélectionner un objet**.
-4. Désignez l'objet dans l'image, au choix :
-   - **cliquez simplement dessus** : l'application délimite l'objet toute seule autour du point cliqué ;
-   - ou **cliquez-glissez** pour tracer un rectangle autour, au plus près, avec le moins de fond possible.
+3. Cliquez sur **Ajouter des objets**.
+4. **Tracez un rectangle** autour du premier objet (cliquer-glisser), au plus près, avec le moins de fond possible. Vous pouvez aussi **cliquer simplement sur l'objet** : l'application le délimite toute seule autour du point cliqué.
 5. Le cadre s'affiche en pointillés avec **8 poignées**. Ajustez-le si besoin :
    - faites glisser une **poignée** pour le redimensionner ;
    - faites glisser l'**intérieur** du cadre pour le déplacer ;
-   - cliquez ou tracez **ailleurs** pour recommencer.
-6. Validez, au choix, avec le bouton **Démarrer le suivi**, la touche **Entrée** ou un **double-clic** dans le cadre. Le suivi démarre.
+   - tracez **ailleurs** pour recommencer.
+6. Validez l'objet, au choix, avec le bouton **Valider l'objet**, la touche **Entrée** ou un **double-clic** dans le cadre. Son suivi démarre et il apparaît dans la **liste des objets**.
+7. Vous restez en mode ajout : **tracez directement le rectangle de l'objet suivant**, puis validez-le de la même façon, et ainsi de suite.
+8. Quand tous les objets sont ajoutés, appuyez sur **Échap** ou cliquez sur **Terminer l'ajout**. Les clics sur l'image servent de nouveau à choisir la couleur du carré.
 
-La délimitation automatique fonctionne bien pour un objet qui se détache du fond. Elle cherche l'objet dans une zone autour du clic (40 % du petit côté de l'image) : un objet plus grand que cette zone, ou qui se confond avec le fond, est mal délimité. Le message « Objet mal délimité » s'affiche alors, et un carré est proposé autour du clic : ajustez-le avec les poignées.
+Chaque objet reçoit un **numéro**, un **nom** (« Objet 1 », « Objet 2 »...) et une **couleur**, utilisés partout : sur l'image, dans le panneau **Résultat**, dans le journal des événements et dans les messages UDP.
 
-**Annuler** ou la touche **Échap** abandonnent la sélection. L'image continue de défiler pendant l'ajustement : si l'objet bouge, recadrez-le avant de valider. **Arrêter le suivi** arrête de suivre l'objet. Pour suivre un autre objet, sélectionnez-le simplement : il remplace le précédent.
+La **liste des objets** permet de les gérer :
+- **double-cliquez sur un nom** pour le modifier, par exemple « Robot bleu » ;
+- sélectionnez un objet puis cliquez sur **Retirer** pour arrêter son suivi ;
+- **Tout retirer** arrête le suivi de tous les objets. La numérotation repart alors de 1.
 
-Le choix de la méthode s'applique à la prochaine sélection.
+La délimitation automatique (clic simple) fonctionne bien pour un objet qui se détache du fond. Elle cherche l'objet dans une zone autour du clic (40 % du petit côté de l'image) : un objet plus grand que cette zone, ou qui se confond avec le fond, est mal délimité. Le message « Objet mal délimité » s'affiche alors, et un carré est proposé autour du clic : ajustez-le avec les poignées.
+
+L'image continue de défiler pendant l'ajustement : si l'objet bouge, recadrez-le avant de valider. Le choix de la méthode s'applique aux objets ajoutés ensuite ; les autres réglages (trajectoire, seuils de mouvement, lissage) s'appliquent à tous les objets.
 
 ### 6.2 Ce qui s'affiche
 
-- **Cadre cyan** autour de l'objet, avec sa vitesse au-dessus (en mm/s si le repère du sol est défini, sinon en pixels par seconde).
-- **Cadre orange** quand la **confiance** baisse sous 60 % : le contenu du cadre ressemble moins à l'objet sélectionné.
-- **Trajectoire** : la ligne cyan des positions passées, sur la **Durée de la trajectoire** choisie (10 s par défaut). La case **Afficher la trajectoire** la masque.
+Chaque objet est dessiné dans **sa couleur** (cyan, blanc, violet, pêche...) :
+- **Cadre plein** autour de l'objet, avec son nom et sa vitesse au-dessus (en mm/s si le repère du sol est défini, sinon en pixels par seconde). La mention « (confiance faible) » s'ajoute quand la **confiance** baisse sous 60 % : le contenu du cadre ressemble moins à l'objet sélectionné.
+- **Trajectoire** : la ligne des positions passées, sur la **Durée de la trajectoire** choisie (10 s par défaut). La case **Afficher la trajectoire** la masque.
 - **Flèche** dans le sens du déplacement, quand l'objet bouge. Elle est plus longue quand il va plus vite.
-- **Cadre cyan en pointillés** et « Objet (prédit) » juste après une perte : pendant le **Maintien après perte** du lissage (0,5 s par défaut), la position est prédite à la même vitesse.
-- **Cadre rouge en pointillés** et « Objet perdu » ensuite, quand l'objet n'est toujours pas retrouvé. L'application le **recherche alors dans toute l'image**. Dès qu'il réapparaît avec un aspect proche de celui de la sélection, même ailleurs, le suivi reprend tout seul. La trajectoire repart alors de la nouvelle position, sans trait à travers l'image.
+- **Cadre en pointillés** et « (prédit) » juste après une perte : pendant le **Maintien après perte** du lissage (0,5 s par défaut), la position est prédite à la même vitesse.
+- **Cadre rouge en pointillés** et « (perdu) » ensuite, quand l'objet n'est toujours pas retrouvé. L'application le **recherche alors dans toute l'image**. Dès qu'il réapparaît avec un aspect proche de celui de la sélection, même ailleurs, le suivi reprend tout seul. La trajectoire repart alors de la nouvelle position, sans trait à travers l'image.
 
-Dans le panneau **Résultat** :
+Dans le panneau **Résultat**, chaque objet a son paragraphe, précédé d'un carré de sa couleur et de son nom :
 
 | Valeur | Signification |
 |---|---|
 | **en mouvement / immobile** | L'objet passe « en mouvement » quand il s'éloigne de sa position de repos de plus du **seuil de mouvement** (20 mm sur le sol, ou 15 px dans l'image sans repère du sol). Il redevient « immobile » quand il reste dans un rayon de la moitié du seuil pendant 0,5 s. Voir [6.5](#65-événements-de-mouvement). |
 | **Position** lissée, **vitesse, direction** | Centre du cadre en pixels (voir [9.1](#91-coordonnées-dans-limage-en-pixels)), vitesse et direction, estimés par un filtre de Kalman, avec la **Force du lissage** du groupe « Lissage des carrés et marqueurs » (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)). La direction est en degrés, de −180 à 180 : 0° vers la droite, 90° vers le bas de l'image. |
 | **Confiance** | Ressemblance du contenu du cadre avec l'objet tel qu'il était à la sélection, de 0 à 100 %. Elle suit lentement les changements progressifs (éclairage, rotation), mais chute si le cadre glisse sur le fond ou s'accroche à un autre objet passé devant. Sous 45 % pendant quelques images, l'objet est déclaré perdu, même si le tracker croit encore le suivre. |
-| **Sol, vitesse au sol** | Si le repère du sol est défini : position en mm, vitesse en mm/s et direction sur le sol, comptée de l'axe X vers l'axe Y (voir [section 8](#8-définir-le-repère-du-sol)) |
+| **Sol** | Si le repère du sol est défini : position en mm, vitesse en mm/s et direction sur le sol, comptée de l'axe X vers l'axe Y (voir [section 8](#8-définir-le-repère-du-sol)) |
 
-Ces valeurs sont aussi envoyées en UDP (champ `tracked`, voir [10.3](#103-format-des-messages)).
+L'onglet **Suivi** indique le nombre d'objets suivis et le nombre d'objets perdus. Ces valeurs sont aussi envoyées en UDP (liste `tracked`, voir [10.3](#103-format-des-messages)).
 
 ### 6.3 Limites
 
-Le suivi d'un objet encadré est très pratique, mais moins fiable que les marqueurs ArUco :
+Le suivi d'objets encadrés est très pratique, mais moins fiable que les marqueurs ArUco :
 
-- **L'objet peut être perdu** s'il est entièrement caché, sort de l'image, bouge très vite ou ressemble trop au fond. L'application le recherche dans toute l'image et reprend le suivi dès qu'il réapparaît. Cette recherche compare l'objet à son aspect mémorisé : un objet qui revient **très tourné**, **beaucoup plus grand ou plus petit** (au-delà d'environ 20 %), ou très différemment éclairé peut ne pas être reconnu. Resélectionnez-le dans ce cas.
-- **Un objet très ressemblant** à l'objet suivi peut être pris pour lui lors d'une reprise automatique.
+- **Un objet peut être perdu** s'il est entièrement caché, sort de l'image, bouge très vite ou ressemble trop au fond. L'application le recherche dans toute l'image et reprend le suivi dès qu'il réapparaît. Cette recherche compare l'objet à son aspect mémorisé : un objet qui revient **très tourné**, **beaucoup plus grand ou plus petit** (au-delà d'environ 20 %), ou très différemment éclairé peut ne pas être reconnu. Retirez-le et ajoutez-le de nouveau dans ce cas.
+- **Des objets très ressemblants** peuvent être confondus, en particulier lors d'une reprise automatique ou quand ils se croisent. Donnez-leur si possible des aspects différents (couleurs, motifs).
 - **Le cadre peut glisser** sur le fond, ou s'accrocher à un autre objet qui passe devant. L'**indice de confiance** le détecte dans la plupart des cas, et l'objet est alors déclaré perdu avec le message « Le cadre ne ressemble plus à l'objet sélectionné ». Un objet qui change très vite d'aspect (retourné d'un coup) peut aussi faire chuter la confiance.
 - **Pas d'orientation** : le cadre reste droit. Seule la direction du déplacement est connue, pas celle vers laquelle l'objet est tourné.
-- **Un seul objet** est suivi à la fois.
-- **Changer de résolution arrête le suivi** : il faut resélectionner l'objet.
-- **Vitesse de l'application** : CSRT demande environ 20 ms par image, ce qui peut réduire le nombre d'images par seconde. Choisissez KCF si l'image devient saccadée.
+- **Changer de résolution arrête le suivi** de tous les objets : il faut les ajouter de nouveau.
+- **Vitesse de l'application** : chaque objet demande environ **25 ms par image avec CSRT** (environ 5 ms avec KCF). Avec 3 objets en CSRT, l'application ne dépasse guère 13 images par seconde. Choisissez **KCF** pour suivre plusieurs objets si l'image devient saccadée. L'onglet **Suivi** le rappelle à partir de 3 objets.
 
 Conseils : un objet bien contrasté et texturé (motif, logo, couleurs) se suit mieux qu'un objet uni. Un éclairage stable et une exposition courte (moins de flou, voir [Régler l'exposition et la balance des blancs](#régler-lexposition-et-la-balance-des-blancs)) aident aussi.
 
@@ -353,13 +357,14 @@ Si vous décochez le groupe, la position de l'objet encadré redevient celle du 
 
 ### 6.5 Événements de mouvement
 
-L'application signale les moments où l'objet suivi **se met en mouvement**, **s'arrête**, est **perdu** ou **retrouvé**. Ces événements s'affichent dans le **Journal des événements** de l'onglet **Suivi**, le plus récent en haut :
+L'application signale les moments où chaque objet suivi **se met en mouvement**, **s'arrête**, est **perdu** ou **retrouvé**. Ces événements s'affichent dans le **Journal des événements** de l'onglet **Suivi**, le plus récent en haut, avec le nom et la couleur de l'objet :
 
 ```
-20:53:16.1  Début de mouvement depuis (249, 298) px
-20:53:18.5  Fin de mouvement en (342, 299) px — déplacement 93 px, parcours 95 px, durée 2.0 s
-20:53:20.6  Objet perdu (dernière position (341, 299) px)
-20:53:23.1  Objet retrouvé en (599, 449) px
+20:53:16.1  Objet 1 : Début de mouvement depuis (249, 298) px
+20:53:16.1  Robot bleu : Début de mouvement depuis (599, 152) px
+20:53:18.5  Objet 1 : Fin de mouvement en (342, 299) px — déplacement 93 px, parcours 95 px, durée 2.0 s
+20:53:20.6  Robot bleu : Objet perdu (dernière position (599, 245) px)
+20:53:23.1  Robot bleu : Objet retrouvé en (402, 449) px
 ```
 
 - **Début de mouvement** : l'objet s'est éloigné de sa position de repos de plus du **seuil de mouvement**. La position indiquée est celle d'où il est parti.
@@ -374,7 +379,7 @@ L'application signale les moments où l'objet suivi **se met en mouvement**, **s
 
 Un seuil plus petit signale les moindres déplacements, mais risque de réagir au tremblement du cadre. Un seuil plus grand ne signale que les vrais déplacements.
 
-**Effacer** vide le journal. **Enregistrer...** l'exporte en **CSV** (séparateur `;`), du plus ancien au plus récent, avec les colonnes `heure`, `horodatage_ms`, `type` (`motion_start`, `motion_stop`, `lost`, `found`), `x`, `y`, `unite` (`mm` ou `px`), `deplacement`, `parcours` et `duree_s`. Le journal garde les 500 derniers événements et n'est pas conservé entre deux lancements.
+**Effacer** vide le journal. **Enregistrer...** l'exporte en **CSV** (séparateur `;`), du plus ancien au plus récent, avec les colonnes `heure`, `horodatage_ms`, `objet_id`, `objet` (nom), `type` (`motion_start`, `motion_stop`, `lost`, `found`), `x`, `y`, `unite` (`mm` ou `px`), `deplacement`, `parcours` et `duree_s`. Le journal garde les 500 derniers événements et n'est pas conservé entre deux lancements.
 
 Les événements sont aussi envoyés en UDP, dans la liste `events` (voir [10.3](#103-format-des-messages)).
 
@@ -636,9 +641,9 @@ Chaque image traitée produit **un message**, sur une seule ligne. Voici un exem
 | `corners` | Les 4 coins `[x, y]`, en pixels. Pour un marqueur, le premier est le coin d'origine (point rouge à l'écran). |
 | `id` | Identifiant du marqueur |
 | `floor` | Uniquement si le repère du sol est défini : `position_mm` `[X, Y]` sur le sol, et `heading_deg` (cap d'un marqueur) ou `angle_deg` (angle d'un carré, de 0 à 90), voir [8.3](#83-lire-les-positions-au-sol) |
-| `events` | Uniquement quand un événement de l'objet suivi survient à cette image (voir [6.5](#65-événements-de-mouvement)). Chaque événement n'est envoyé qu'une fois, avec `type` (`motion_start`, `motion_stop`, `lost` ou `found`), `timestamp_ms` (heure de l'événement) et `position_mm` (sur le sol) ou `position_px` (dans l'image). Pour `motion_stop` s'ajoutent `distance_mm` (ou `_px`), `travelled_mm` (ou `_px`) et `duration_s`. |
+| `events` | Uniquement quand un événement d'un objet suivi survient à cette image (voir [6.5](#65-événements-de-mouvement)). Chaque événement n'est envoyé qu'une fois, avec `object_id` et `name` (l'objet concerné), `type` (`motion_start`, `motion_stop`, `lost` ou `found`), `timestamp_ms` (heure de l'événement) et `position_mm` (sur le sol) ou `position_px` (dans l'image). Pour `motion_stop` s'ajoutent `distance_mm` (ou `_px`), `travelled_mm` (ou `_px`) et `duration_s`. |
 | `tracks` | Uniquement si le lissage est actif (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)) : une entrée par carré principal ou marqueur suivi, avec `type` (`square` ou `marker`), `id` (marqueur), `predicted` (non détecté dans cette image), `position_px` lissée, `velocity_px_s`, `speed_px_s`, `angle_deg` lissé et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s`, `direction_deg` et `heading_deg` (marqueur) ou `angle_deg` (carré) |
-| `tracked` | Uniquement si un objet est suivi (voir [section 6](#6-suivre-un-objet-encadré)) : `found` (trouvé ou perdu), `predicted` (perdu depuis peu, position prédite), `confidence` (indice de confiance, de 0 à 1), `drifted` (perdu parce que le cadre ne ressemble plus à l'objet), `reacquired` (retrouvé à cette image par la recherche dans toute l'image), `reacquisitions` (nombre de reprises automatiques depuis la sélection), `center` (position lissée), `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
+| `tracked` | Uniquement si au moins un objet est suivi (voir [section 6](#6-suivre-des-objets-encadrés)) : une **liste**, avec une entrée par objet. Chaque entrée contient `id` (numéro de l'objet), `name` (son nom), `found` (trouvé ou perdu), `predicted` (perdu depuis peu, position prédite), `confidence` (indice de confiance, de 0 à 1), `drifted` (perdu parce que le cadre ne ressemble plus à l'objet), `reacquired` (retrouvé à cette image par la recherche dans toute l'image), `reacquisitions` (nombre de reprises automatiques depuis la sélection), `center` (position lissée), `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
 | `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [9.2](#92-position-3d-dun-marqueur-en-mm-après-calibration) et [9.3](#93-rotations-dun-marqueur-en-degrés-après-calibration)) |
 
 Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont celles de l'image réelle de la caméra, même avec l'effet miroir.
@@ -682,7 +687,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Le nombre d'images par seconde (i/s) est affiché dans **Résultat**.
 - Choisissez une **résolution plus basse** (liste **Résolution**) : la détection est plus rapide.
 - Désactivez les détections inutiles (case **Activer la détection** de chaque onglet) et le **Mode calibration** pour gagner en vitesse.
-- Le suivi d'un objet avec **CSRT** demande environ 20 ms par image : passez à **KCF** (environ 5 ms), ou arrêtez le suivi s'il ne sert pas.
+- Le suivi d'objets avec **CSRT** demande environ 25 ms par image **et par objet** : passez à **KCF** (environ 5 ms par objet), ou retirez les objets qui ne servent plus.
 
 ---
 
@@ -797,7 +802,7 @@ L'application retrouve au lancement les réglages de la fois précédente :
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
 - **Sol** : les 4 points du repère, les dimensions du rectangle et l'affichage de la zone ;
-- **Suivi** : la méthode, l'affichage et la durée de la trajectoire, les seuils de mouvement (l'objet sélectionné et le journal des événements, eux, ne sont pas mémorisés), et tous les réglages du lissage ;
+- **Suivi** : la méthode, l'affichage et la durée de la trajectoire, les seuils de mouvement (les objets suivis et le journal des événements, eux, ne sont pas mémorisés), et tous les réglages du lissage ;
 - **Envoi UDP** : activation, adresse et port ;
 - **Fenêtre** : taille, position et onglet ouvert.
 
@@ -805,6 +810,6 @@ Le fichier contient aussi une option sans équivalent dans l'interface : `hideLi
 
 La résolution, l'exposition, la balance des blancs et le repère du sol sont enregistrés dès qu'on les modifie. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
 
-Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, l'objet suivi et le journal des événements.
+Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, les objets suivis et le journal des événements.
 
 Pour revenir aux réglages par défaut, fermez l'application et supprimez le fichier `settings.ini`. La calibration, enregistrée à part dans `calibration.yml`, est conservée.

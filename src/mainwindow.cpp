@@ -10,6 +10,7 @@
 #include <QColorDialog>
 #include <QFile>
 #include <QFileDialog>
+#include <QIcon>
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QComboBox>
@@ -24,6 +25,7 @@
 #include <QMediaCaptureSession>
 #include <QMediaDevices>
 #include <QPainter>
+#include <QPixmap>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
@@ -216,10 +218,10 @@ MainWindow::MainWindow(QWidget *parent)
     floorLayout->addStretch();
     tabs->addTab(floorTab, tr("Sol"));
 
-    // Onglet suivi : objet encadré à la main, suivi par un tracker OpenCV.
+    // Onglet suivi : objets désignés à la main, chacun suivi par un tracker OpenCV.
     auto *trackTab = new QWidget(tabs);
     auto *trackLayout = new QVBoxLayout(trackTab);
-    auto *trackBox = new QGroupBox(tr("Suivi d'un objet"), trackTab);
+    auto *trackBox = new QGroupBox(tr("Suivi d'objets"), trackTab);
     auto *trackForm = new QFormLayout(trackBox);
     m_trackAlgoCombo = new QComboBox(trackBox);
     m_trackAlgoCombo->addItems(ObjectTracker::algorithmNames());
@@ -228,11 +230,23 @@ MainWindow::MainWindow(QWidget *parent)
     trackForm->addRow(tr("Méthode"), m_trackAlgoCombo);
     m_trackSelectButton = new QPushButton(trackBox);
     trackForm->addRow(m_trackSelectButton);
-    m_trackStartButton = new QPushButton(tr("Démarrer le suivi"), trackBox);
-    m_trackStartButton->setToolTip(tr("Valide le cadre (aussi avec Entrée ou un double-clic dans le cadre)"));
+    m_trackStartButton = new QPushButton(tr("Valider l'objet"), trackBox);
+    m_trackStartButton->setToolTip(tr("Ajoute l'objet encadré et commence son suivi (aussi avec Entrée ou un "
+                                      "double-clic dans le cadre)"));
     trackForm->addRow(m_trackStartButton);
-    m_trackStopButton = new QPushButton(tr("Arrêter le suivi"), trackBox);
-    trackForm->addRow(m_trackStopButton);
+    m_objectList = new QListWidget(trackBox);
+    m_objectList->setMaximumHeight(110);
+    m_objectList->setToolTip(tr("Objets suivis. Double-cliquez sur un nom pour le modifier."));
+    trackForm->addRow(m_objectList);
+    auto *objectButtons = new QWidget(trackBox);
+    auto *objectButtonsLayout = new QHBoxLayout(objectButtons);
+    objectButtonsLayout->setContentsMargins(0, 0, 0, 0);
+    m_trackRemoveButton = new QPushButton(tr("Retirer"), objectButtons);
+    m_trackRemoveButton->setToolTip(tr("Arrête le suivi de l'objet sélectionné dans la liste"));
+    m_trackStopButton = new QPushButton(tr("Tout retirer"), objectButtons);
+    objectButtonsLayout->addWidget(m_trackRemoveButton);
+    objectButtonsLayout->addWidget(m_trackStopButton);
+    trackForm->addRow(objectButtons);
     m_trackTrailCheck = new QCheckBox(tr("Afficher la trajectoire"), trackBox);
     m_trackTrailCheck->setChecked(true);
     trackForm->addRow(m_trackTrailCheck);
@@ -291,10 +305,10 @@ MainWindow::MainWindow(QWidget *parent)
     m_trackLabel->setWordWrap(true);
     m_trackLabel->setTextFormat(Qt::RichText);
     trackLayout->addWidget(m_trackLabel);
-    auto *trackHelp = new QLabel(tr("<i>Cliquez sur « Sélectionner un objet », puis cliquez sur l'objet dans "
-                                    "l'image (délimitation automatique) ou tracez un rectangle autour. "
-                                    "Ajustez le cadre avec ses poignées, puis validez avec « Démarrer le suivi », "
-                                    "Entrée ou un double-clic. Échap annule.</i>"),
+    auto *trackHelp = new QLabel(tr("<i>Cliquez sur « Ajouter des objets », puis tracez un rectangle autour "
+                                    "de chaque objet (ou cliquez dessus pour le délimiter automatiquement). "
+                                    "Ajustez le cadre avec ses poignées et validez chaque objet avec Entrée, "
+                                    "un double-clic ou « Valider l'objet ». Échap termine l'ajout.</i>"),
                                  trackTab);
     trackHelp->setWordWrap(true);
     trackLayout->addWidget(trackHelp);
@@ -414,16 +428,20 @@ MainWindow::MainWindow(QWidget *parent)
     }
     connect(m_trackStopButton, &QPushButton::clicked, this, &MainWindow::stopTracking);
     connect(m_video, &VideoWidget::rectangleSelected, this, &MainWindow::onRectangleSelected);
-    connect(m_trackAlgoCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
-        m_tracker.setAlgorithm(ObjectTracker::Algorithm(index));
+    // La méthode s'applique aux prochains objets ; les autres réglages à tous les objets suivis.
+    connect(m_trackTrailSpin, &QDoubleSpinBox::valueChanged, this, [this](double seconds) {
+        for (TrackedItem &item : m_tracked)
+            item.tracker->setTrailDuration(seconds);
     });
-    connect(m_trackTrailSpin, &QDoubleSpinBox::valueChanged, this,
-            [this](double seconds) { m_tracker.setTrailDuration(seconds); });
     for (QDoubleSpinBox *spin : {m_motionMmSpin, m_motionPxSpin}) {
         connect(spin, &QDoubleSpinBox::valueChanged, this, [this] {
-            m_tracker.setMotionThresholds(m_motionMmSpin->value(), m_motionPxSpin->value());
+            for (TrackedItem &item : m_tracked)
+                item.tracker->setMotionThresholds(m_motionMmSpin->value(), m_motionPxSpin->value());
         });
     }
+    connect(m_trackRemoveButton, &QPushButton::clicked, this, &MainWindow::removeSelectedObject);
+    connect(m_objectList, &QListWidget::itemChanged, this, &MainWindow::onObjectRenamed);
+    connect(m_objectList, &QListWidget::currentRowChanged, this, &MainWindow::updateTrackStatus);
     connect(m_smoothBox, &QGroupBox::toggled, this, [this] {
         m_smoother.clear();
         applySmoothingToTracker();
@@ -675,7 +693,6 @@ void MainWindow::loadSettings()
     m_trackTrailSpin->setValue(s.value(QStringLiteral("tracking/trailSeconds"), m_trackTrailSpin->value()).toDouble());
     m_motionMmSpin->setValue(s.value(QStringLiteral("tracking/motionThresholdMm"), m_motionMmSpin->value()).toDouble());
     m_motionPxSpin->setValue(s.value(QStringLiteral("tracking/motionThresholdPx"), m_motionPxSpin->value()).toDouble());
-    m_tracker.setMotionThresholds(m_motionMmSpin->value(), m_motionPxSpin->value());
 
     m_udpHostEdit->setText(s.value(QStringLiteral("udp/host"), m_udpHostEdit->text()).toString());
     m_udpPortSpin->setValue(s.value(QStringLiteral("udp/port"), m_udpPortSpin->value()).toInt());
@@ -1137,9 +1154,45 @@ void MainWindow::toggleTrackSelection()
     updateTrackStatus();
 }
 
+namespace {
+
+// Couleurs des objets suivis, distinctes de celles des autres détections (vert, jaune, magenta,
+// orange, rouge, bleu clair).
+QColor trackColor(int id)
+{
+    static const QColor palette[] = {QColor(0, 255, 255),   QColor(255, 255, 255), QColor(170, 130, 255),
+                                     QColor(255, 190, 120), QColor(120, 255, 190), QColor(100, 170, 255),
+                                     QColor(255, 140, 190), QColor(200, 255, 100)};
+    return palette[(id - 1) % (sizeof(palette) / sizeof(palette[0]))];
+}
+
+QIcon colorIcon(const QColor &color)
+{
+    // Contour sombre : les couleurs claires (blanc) restent visibles sur fond clair.
+    QPixmap pixmap(14, 14);
+    pixmap.fill(color);
+    QPainter painter(&pixmap);
+    painter.setPen(QColor(60, 60, 60));
+    painter.drawRect(0, 0, 13, 13);
+    return QIcon(pixmap);
+}
+
+} // namespace
+
+void MainWindow::configureTracker(ObjectTracker &tracker) const
+{
+    tracker.setAlgorithm(ObjectTracker::Algorithm(m_trackAlgoCombo->currentIndex()));
+    tracker.setTrailDuration(m_trackTrailSpin->value());
+    tracker.setMotionThresholds(m_motionMmSpin->value(), m_motionPxSpin->value());
+    // Mêmes réglages que le lissage des carrés et des marqueurs. Sans lissage, la position est celle
+    // du tracker et rien n'est prédit ; la vitesse reste filtrée (force 50).
+    const bool on = m_smoothBox->isChecked();
+    tracker.setSmoothing(on ? m_smoothStrengthSlider->value() : 50, on);
+    tracker.setHoldTime(on ? m_smoothHoldSpin->value() : 0.0);
+}
+
 void MainWindow::onRectangleSelected(const QRect &displayRect)
 {
-    m_video->setSelectionMode(false);
     if (m_lastFrame.isNull()) {
         updateTrackStatus();
         return;
@@ -1148,13 +1201,59 @@ void MainWindow::onRectangleSelected(const QRect &displayRect)
     QRect rect = displayRect;
     if (m_mirrorCheck->isChecked())
         rect.moveLeft(m_lastFrame.width() - displayRect.right() - 1);
-    if (m_tracker.start(m_lastFrame, rect, m_clock.elapsed())) {
-        m_trackImageSize = m_lastFrame.size();
-        updateTrackStatus();
-    } else {
-        updateTrackStatus();
+
+    TrackedItem item;
+    item.id = m_nextTrackId;
+    item.name = tr("Objet %1").arg(item.id);
+    item.color = trackColor(item.id);
+    item.tracker = std::make_unique<ObjectTracker>();
+    configureTracker(*item.tracker);
+    const bool started = item.tracker->start(m_lastFrame, rect, m_clock.elapsed());
+    if (started) {
+        ++m_nextTrackId;
+        if (m_tracked.empty())
+            m_trackImageSize = m_lastFrame.size();
+        auto *listItem = new QListWidgetItem(colorIcon(item.color), item.name);
+        listItem->setData(Qt::UserRole, item.id);
+        listItem->setFlags(listItem->flags() | Qt::ItemIsEditable);
+        const QSignalBlocker blocker(m_objectList);
+        m_objectList->addItem(listItem);
+        m_tracked.push_back(std::move(item));
+    }
+    // On reste en mode sélection pour ajouter d'autres objets (Échap ou « Terminer » pour finir).
+    m_video->setSelectionMode(true);
+    updateTrackStatus();
+    if (!started) {
         m_trackLabel->setText(tr("<b style='color:#c00'>Sélection trop petite</b> : tracez un rectangle "
                                  "plus grand autour de l'objet."));
+    }
+}
+
+void MainWindow::removeSelectedObject()
+{
+    QListWidgetItem *listItem = m_objectList->currentItem();
+    if (!listItem)
+        return;
+    const int id = listItem->data(Qt::UserRole).toInt();
+    m_tracked.erase(std::remove_if(m_tracked.begin(), m_tracked.end(),
+                                   [id](const TrackedItem &item) { return item.id == id; }),
+                    m_tracked.end());
+    delete listItem;
+    updateTrackStatus();
+}
+
+void MainWindow::onObjectRenamed(QListWidgetItem *listItem)
+{
+    const int id = listItem->data(Qt::UserRole).toInt();
+    for (TrackedItem &item : m_tracked) {
+        if (item.id == id) {
+            const QString name = listItem->text().trimmed();
+            item.name = name.isEmpty() ? tr("Objet %1").arg(id) : name;
+            if (name.isEmpty()) {
+                const QSignalBlocker blocker(m_objectList);
+                listItem->setText(item.name);
+            }
+        }
     }
 }
 
@@ -1189,48 +1288,56 @@ void MainWindow::cancelCurrentInput()
 
 void MainWindow::stopTracking()
 {
+    // « Tout retirer » : plus aucun objet suivi. La numérotation repart de 1.
     m_video->setSelectionMode(false);
-    m_tracker.stop();
+    m_tracked.clear();
+    m_objectList->clear();
+    m_nextTrackId = 1;
     updateTrackStatus();
 }
 
 void MainWindow::applySmoothingToTracker()
 {
-    // L'objet suivi utilise les mêmes réglages que les carrés et les marqueurs. Sans lissage, sa
-    // position est celle du tracker et rien n'est prédit ; sa vitesse reste filtrée (force 50).
-    const bool on = m_smoothBox->isChecked();
-    m_tracker.setSmoothing(on ? m_smoothStrengthSlider->value() : 50, on);
-    m_tracker.setHoldTime(on ? m_smoothHoldSpin->value() : 0.0);
+    for (TrackedItem &item : m_tracked)
+        configureTracker(*item.tracker);
 }
 
 void MainWindow::updateTrackStatus()
 {
     const bool selecting = m_video->selectionMode();
     const bool pending = selecting && m_video->hasPendingRect();
-    m_trackSelectButton->setText(selecting ? tr("Annuler") : tr("Sélectionner un objet"));
+    m_trackSelectButton->setText(selecting ? tr("Terminer l'ajout") : tr("Ajouter des objets"));
     m_trackStartButton->setEnabled(pending);
     m_confirmShortcut->setEnabled(pending);
     m_confirmShortcutKeypad->setEnabled(pending);
-    m_trackStopButton->setEnabled(m_tracker.isActive());
+    m_trackStopButton->setEnabled(!m_tracked.empty());
+    m_trackRemoveButton->setEnabled(m_objectList->currentItem() != nullptr);
+
+    int lost = 0;
+    for (const TrackedItem &item : m_tracked)
+        lost += !item.tracker->state().found && !item.tracker->state().predicted;
+    const QString count = m_tracked.empty() ? tr("Aucun objet suivi.")
+                                            : tr("<b style='color:#080'>%n objet(s) suivi(s)</b>", nullptr,
+                                                 int(m_tracked.size()));
+    QString text;
     if (pending) {
-        m_trackLabel->setText(tr("<b style='color:#c60'>Ajustez le cadre</b> (poignées, glisser), puis "
-                                 "validez : « Démarrer le suivi », Entrée ou double-clic dans le cadre."));
+        text = tr("<b style='color:#c60'>Ajustez le cadre</b> (poignées, glisser), puis validez : « Valider "
+                  "l'objet », Entrée ou double-clic dans le cadre.");
     } else if (selecting) {
-        m_trackLabel->setText(tr("<b style='color:#c60'>Cliquez sur l'objet</b> dans l'image, ou tracez un "
-                                 "rectangle autour (cliquer-glisser)."));
-    } else if (!m_tracker.isActive()) {
-        m_trackLabel->setText(tr("Aucun objet suivi."));
-    } else if (m_tracker.state().found) {
-        QString text = tr("<b style='color:#080'>Suivi en cours</b> (%1)")
-                           .arg(m_trackAlgoCombo->itemText(int(m_tracker.algorithm())));
-        if (m_tracker.state().reacquisitions > 0)
-            text += tr("<br>Retrouvé automatiquement %n fois.", nullptr, m_tracker.state().reacquisitions);
-        m_trackLabel->setText(text);
-    } else {
-        m_trackLabel->setText(tr("<b style='color:#c00'>Objet perdu</b> : recherche en cours dans toute "
-                                 "l'image. Il sera retrouvé automatiquement s'il réapparaît avec un aspect "
-                                 "proche ; sinon, resélectionnez-le."));
+        text = tr("<b style='color:#c60'>Tracez un rectangle</b> autour de l'objet à ajouter (ou cliquez dessus). "
+                  "Échap ou « Terminer l'ajout » pour finir.");
     }
+    if (!m_tracked.empty() || text.isEmpty())
+        text += (text.isEmpty() ? QString() : QStringLiteral("<br>")) + count;
+    if (lost > 0) {
+        text += tr("<br><b style='color:#c00'>%n perdu(s)</b> : recherche en cours dans toute l'image.", nullptr,
+                   lost);
+    }
+    if (m_tracked.size() >= 3) {
+        text += tr("<br><i>Chaque objet ajoute environ 25 ms par image avec CSRT (5 ms avec KCF) : surveillez "
+                   "le nombre d'images par seconde, ou choisissez KCF pour les prochains objets.</i>");
+    }
+    m_trackLabel->setText(text);
 }
 
 namespace {
@@ -1275,11 +1382,15 @@ void MainWindow::logEvents(const std::vector<MotionEvent> &events)
     // Le plus récent en haut ; on garde les 500 derniers.
     for (const MotionEvent &e : events) {
         const QString time = QDateTime::fromMSecsSinceEpoch(e.wallTimeMs).toString(QStringLiteral("HH:mm:ss.z"));
-        auto *item = new QListWidgetItem(QStringLiteral("%1  %2").arg(time, eventText(e)));
+        auto *item = new QListWidgetItem(QStringLiteral("%1  %2 : %3").arg(time, e.objectName, eventText(e)));
+        for (const TrackedItem &tracked : m_tracked) {
+            if (tracked.id == e.objectId)
+                item->setIcon(colorIcon(tracked.color));
+        }
         // Données brutes, pour l'enregistrement en CSV.
         item->setData(Qt::UserRole, QVariantList{e.wallTimeMs, eventTypeKey(e.type), e.position.x(), e.position.y(),
                                                  e.onFloor ? QStringLiteral("mm") : QStringLiteral("px"),
-                                                 e.distance, e.travelled, e.duration});
+                                                 e.distance, e.travelled, e.duration, e.objectId, e.objectName});
         m_eventList->insertItem(0, item);
     }
     while (m_eventList->count() > 500)
@@ -1298,11 +1409,11 @@ void MainWindow::saveEventLog()
         return;
     }
     QTextStream out(&file);
-    out << "heure;horodatage_ms;type;x;y;unite;deplacement;parcours;duree_s\n";
+    out << "heure;horodatage_ms;objet_id;objet;type;x;y;unite;deplacement;parcours;duree_s\n";
     for (int i = m_eventList->count() - 1; i >= 0; --i) {  // du plus ancien au plus récent
         const QVariantList d = m_eventList->item(i)->data(Qt::UserRole).toList();
         out << QDateTime::fromMSecsSinceEpoch(d[0].toLongLong()).toString(Qt::ISODateWithMs) << ';' << d[0].toLongLong()
-            << ';' << d[1].toString() << ';' << QString::number(d[2].toDouble(), 'f', 1) << ';'
+            << ';' << d[8].toInt() << ';' << d[9].toString().replace(';', ',') << ';' << d[1].toString() << ';' << QString::number(d[2].toDouble(), 'f', 1) << ';'
             << QString::number(d[3].toDouble(), 'f', 1) << ';' << d[4].toString() << ';'
             << QString::number(d[5].toDouble(), 'f', 1) << ';' << QString::number(d[6].toDouble(), 'f', 1) << ';'
             << QString::number(d[7].toDouble(), 'f', 2) << '\n';
@@ -1359,18 +1470,26 @@ void MainWindow::onFrame(const QVideoFrame &frame)
     if (m_floor.prepare(image.size()))
         m_floor.apply(squares, markers);
     std::vector<MotionEvent> frameEvents;
-    if (m_tracker.isActive()) {
+    if (!m_tracked.empty()) {
         if (image.size() != m_trackImageSize) {
-            m_tracker.stop();  // le cadre n'a plus de sens dans une autre résolution
-            updateTrackStatus();
+            stopTracking();  // les cadres n'ont plus de sens dans une autre résolution
             m_trackLabel->setText(tr("<b style='color:#c60'>Suivi arrêté</b> : la résolution a changé. "
-                                     "Resélectionnez l'objet."));
+                                     "Ajoutez de nouveau les objets."));
         } else {
-            const bool wasFound = m_tracker.state().found;
-            m_tracker.update(image, m_clock.elapsed(), &m_floor);
-            if (m_tracker.state().found != wasFound)
+            bool stateChanged = false;
+            const qint64 now = m_clock.elapsed();
+            for (TrackedItem &item : m_tracked) {
+                const bool wasFound = item.tracker->state().found;
+                item.tracker->update(image, now, &m_floor);
+                stateChanged |= item.tracker->state().found != wasFound;
+                for (MotionEvent &e : item.tracker->takeEvents()) {
+                    e.objectId = item.id;
+                    e.objectName = item.name;
+                    frameEvents.push_back(e);
+                }
+            }
+            if (stateChanged)
                 updateTrackStatus();
-            frameEvents = m_tracker.takeEvents();
             // Heure réelle de chaque événement, à partir de l'horloge du suivi.
             const qint64 nowWall = QDateTime::currentMSecsSinceEpoch(), nowClock = m_clock.elapsed();
             for (MotionEvent &e : frameEvents)
@@ -1417,8 +1536,11 @@ void MainWindow::onFrame(const QVideoFrame &frame)
     m_captureRequested = false;
 
     if (m_udpBox->isChecked() && m_sender.hasTarget()) {
+        std::vector<TrackedEntry> trackedEntries;
+        for (const TrackedItem &item : m_tracked)
+            trackedEntries.push_back({item.id, item.name, &item.tracker->state()});
         m_sender.send(image.size(), squaresOn ? &squares : nullptr, markersOn ? &markers : nullptr,
-                      m_tracker.isActive() ? &m_tracker.state() : nullptr,
+                      trackedEntries.empty() ? nullptr : &trackedEntries,
                       m_smoothBox->isChecked() ? &tracks : nullptr, frameEvents.empty() ? nullptr : &frameEvents);
         QString text = tr("Destination : <b>%1</b><br>Messages envoyés : %2 (dernier : %3 octets)")
                            .arg(m_sender.targetDescription())
@@ -1566,16 +1688,17 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         }
     }
 
-    // Objet suivi : trajectoire, cadre, flèche de direction quand il bouge.
-    if (m_tracker.isActive()) {
-        const TrackedObject &t = m_tracker.state();
-        const QColor trackColor(0, 255, 255);
-        if (m_trackTrailCheck->isChecked() && m_tracker.trail().size() > 1) {
+    // Objets suivis : trajectoire, cadre et flèche de direction, dans la couleur de chaque objet.
+    // Cadre plein : trouvé ; pointillés : position prédite ; rouge en pointillés : perdu.
+    for (const TrackedItem &item : m_tracked) {
+        const TrackedObject &t = item.tracker->state();
+        const QColor color = item.color;
+        if (m_trackTrailCheck->isChecked() && item.tracker->trail().size() > 1) {
             // Une reprise automatique commence un nouveau tronçon : pas de trait à travers l'image.
-            painter.setPen(QPen(trackColor, std::max(1, penWidth / 2)));
+            painter.setPen(QPen(color, std::max(1, penWidth / 2)));
             painter.setBrush(Qt::NoBrush);
             QPolygonF segment;
-            for (const ObjectTracker::TrailPoint &p : m_tracker.trail()) {
+            for (const ObjectTracker::TrailPoint &p : item.tracker->trail()) {
                 if (p.newSegment && segment.size() > 1)
                     painter.drawPolyline(segment);
                 if (p.newSegment)
@@ -1588,30 +1711,32 @@ void MainWindow::onFrame(const QVideoFrame &frame)
         QRectF box = t.box;
         if (mirror)
             box.moveLeft(width - t.box.right());
-        // Orange quand la confiance baisse : le cadre ressemble moins à l'objet sélectionné.
-        const QColor boxColor = !(t.found || t.predicted) ? QColor(255, 60, 60)
-                                : t.found && t.confidence < 0.6 ? QColor(255, 160, 0)
-                                                                : trackColor;
+        const bool lostNow = !(t.found || t.predicted);
+        const QColor boxColor = lostNow ? QColor(255, 60, 60) : color;
         painter.setPen(QPen(boxColor, penWidth, t.found ? Qt::SolidLine : Qt::DashLine));
         painter.setBrush(Qt::NoBrush);
         painter.drawRect(box);
         const QPointF center = toDisplay(t.center);
-        if (t.moving) {
+        if (t.moving && t.speed > 0) {
             // Flèche dans le sens du déplacement, plus longue quand l'objet va plus vite.
             QPointF dir = toDisplay(t.center + t.velocity) - center;
             dir /= std::hypot(dir.x(), dir.y());
             const double length = std::clamp(t.speed * 0.3, penWidth * 8.0, penWidth * 40.0);
             const QPointF tip = center + dir * length;
             const QPointF side(-dir.y(), dir.x());
-            painter.setPen(QPen(trackColor, penWidth));
+            painter.setPen(QPen(color, penWidth));
             painter.drawLine(center, tip);
             painter.drawLine(tip, tip - dir * penWidth * 4 + side * penWidth * 3);
             painter.drawLine(tip, tip - dir * penWidth * 4 - side * penWidth * 3);
         }
-        QString label = t.found ? tr("Objet") : t.predicted ? tr("Objet (prédit)") : tr("Objet perdu");
-        if (t.found)
-            label += t.hasFloor ? tr(" %1 mm/s").arg(t.floorSpeed, 0, 'f', 0)
-                                : tr(" %1 px/s").arg(t.speed, 0, 'f', 0);
+        QString label = item.name;
+        if (t.found) {
+            label += t.hasFloor ? tr(" %1 mm/s").arg(t.floorSpeed, 0, 'f', 0) : tr(" %1 px/s").arg(t.speed, 0, 'f', 0);
+            if (t.confidence < 0.6)
+                label += tr(" (confiance faible)");
+        } else {
+            label += t.predicted ? tr(" (prédit)") : tr(" (perdu)");
+        }
         painter.setPen(boxColor);
         painter.drawText(box.topLeft() - QPointF(0, penWidth * 2), label);
     }
@@ -1721,24 +1846,22 @@ void MainWindow::onFrame(const QVideoFrame &frame)
                           .arg(t->position.y(), 0, 'f', 0);
         }
     }
-    if (m_tracker.isActive()) {
-        const TrackedObject &t = m_tracker.state();
-        status += QStringLiteral("<br><br>");
+    for (const TrackedItem &item : m_tracked) {
+        const TrackedObject &t = item.tracker->state();
+        status += tr("<br><br><b style='color:%1'>■</b> <b>%2</b>").arg(item.color.darker(130).name(), item.name.toHtmlEscaped());
         if (t.predicted) {
-            status += tr("<b style='color:#c60'>Objet suivi non trouvé</b>, position prédite (%1, %2) px")
+            status += tr(" : <b style='color:#c60'>non trouvé</b>, position prédite (%1, %2) px")
                           .arg(t.center.x(), 0, 'f', 0)
                           .arg(t.center.y(), 0, 'f', 0);
         } else if (!t.found) {
-            status += tr("<b style='color:#c00'>Objet suivi perdu</b> (dernière position (%1, %2) px)")
+            status += tr(" : <b style='color:#c00'>perdu</b> (dernière position (%1, %2) px)")
                           .arg(t.center.x(), 0, 'f', 0)
                           .arg(t.center.y(), 0, 'f', 0);
             if (t.drifted)
                 status += tr("<br>Le cadre ne ressemble plus à l'objet sélectionné.");
             status += tr("<br>Recherche dans toute l'image...");
         } else {
-            status += tr("<b style='color:#088'>Objet suivi</b> : %1<br>"
-                         "Position : (%2, %3) px<br>"
-                         "Vitesse : %4 px/s, direction %5°")
+            status += tr(" : %1<br>Position : (%2, %3) px, vitesse %4 px/s, direction %5°")
                           .arg(t.moving ? tr("en mouvement") : tr("immobile"))
                           .arg(t.center.x(), 0, 'f', 0)
                           .arg(t.center.y(), 0, 'f', 0)
@@ -1748,7 +1871,7 @@ void MainWindow::onFrame(const QVideoFrame &frame)
             if (t.reacquisitions > 0)
                 status += tr(" — retrouvé automatiquement %n fois", nullptr, t.reacquisitions);
             if (t.hasFloor) {
-                status += tr("<br>Sol : X %1  Y %2 mm<br>Vitesse au sol : %3 mm/s, direction %4°")
+                status += tr("<br>Sol : X %1  Y %2 mm, vitesse %3 mm/s, direction %4°")
                               .arg(t.floorPosition.x(), 0, 'f', 0)
                               .arg(t.floorPosition.y(), 0, 'f', 0)
                               .arg(t.floorSpeed, 0, 'f', 0)

@@ -13,6 +13,9 @@
 #include <QElapsedTimer>
 #include <QMainWindow>
 
+#include <memory>
+#include <vector>
+
 class QCamera;
 class QCheckBox;
 class QComboBox;
@@ -22,6 +25,7 @@ class QGroupBox;
 class QLabel;
 class QLineEdit;
 class QListWidget;
+class QListWidgetItem;
 class QMediaCaptureSession;
 class QPushButton;
 class QShortcut;
@@ -69,6 +73,8 @@ private slots:
     void onSelectionPointClicked(const QPoint &displayPos);
     void cancelCurrentInput();
     void saveEventLog();
+    void removeSelectedObject();
+    void onObjectRenamed(QListWidgetItem *item);
 
 private:
     QSlider *addSlider(QFormLayout *form, const QString &label, int min, int max, int value);
@@ -89,6 +95,7 @@ private:
     void updateFloorStatus();
     void updateTrackStatus();
     void applySmoothingToTracker();
+    void configureTracker(ObjectTracker &tracker) const;
     void logEvents(const std::vector<MotionEvent> &events);
     void saveSettings() const;
 
@@ -140,6 +147,8 @@ private:
     QComboBox *m_trackAlgoCombo = nullptr;
     QPushButton *m_trackSelectButton = nullptr;
     QPushButton *m_trackStartButton = nullptr;
+    QPushButton *m_trackRemoveButton = nullptr;
+    QListWidget *m_objectList = nullptr;
     QDoubleSpinBox *m_motionMmSpin = nullptr;
     QDoubleSpinBox *m_motionPxSpin = nullptr;
     QListWidget *m_eventList = nullptr;
@@ -162,10 +171,19 @@ private:
     CameraCalibration m_calibration;
     PositionSender m_sender;
     FloorMapper m_floor;
-    ObjectTracker m_tracker;
+    // Objets suivis, chacun avec son propre tracker, son nom et sa couleur.
+    struct TrackedItem
+    {
+        int id = 0;
+        QString name;
+        QColor color;
+        std::unique_ptr<ObjectTracker> tracker;
+    };
+    std::vector<TrackedItem> m_tracked;
+    int m_nextTrackId = 1;
     MotionSmoother m_smoother;
     QSize m_smoothImageSize;   // résolution des positions lissées
-    QSize m_trackImageSize;    // résolution à laquelle l'objet a été sélectionné
+    QSize m_trackImageSize;    // résolution à laquelle les objets ont été sélectionnés
     QElapsedTimer m_clock;     // horloge des points de trajectoire
     bool m_floorPicking = false;
     std::vector<QPointF> m_floorPicked;  // points cliqués, dans l'image réelle de la caméra

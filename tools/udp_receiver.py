@@ -44,13 +44,19 @@ def describe(msg):
             text += f" | X {x:.0f} Y {y:.0f} Z {z:.0f} mm"
         parts.append(text)
 
-    # Événements de l'objet suivi (liste « events »).
+    # Objets suivis (liste « tracked ») : nom, position et état de chacun.
+    for t in msg.get("tracked", []):
+        state = "perdu" if not t["found"] and not t["predicted"] else "prédit" if t["predicted"] else \
+            "en mouvement" if t["moving"] else "immobile"
+        parts.append(f"{t['name']} ({t['center'][0]:.0f}, {t['center'][1]:.0f}) px {state}")
+
+    # Événements des objets suivis (liste « events »).
     names = {"motion_start": "DÉBUT DE MOUVEMENT", "motion_stop": "FIN DE MOUVEMENT",
              "lost": "OBJET PERDU", "found": "OBJET RETROUVÉ"}
     for e in msg.get("events", []):
         unit = "mm" if "position_mm" in e else "px"
         x, y = e.get("position_mm") or e.get("position_px")
-        text = f"*** {names.get(e['type'], e['type'])} ({x:.0f}, {y:.0f}) {unit}"
+        text = f"*** {e.get('name', 'objet')} : {names.get(e['type'], e['type'])} ({x:.0f}, {y:.0f}) {unit}"
         if e["type"] == "motion_stop":
             text += f", déplacement {e['distance_' + unit]:.0f} {unit} en {e['duration_s']:.1f} s"
         parts.append(text)

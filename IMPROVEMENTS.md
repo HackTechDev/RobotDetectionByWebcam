@@ -21,8 +21,8 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
   - seuils réglables et affichage du masque ;
   - forme vérifiée par le rectangle orienté minimal, ce qui écarte les disques et les rectangles.
 - **Marqueurs ArUco et AprilTag** : six dictionnaires, coins affinés au sous-pixel, génération de marqueurs à imprimer.
-- **Suivi d'un objet quelconque** désigné à la souris (trackers OpenCV CSRT ou KCF) :
-  - sélection d'un clic (délimitation automatique) ou par un cadre, ajustable avant validation ; Échap pour annuler ;
+- **Suivi d'un ou plusieurs objets quelconques** désignés à la souris (trackers OpenCV CSRT ou KCF), chacun avec son nom et sa couleur :
+  - ajout par un rectangle ou d'un clic (délimitation automatique), cadre ajustable avant validation, ajout de plusieurs objets à la suite ; liste des objets (renommer, retirer) ;
   - trajectoire, position lissée, vitesse et direction (filtre de Kalman), position prédite juste après une perte ;
   - indice de confiance, qui détecte le cadre qui glisse sur le fond ou s'accroche à un autre objet ;
   - reprise automatique : un objet perdu est recherché dans toute l'image et le suivi reprend dès qu'il réapparaît ;
@@ -38,12 +38,12 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
   - calibration enregistrée et rechargée au lancement ;
   - adaptation aux résolutions du même format d'image.
 - **Pose 3D des marqueurs** (si la caméra est calibrée) : position en mm, distance et rotations par rapport à la caméra. Les axes du marqueur sont dessinés sur l'image.
-- **Positions sur le sol en millimètres** : repère défini par les 4 coins d'un rectangle de dimensions connues, cliqués dans l'image. Il donne la position et le cap des carrés et des marqueurs, ainsi que la position, la vitesse et la direction de déplacement de l'objet suivi. Il fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus.
+- **Positions sur le sol en millimètres** : repère défini par les 4 coins d'un rectangle de dimensions connues, cliqués dans l'image. Il donne la position et le cap des carrés et des marqueurs, ainsi que la position, la vitesse et la direction de déplacement des objets suivis. Il fonctionne sans calibration. Si la caméra est calibrée, la distorsion de l'objectif est corrigée en plus.
 - **Lissage dans le temps** (filtre de Kalman) du carré principal et de chaque marqueur : position lissée, vitesse, position prédite pendant une courte perte de détection, trajectoires.
 
 ### Intégration
 
-- **Envoi des positions en JSON sur UDP**, un message par image : carrés, marqueurs, pose 3D, positions au sol, objet suivi (`tracked`), objets lissés (`tracks`) et événements de mouvement (`events`).
+- **Envoi des positions en JSON sur UDP**, un message par image : carrés, marqueurs, pose 3D, positions au sol, objets suivis (`tracked`), objets lissés (`tracks`) et événements de mouvement (`events`).
 - Script de réception `tools/udp_receiver.py`, pour tester l'envoi ou servir de base à un programme de pilotage.
 
 ### Confort
@@ -121,7 +121,7 @@ Les images de synthèse sont générées par les tests eux-mêmes, sans webcam.
 
 ### Suivi d'objet
 
-Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissage de Kalman, l'indice de confiance, la reprise automatique, la sélection simplifiée et les événements de mouvement sont réalisés. Parmi les pistes restantes, l'orientation de l'objet est la plus utile pour suivre un robot sans marqueur.
+Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissage de Kalman, l'indice de confiance, la reprise automatique, la sélection simplifiée, les événements de mouvement et le suivi de plusieurs objets sont réalisés. Parmi les pistes restantes, l'orientation de l'objet est la plus utile pour suivre un robot sans marqueur.
 
 #### Orientation de l'objet — M
 
@@ -141,12 +141,6 @@ Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissag
 
 **Piste.** Si le format reste le même (4:3 vers 4:3), mettre le cadre et la trajectoire à l'échelle, puis réinitialiser le tracker sur la nouvelle image au lieu de l'arrêter.
 
-#### Plusieurs objets suivis — M
-
-**Intérêt.** Un seul objet peut être suivi à la fois.
-
-**Piste.** Une liste d'objets suivis, chacun avec son nom et sa couleur d'affichage, dans le panneau Résultat et dans les messages UDP (`tracked` deviendrait une liste). Le coût augmente avec le nombre d'objets, environ 20 ms par objet avec CSRT : à combiner avec le suivi dans un fil séparé.
-
 #### Statistiques et export de la trajectoire — S
 
 **Intérêt.** Analyser un déplacement après coup.
@@ -155,7 +149,7 @@ Améliorations du suivi d'un objet encadré (`src/objecttracker.cpp`). Le lissag
 
 #### Suivi plus rapide — M
 
-**Intérêt.** CSRT prend environ 20 ms par image dans le fil principal de l'application, ce qui peut faire baisser le nombre d'images par seconde.
+**Intérêt.** CSRT prend environ 25 ms par image et par objet dans le fil principal de l'application : avec plusieurs objets, le nombre d'images par seconde baisse nettement (environ 13 i/s avec 3 objets).
 
 **Piste.**
 - Exécuter le suivi dans un fil dédié (voir « Détection dans un fil d'exécution séparé »).

@@ -65,7 +65,7 @@ QString PositionSender::targetDescription() const
 QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const QSize &imageSize,
                                         const std::vector<DetectedSquare> *squares,
                                         const std::vector<DetectedMarker> *markers,
-                                        const TrackedObject *tracked,
+                                        const std::vector<TrackedEntry> *tracked,
                                         const std::vector<const SmoothedTrack *> *tracks,
                                         const std::vector<MotionEvent> *events)
 {
@@ -144,29 +144,36 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
         msg.insert(QStringLiteral("tracks"), list);
     }
 
-    if (tracked && tracked->active) {
-        QJsonObject o{{QStringLiteral("found"), tracked->found},
-                      {QStringLiteral("predicted"), tracked->predicted},
-                      {QStringLiteral("confidence"), std::round(tracked->confidence * 100) / 100},
-                      {QStringLiteral("drifted"), tracked->drifted},
-                      {QStringLiteral("reacquired"), tracked->reacquired},
-                      {QStringLiteral("reacquisitions"), tracked->reacquisitions},
-                      {QStringLiteral("center"), point(tracked->center)},
-                      {QStringLiteral("box"), QJsonArray{round1(tracked->box.x()), round1(tracked->box.y()),
-                                                         round1(tracked->box.width()),
-                                                         round1(tracked->box.height())}},
-                      {QStringLiteral("moving"), tracked->moving},
-                      {QStringLiteral("velocity_px_s"), point(tracked->velocity)},
-                      {QStringLiteral("speed_px_s"), round1(tracked->speed)},
-                      {QStringLiteral("direction_deg"), round1(tracked->direction)}};
-        if (tracked->hasFloor) {
-            o.insert(QStringLiteral("floor"),
-                     QJsonObject{{QStringLiteral("position_mm"), point(tracked->floorPosition)},
-                                 {QStringLiteral("velocity_mm_s"), point(tracked->floorVelocity)},
-                                 {QStringLiteral("speed_mm_s"), round1(tracked->floorSpeed)},
-                                 {QStringLiteral("direction_deg"), round1(tracked->floorDirection)}});
+    // Objets suivis : une entrée par objet, avec son numéro et son nom.
+    if (tracked && !tracked->empty()) {
+        QJsonArray list;
+        for (const TrackedEntry &entry : *tracked) {
+            const TrackedObject *t = entry.state;
+            QJsonObject o{{QStringLiteral("id"), entry.id},
+                          {QStringLiteral("name"), entry.name},
+                          {QStringLiteral("found"), t->found},
+                          {QStringLiteral("predicted"), t->predicted},
+                          {QStringLiteral("confidence"), std::round(t->confidence * 100) / 100},
+                          {QStringLiteral("drifted"), t->drifted},
+                          {QStringLiteral("reacquired"), t->reacquired},
+                          {QStringLiteral("reacquisitions"), t->reacquisitions},
+                          {QStringLiteral("center"), point(t->center)},
+                          {QStringLiteral("box"), QJsonArray{round1(t->box.x()), round1(t->box.y()),
+                                                             round1(t->box.width()), round1(t->box.height())}},
+                          {QStringLiteral("moving"), t->moving},
+                          {QStringLiteral("velocity_px_s"), point(t->velocity)},
+                          {QStringLiteral("speed_px_s"), round1(t->speed)},
+                          {QStringLiteral("direction_deg"), round1(t->direction)}};
+            if (t->hasFloor) {
+                o.insert(QStringLiteral("floor"),
+                         QJsonObject{{QStringLiteral("position_mm"), point(t->floorPosition)},
+                                     {QStringLiteral("velocity_mm_s"), point(t->floorVelocity)},
+                                     {QStringLiteral("speed_mm_s"), round1(t->floorSpeed)},
+                                     {QStringLiteral("direction_deg"), round1(t->floorDirection)}});
+            }
+            list.append(o);
         }
-        msg.insert(QStringLiteral("tracked"), o);
+        msg.insert(QStringLiteral("tracked"), list);
     }
 
     // Événements de l'objet suivi survenus à cette image (chacun n'est envoyé qu'une fois).
@@ -175,6 +182,8 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
         QJsonArray list;
         for (const MotionEvent &e : *events) {
             QJsonObject o{{QStringLiteral("type"), QString::fromLatin1(types[e.type])},
+                          {QStringLiteral("object_id"), e.objectId},
+                          {QStringLiteral("name"), e.objectName},
                           {QStringLiteral("timestamp_ms"), e.wallTimeMs},
                           {e.onFloor ? QStringLiteral("position_mm") : QStringLiteral("position_px"), point(e.position)}};
             if (e.type == MotionEvent::MotionStop) {
@@ -192,7 +201,7 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
 }
 
 bool PositionSender::send(const QSize &imageSize, const std::vector<DetectedSquare> *squares,
-                          const std::vector<DetectedMarker> *markers, const TrackedObject *tracked,
+                          const std::vector<DetectedMarker> *markers, const std::vector<TrackedEntry> *tracked,
                           const std::vector<const SmoothedTrack *> *tracks,
                           const std::vector<MotionEvent> *events)
 {

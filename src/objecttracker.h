@@ -57,6 +57,8 @@ struct MotionEvent
     double distance = 0;    // fin de mouvement : distance entre le départ et l'arrivée
     double travelled = 0;   // fin de mouvement : longueur du chemin parcouru
     double duration = 0;    // fin de mouvement : durée en secondes
+    int objectId = 0;       // objet concerné (renseigné par l'application)
+    QString objectName;
 };
 
 // Suivi d'un objet encadré à la main (trackers CSRT ou KCF d'OpenCV), avec sa trajectoire.

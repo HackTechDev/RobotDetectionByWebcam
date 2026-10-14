@@ -11,6 +11,14 @@
 #include <QUdpSocket>
 #include <vector>
 
+// Objet suivi à envoyer : son numéro, son nom et son état.
+struct TrackedEntry
+{
+    int id = 0;
+    QString name;
+    const TrackedObject *state = nullptr;
+};
+
 // Envoie les résultats de détection en JSON, un datagramme UDP par image.
 class PositionSender
 {
@@ -23,7 +31,7 @@ public:
     // Un pointeur nul signifie que la détection correspondante est désactivée (ou qu'aucun
     // objet n'est suivi) : la clé est alors absente du message.
     bool send(const QSize &imageSize, const std::vector<DetectedSquare> *squares,
-              const std::vector<DetectedMarker> *markers, const TrackedObject *tracked = nullptr,
+              const std::vector<DetectedMarker> *markers, const std::vector<TrackedEntry> *tracked = nullptr,
               const std::vector<const SmoothedTrack *> *tracks = nullptr,
               const std::vector<MotionEvent> *events = nullptr);
 
@@ -35,7 +43,7 @@ public:
     static QByteArray buildMessage(qint64 frame, qint64 timestampMs, const QSize &imageSize,
                                    const std::vector<DetectedSquare> *squares,
                                    const std::vector<DetectedMarker> *markers,
-                                   const TrackedObject *tracked = nullptr,
+                                   const std::vector<TrackedEntry> *tracked = nullptr,
                                    const std::vector<const SmoothedTrack *> *tracks = nullptr,
                                    const std::vector<MotionEvent> *events = nullptr);
 
