@@ -155,6 +155,7 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
                           {QStringLiteral("predicted"), t->predicted},
                           {QStringLiteral("confidence"), std::round(t->confidence * 100) / 100},
                           {QStringLiteral("drifted"), t->drifted},
+                          {QStringLiteral("out_of_view"), t->outOfView},
                           {QStringLiteral("reacquired"), t->reacquired},
                           {QStringLiteral("reacquisitions"), t->reacquisitions},
                           {QStringLiteral("center"), point(t->center)},

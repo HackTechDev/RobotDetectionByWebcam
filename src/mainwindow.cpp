@@ -2123,7 +2123,7 @@ void MainWindow::presentFrame(const FrameResult &result)
             if (t.confidence < 0.6)
                 label += tr(" (confiance faible)");
         } else {
-            label += t.predicted ? tr(" (prédit)") : tr(" (perdu)");
+            label += t.predicted ? tr(" (prédit)") : t.outOfView ? tr(" (hors du champ)") : tr(" (perdu)");
         }
         painter.setPen(boxColor);
         painter.drawText(box.topLeft() - QPointF(0, penWidth * 2), label);
@@ -2241,6 +2241,11 @@ void MainWindow::presentFrame(const FrameResult &result)
             status += tr(" : <b style='color:#c60'>non trouvé</b>, position prédite (%1, %2) px")
                           .arg(t.center.x(), 0, 'f', 0)
                           .arg(t.center.y(), 0, 'f', 0);
+        } else if (t.outOfView) {
+            status += tr(" : <b style='color:#c00'>hors du champ</b> (sorti en (%1, %2) px)")
+                          .arg(t.center.x(), 0, 'f', 0)
+                          .arg(t.center.y(), 0, 'f', 0);
+            status += tr("<br>Recherche le long des bords de l'image, par où il reviendra...");
         } else if (!t.found) {
             status += tr(" : <b style='color:#c00'>perdu</b> (dernière position (%1, %2) px)")
                           .arg(t.center.x(), 0, 'f', 0)

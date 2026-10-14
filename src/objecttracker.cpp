@@ -31,6 +31,31 @@ constexpr int kSearchEveryFrames = 3;
 constexpr double kSearchDownscale = 0.5;
 constexpr double kSearchMinCorrelation = 0.6;
 constexpr double kSearchMinConfidence = 0.55;
+// Candidats retenus par motif et par échelle, et nombre de candidats vérifiés en tout.
+constexpr int kSearchPeaks = 3;
+constexpr int kSearchVerified = 6;
+// Le candidat doit être retrouvé à deux recherches de suite au même endroit : un visage ou un décor
+// ressemblant par hasard sur une seule image ne suffit pas.
+constexpr double kCandidateMinOverlap = 0.3;
+// La référence d'apparence ne suit l'objet que s'il ressemble encore un peu à celui d'origine : elle
+// accepte une rotation ou un changement de taille progressifs, mais ne dérive pas vers autre chose.
+constexpr double kUpdateMinInitialConfidence = 0.35;
+
+// Sortie du champ : cadre à moins de 2 % de la largeur du bord, ou visible à moins de moitié.
+// Un objet sorti ne peut revenir que par un bord : la recherche se limite alors à une bande de
+// 20 % le long des bords.
+constexpr double kBorderMargin = 0.02;
+constexpr double kMinVisibleFraction = 0.5;
+constexpr double kReentryBand = 0.2;
+// Saut du cadre de plus de 1,5 fois sa taille en une image : le tracker s'est accroché ailleurs.
+constexpr double kMaxJump = 1.5;
+
+double overlap(const cv::Rect &a, const cv::Rect &b)
+{
+    const int inter = (a & b).area();
+    const int uni = a.area() + b.area() - inter;
+    return uni > 0 ? double(inter) / uni : 0.0;
+}
 
 } // namespace
 
@@ -154,21 +179,23 @@ cv::Mat ObjectTracker::colorHistogram(const cv::Mat &bgrPatch)
     return hist;
 }
 
-double ObjectTracker::appearanceScore(const cv::Mat &work, const cv::Rect &roi) const
+double ObjectTracker::appearanceScore(const cv::Mat &work, const cv::Rect &roi, bool initial) const
 {
+    const cv::Mat &refHist = initial ? m_initHist : m_refHist;
+    const cv::Mat &refGray = initial ? m_initGray : m_refGray;
     const cv::Rect r = roi & cv::Rect(0, 0, work.cols, work.rows);
-    if (r.width < 4 || r.height < 4 || m_refHist.empty())
+    if (r.width < 4 || r.height < 4 || refHist.empty())
         return 0.0;
     const cv::Mat patch = work(r);
 
     // Couleurs : peu sensibles à la rotation et aux déformations de l'objet.
-    const double colorScore = 1.0 - cv::compareHist(m_refHist, colorHistogram(patch), cv::HISTCMP_BHATTACHARYYA);
+    const double colorScore = 1.0 - cv::compareHist(refHist, colorHistogram(patch), cv::HISTCMP_BHATTACHARYYA);
 
     // Motif en niveaux de gris : distingue l'objet d'un fond ou d'un intrus aux couleurs proches.
     cv::Mat gray, resized, ncc;
     cv::cvtColor(patch, gray, cv::COLOR_BGR2GRAY);
-    cv::resize(gray, resized, m_refGray.size(), 0, 0, cv::INTER_AREA);
-    cv::matchTemplate(resized, m_refGray, ncc, cv::TM_CCOEFF_NORMED);
+    cv::resize(gray, resized, refGray.size(), 0, 0, cv::INTER_AREA);
+    cv::matchTemplate(resized, refGray, ncc, cv::TM_CCOEFF_NORMED);
     const double patternScore = std::max(0.0, double(ncc.at<float>(0, 0)));
 
     return 0.5 * colorScore + 0.5 * patternScore;
@@ -206,7 +233,7 @@ bool ObjectTracker::createTracker(const cv::Mat &work, const cv::Rect &roi)
     return true;
 }
 
-cv::Rect ObjectTracker::searchObject(const cv::Mat &work) const
+cv::Rect ObjectTracker::searchObject(const cv::Mat &work, bool bordersOnly) const
 {
     if (m_initGray.empty())
         return {};
@@ -214,10 +241,11 @@ cv::Rect ObjectTracker::searchObject(const cv::Mat &work) const
     cv::cvtColor(work, gray, cv::COLOR_BGR2GRAY);
     cv::resize(gray, small, cv::Size(), kSearchDownscale, kSearchDownscale, cv::INTER_AREA);
 
-    // Échelles autour de la dernière taille connue de l'objet.
+    // Échelles autour de la dernière taille connue de l'objet. Pour chaque motif et chaque échelle,
+    // les meilleurs emplacements (pas seulement le premier : une tache du décor peut corréler
+    // mieux qu'un objet tourné) deviennent des candidats.
     const double base = m_lastBoxSize.width() / m_initGray.cols;
-    double bestScore = -1.0;
-    cv::Rect best;
+    std::vector<std::pair<double, cv::Rect>> candidates;
     for (const cv::Mat *reference : {&m_initGray, &m_refGray}) {
         for (double factor : {0.85, 1.0, 1.2}) {
             const double s = base * factor * kSearchDownscale;
@@ -227,22 +255,44 @@ cv::Rect ObjectTracker::searchObject(const cv::Mat &work) const
             cv::Mat templ, result;
             cv::resize(*reference, templ, size, 0, 0, cv::INTER_AREA);
             cv::matchTemplate(small, templ, result, cv::TM_CCOEFF_NORMED);
-            double maxVal = 0;
-            cv::Point maxLoc;
-            cv::minMaxLoc(result, nullptr, &maxVal, nullptr, &maxLoc);
-            if (maxVal > bestScore) {
-                bestScore = maxVal;
-                best = cv::Rect(int(maxLoc.x / kSearchDownscale), int(maxLoc.y / kSearchDownscale),
-                                int(size.width / kSearchDownscale), int(size.height / kSearchDownscale));
+            if (bordersOnly) {
+                // Positions dont le cadre n'approche aucun bord : exclues.
+                const int band = int(kReentryBand * std::min(small.cols, small.rows));
+                const cv::Rect inner(band, band, small.cols - 2 * band - size.width + 1,
+                                     small.rows - 2 * band - size.height + 1);
+                if (inner.width > 0 && inner.height > 0)
+                    result(inner).setTo(-1.0f);
+            }
+            for (int peak = 0; peak < kSearchPeaks; ++peak) {
+                double maxVal = 0;
+                cv::Point maxLoc;
+                cv::minMaxLoc(result, nullptr, &maxVal, nullptr, &maxLoc);
+                if (maxVal < kSearchMinCorrelation)
+                    break;
+                candidates.emplace_back(maxVal, cv::Rect(int(maxLoc.x / kSearchDownscale), int(maxLoc.y / kSearchDownscale),
+                                                         int(size.width / kSearchDownscale),
+                                                         int(size.height / kSearchDownscale)));
+                // Pic suivant : ailleurs que autour de celui-ci.
+                const cv::Rect around(maxLoc.x - size.width / 2, maxLoc.y - size.height / 2, size.width, size.height);
+                result(around & cv::Rect(0, 0, result.cols, result.rows)).setTo(-1.0f);
             }
         }
     }
-    best &= cv::Rect(0, 0, work.cols, work.rows);
-    if (bestScore < kSearchMinCorrelation || best.width < 8 || best.height < 8)
-        return {};
-    // Vérification complète (couleurs et motif) avant d'accepter le candidat.
-    if (appearanceScore(work, best) < kSearchMinConfidence)
-        return {};
+    // Vérification complète (couleurs et motif) des meilleurs candidats : on garde le plus ressemblant.
+    std::sort(candidates.begin(), candidates.end(),
+              [](const auto &a, const auto &b) { return a.first > b.first; });
+    double bestConfidence = kSearchMinConfidence;
+    cv::Rect best;
+    for (size_t k = 0; k < candidates.size() && k < size_t(kSearchVerified); ++k) {
+        const cv::Rect r = candidates[k].second & cv::Rect(0, 0, work.cols, work.rows);
+        if (r.width < 8 || r.height < 8)
+            continue;
+        const double confidence = appearanceScore(work, r);
+        if (confidence >= bestConfidence) {
+            bestConfidence = confidence;
+            best = r;
+        }
+    }
     return best;
 }
 
@@ -261,11 +311,15 @@ bool ObjectTracker::start(const QImage &image, const QRectF &box, qint64 timeMs)
         return false;
 
     m_refHist = colorHistogram(work(roi));
+    m_initHist = m_refHist.clone();
     cv::cvtColor(work(roi), m_initGray, cv::COLOR_BGR2GRAY);
     m_refGray = m_initGray.clone();
     m_lowConfidenceFrames = 0;
     m_lostFrames = 0;
     m_lastBoxSize = QSizeF(roi.width, roi.height);
+    m_lastRoi = roi;
+    m_lastTouchedBorder = false;
+    m_candidate = cv::Rect();
     m_anchorValid = false;
     m_recentPositions.clear();
     m_lostReported = false;
@@ -296,31 +350,51 @@ void ObjectTracker::stop()
 
 const TrackedObject &ObjectTracker::update(const QImage &image, qint64 timeMs, const FloorMapper *floor)
 {
-    if (!m_tracker)
+    if (!m_state.active)
         return m_state;
 
     double scale = 1.0;
     const cv::Mat work = toWorkingImage(image, scale);
+    const cv::Rect frame(0, 0, work.cols, work.rows);
     cv::Rect roi;
     bool found = false;
-    try {
-        found = m_tracker->update(work, roi);
-    } catch (const cv::Exception &) {
-        found = false;
+    // Objet sorti de l'image : le tracker est arrêté, il s'accrocherait à autre chose.
+    if (m_tracker) {
+        try {
+            found = m_tracker->update(work, roi);
+        } catch (const cv::Exception &) {
+            found = false;
+        }
+    }
+    // Saut brutal du cadre depuis la dernière position connue (marge plus large après quelques
+    // images de perte) : le tracker s'est accroché à autre chose.
+    bool jumped = false;
+    if (found) {
+        const cv::Point2d d = (cv::Point2d(roi.tl()) + cv::Point2d(roi.br()) - cv::Point2d(m_lastRoi.tl())
+                               - cv::Point2d(m_lastRoi.br())) / 2.0;
+        jumped = std::hypot(d.x, d.y) > kMaxJump * (1 + m_lostFrames) * std::max(m_lastRoi.width, m_lastRoi.height);
+        found = !jumped;
     }
 
     // Indice de confiance : le tracker peut affirmer avoir trouvé l'objet alors que son cadre a
     // glissé sur le fond ou s'est accroché à un autre objet passé devant. On compare le contenu du
     // cadre à l'apparence mémorisée ; une confiance trop basse plusieurs images d'affilée vaut perte.
-    m_state.drifted = false;
+    m_state.drifted = jumped;
+    bool reliable = false;  // cadre assez ressemblant pour servir de dernière position connue
     if (found) {
         const double score = appearanceScore(work, roi);
         m_state.confidence = 0.6 * m_state.confidence + 0.4 * score;
         m_lowConfidenceFrames = m_state.confidence < kLostConfidence ? m_lowConfidenceFrames + 1 : 0;
+        reliable = m_lowConfidenceFrames == 0;
         if (m_lowConfidenceFrames >= kLostConfidenceFrames) {
             found = false;
             m_state.drifted = true;
-        } else if (m_state.confidence > kUpdateConfidence) {
+        } else if (m_state.confidence > kUpdateConfidence && (roi & frame) == roi
+                   && roi.x > kBorderMargin * work.cols && roi.br().x < (1.0 - kBorderMargin) * work.cols
+                   && roi.y > kBorderMargin * work.cols && roi.br().y < work.rows - kBorderMargin * work.cols
+                   && appearanceScore(work, roi, true) > kUpdateMinInitialConfidence) {
+            // Référence mise à jour seulement pour un objet entièrement visible, qui ressemble encore
+            // à celui d'origine : elle ne dérive pas vers ce qu'un tracker égaré suit.
             const cv::Mat patch = work(roi & cv::Rect(0, 0, work.cols, work.rows));
             cv::addWeighted(m_refHist, 1.0 - kReferenceUpdateRate, colorHistogram(patch), kReferenceUpdateRate,
                             0.0, m_refHist);
@@ -333,19 +407,58 @@ const TrackedObject &ObjectTracker::update(const QImage &image, qint64 timeMs, c
         m_state.confidence = 0.6 * m_state.confidence;
     }
 
+    // Sortie du champ : cadre surtout hors de l'image, ou objet perdu alors que son cadre touchait
+    // le bord. Le tracker est arrêté.
+    if (found) {
+        const double visible = double((roi & frame).area()) / std::max(1, roi.area());
+        if (visible < kMinVisibleFraction) {
+            found = false;
+            m_lastTouchedBorder = true;
+        }
+    }
+    if (found && reliable) {
+        const int margin = int(kBorderMargin * work.cols);
+        m_lastTouchedBorder = roi.x <= margin || roi.y <= margin || roi.br().x >= work.cols - margin
+                              || roi.br().y >= work.rows - margin;
+    } else if (m_lastTouchedBorder && !m_state.outOfView) {
+        // Perdu, ou cadre devenu peu ressemblant, juste après avoir touché le bord : sorti.
+        m_state.outOfView = true;
+        m_tracker.release();
+        found = false;
+    }
+
     // Reprise automatique : objet perdu (par le tracker ou par l'indice de confiance), on le
-    // cherche dans toute l'image et on relance le tracker là où il est retrouvé.
+    // cherche dans l'image (le long des bords seulement s'il est sorti) ; un candidat doit être
+    // retrouvé à deux recherches de suite au même endroit avant de relancer le tracker.
     m_state.reacquired = false;
     if (found) {
         m_lostFrames = 0;
-        m_lastBoxSize = QSizeF(roi.width, roi.height);
+        // Dernière position connue (bord, sauts) : seulement sur des images fiables. Taille de
+        // référence de la recherche : seulement quand l'objet est entièrement visible (au bord, le
+        // cadre rétrécit avec la partie visible).
+        if (reliable) {
+            if (!m_lastTouchedBorder)
+                m_lastBoxSize = QSizeF(roi.width, roi.height);
+            m_lastRoi = roi;
+        }
+        m_candidate = cv::Rect();
     } else if (++m_lostFrames % kSearchEveryFrames == 0) {
-        const cv::Rect candidate = searchObject(work);
+        cv::Rect candidate = searchObject(work, m_state.outOfView);
+        if (!candidate.empty() && overlap(candidate, m_candidate) < kCandidateMinOverlap) {
+            m_candidate = candidate;  // première vue : à confirmer
+            candidate = cv::Rect();
+        } else if (candidate.empty()) {
+            m_candidate = cv::Rect();
+        }
         if (!candidate.empty() && createTracker(work, candidate)) {
             roi = candidate;
             found = true;
             m_state.reacquired = true;
             m_state.drifted = false;
+            m_state.outOfView = false;
+            m_candidate = cv::Rect();
+            m_lastRoi = candidate;
+            m_lastTouchedBorder = false;
             ++m_state.reacquisitions;
             m_state.confidence = appearanceScore(work, roi);
             m_lowConfidenceFrames = 0;
@@ -370,7 +483,7 @@ const TrackedObject &ObjectTracker::update(const QImage &image, qint64 timeMs, c
     }
     // Objet perdu : position prédite pendant le délai de maintien, puis figée à la dernière
     // position connue. Le tracker continue de chercher aux images suivantes.
-    m_state.predicted = !found && timeMs - m_lastSeenMs <= m_holdMs;
+    m_state.predicted = !found && !m_state.outOfView && timeMs - m_lastSeenMs <= m_holdMs;
     if (m_state.predicted) {
         m_state.center = m_filter.position();
         m_state.box.moveCenter(m_state.center);

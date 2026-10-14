@@ -26,6 +26,8 @@ struct TrackedObject
     // Ressemblance du contenu du cadre avec l'objet sélectionné, de 0 à 1 (lissée dans le temps).
     double confidence = 0.0;
     bool drifted = false;  // perdu parce que le cadre ne ressemble plus à l'objet
+    // Sorti de l'image (perdu au bord) : seul un retour par un bord de l'image peut le retrouver.
+    bool outOfView = false;
     bool reacquired = false;  // retrouvé à cette image par la recherche dans toute l'image
     int reacquisitions = 0;   // nombre de reprises automatiques depuis la sélection
     QRectF box;           // cadre du tracker (dernière position connue si l'objet est perdu)
@@ -128,11 +130,13 @@ public:
 
 private:
     cv::Mat toWorkingImage(const QImage &image, double &scale) const;
-    // Ressemblance (0 à 1) du contenu de « roi » avec l'apparence mémorisée de l'objet.
-    double appearanceScore(const cv::Mat &work, const cv::Rect &roi) const;
+    // Ressemblance (0 à 1) du contenu de « roi » avec l'apparence mémorisée de l'objet (mise à
+    // jour lentement), ou avec son apparence d'origine si « initial » est vrai.
+    double appearanceScore(const cv::Mat &work, const cv::Rect &roi, bool initial = false) const;
     static cv::Mat colorHistogram(const cv::Mat &bgrPatch);
-    // Cherche l'objet dans toute l'image de travail ; retourne un cadre vide s'il n'est pas trouvé.
-    cv::Rect searchObject(const cv::Mat &work) const;
+    // Cherche l'objet dans l'image de travail (seulement le long des bords si « bordersOnly ») ;
+    // retourne un cadre vide s'il n'est pas trouvé.
+    cv::Rect searchObject(const cv::Mat &work, bool bordersOnly) const;
     bool createTracker(const cv::Mat &work, const cv::Rect &roi);
     void computeMotion(const FloorMapper *floor);
     void updateMotionState(qint64 timeMs);
@@ -152,8 +156,12 @@ private:
     cv::Mat m_refHist;   // histogramme teinte-saturation (mis à jour lentement)
     cv::Mat m_refGray;   // motif en niveaux de gris, mis à jour lentement (suit les rotations lentes)
     cv::Mat m_initGray;  // motif d'origine, tel qu'à la sélection
+    cv::Mat m_initHist;  // couleurs d'origine
     int m_lowConfidenceFrames = 0;
     int m_lostFrames = 0;    // images consécutives sans l'objet
+    bool m_lastTouchedBorder = false;  // le dernier cadre trouvé touchait le bord de l'image
+    cv::Rect m_lastRoi;      // dernier cadre trouvé (image de travail)
+    cv::Rect m_candidate;    // candidat de reprise à confirmer à la recherche suivante
 
     // Détection de mouvement (dans l'unité courante : mm sur le sol ou pixels).
     double m_motionMm = 20.0;
