@@ -53,7 +53,7 @@ struct MotionEvent
     // GameEnter et GameExit : jeu « Détection robot dans zone » (robot entièrement dans la zone).
     // GameGreen à GameWin : jeu « 1, 2, 3 Soleil » (feu vert, « Soleil ! », faute, arrivée).
     enum Type { MotionStart, MotionStop, Lost, Found, ZoneEnter, ZoneExit, GameEnter, GameExit, GameGreen, GameRed,
-                GameFault, GameWin };
+                GameFault, GameWin, GameTreasure, GameOver };  // GameTreasure, GameOver : chasse au trésor
     Type type = MotionStart;
     qint64 timeMs = 0;      // horloge du suivi
     qint64 wallTimeMs = 0;  // heure réelle (ms depuis 1970), renseignée par l'application

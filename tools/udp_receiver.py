@@ -56,7 +56,8 @@ def describe(msg):
              "zone_enter": "ENTRE DANS LA ZONE", "zone_exit": "SORT DE LA ZONE",
              "game_zone_enter": "JEU : ENTIÈREMENT DANS LA ZONE", "game_zone_exit": "JEU : SORT DE LA ZONE",
              "game_green": "SOLEIL : FEU VERT", "game_red": "SOLEIL : « SOLEIL ! »",
-             "game_fault": "SOLEIL : FAUTE", "game_win": "SOLEIL : ARRIVÉE"}
+             "game_fault": "SOLEIL : FAUTE", "game_win": "SOLEIL : ARRIVÉE",
+             "game_treasure": "TRÉSOR TROUVÉ", "game_over": "CHASSE AU TRÉSOR TERMINÉE"}
     for e in msg.get("events", []):
         unit = "mm" if "position_mm" in e else "px"
         x, y = e.get("position_mm") or e.get("position_px")
@@ -75,7 +76,10 @@ def describe(msg):
     # Jeu « Détection robot dans zone » en cours (objet « game »).
     game = msg.get("game")
     if game:
-        if game["mode"] == "soleil":
+        if game["mode"] == "treasure":
+            parts.append(f"jeu chasse au trésor : {game['hint']}, {game['found']} trésor(s), "
+                         f"{game['remaining_s']:.0f} s restantes")
+        elif game["mode"] == "soleil":
             parts.append(f"jeu 1, 2, 3 Soleil : {game['phase']}, {game['elapsed_s']:.1f} s, "
                          f"{game['faults']} faute(s), score {game['score_s']:.1f} s")
         else:

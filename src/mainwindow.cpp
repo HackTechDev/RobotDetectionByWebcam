@@ -615,6 +615,7 @@ MainWindow::MainWindow(QWidget *parent)
     QMenu *gameMenu = menuBar()->addMenu(tr("&Jeu"));
     gameMenu->addAction(tr("Détection robot dans zone..."), this, &MainWindow::openRobotZoneGame);
     gameMenu->addAction(tr("1, 2, 3 Soleil..."), this, &MainWindow::openSoleilGame);
+    gameMenu->addAction(tr("Chasse au trésor..."), this, &MainWindow::openTreasureGame);
     resize(1100, 650);
 
     connect(m_colorButton, &QPushButton::clicked, this, &MainWindow::chooseColor);
@@ -1928,10 +1929,7 @@ void MainWindow::openRobotZoneGame()
             m_game.setZone(m_gameDialog->selectedZone());
         };
         connect(m_gameDialog, &RobotZoneGameDialog::startRequested, this, [this, applySelection] {
-            // Un seul jeu à la fois.
-            if (m_soleil.isActive() && m_soleilDialog)
-                m_soleilDialog->showStopped();
-            m_soleil.stop();
+            stopOtherGames(GameKind::RobotZone);
             applySelection();
             m_game.start(m_clock.elapsed());
             m_gameDialog->setRunning(true);
@@ -1962,10 +1960,7 @@ void MainWindow::openSoleilGame()
     if (!m_soleilDialog) {
         m_soleilDialog = new SoleilGameDialog(this);
         connect(m_soleilDialog, &SoleilGameDialog::startRequested, this, [this] {
-            // Un seul jeu à la fois.
-            m_game.stop();
-            if (m_gameDialog)
-                m_gameDialog->setRunning(false);
+            stopOtherGames(GameKind::Soleil);
             m_soleil.setRobot(m_soleilDialog->selectedRobot());
             m_soleil.setFinishZone(m_soleilDialog->selectedZone());
             m_soleil.setDifficulty(m_soleilDialog->difficulty());
@@ -1986,9 +1981,53 @@ void MainWindow::openSoleilGame()
     m_soleilDialog->activateWindow();
 }
 
+void MainWindow::stopOtherGames(GameKind keep)
+{
+    if (keep != GameKind::RobotZone && m_game.isRunning()) {
+        m_game.stop();
+        if (m_gameDialog)
+            m_gameDialog->setRunning(false);
+    }
+    if (keep != GameKind::Soleil && m_soleil.isActive()) {
+        if (m_soleilDialog)
+            m_soleilDialog->showStopped();
+        m_soleil.stop();
+    }
+    if (keep != GameKind::Treasure && m_treasure.isActive()) {
+        if (m_treasureDialog)
+            m_treasureDialog->showStopped();
+        m_treasure.stop();
+    }
+}
+
+void MainWindow::openTreasureGame()
+{
+    if (!m_treasureDialog) {
+        m_treasureDialog = new TreasureGameDialog(this);
+        connect(m_treasureDialog, &TreasureGameDialog::startRequested, this, [this] {
+            stopOtherGames(GameKind::Treasure);
+            m_treasure.setRobot(m_treasureDialog->selectedRobot());
+            m_treasure.setTerrainZone(m_treasureDialog->selectedZone());
+            m_treasure.setDuration(m_treasureDialog->duration());
+            m_treasure.setDifficulty(m_treasureDialog->difficulty());
+            m_treasure.start(m_clock.elapsed());
+            m_treasureDialog->setRunning(true);
+        });
+        connect(m_treasureDialog, &TreasureGameDialog::stopRequested, this, [this] {
+            m_treasure.stop();
+            m_treasureDialog->showStopped();
+            refreshGameChoices();
+        });
+    }
+    refreshGameChoices();
+    m_treasureDialog->show();
+    m_treasureDialog->raise();
+    m_treasureDialog->activateWindow();
+}
+
 void MainWindow::refreshGameChoices()
 {
-    if (!m_gameDialog && !m_soleilDialog)
+    if (!m_gameDialog && !m_soleilDialog && !m_treasureDialog)
         return;
     std::vector<std::pair<int, QString>> robots, zones;
     for (const TrackedItem &item : m_tracked)
@@ -2000,6 +2039,8 @@ void MainWindow::refreshGameChoices()
     // Pendant une partie, les choix sont figés.
     if (m_soleilDialog && !m_soleil.isRunning())
         m_soleilDialog->setChoices(robots, zones);
+    if (m_treasureDialog && !m_treasure.isRunning())
+        m_treasureDialog->setChoices(robots, zones);
 }
 
 void MainWindow::saveZones() const
@@ -2307,6 +2348,12 @@ QString eventText(const MotionEvent &e)
             .arg(e.duration, 0, 'f', 1)
             .arg(e.count)
             .arg(e.duration + e.count * SoleilGame::kPenaltySeconds, 0, 'f', 1);
+    case MotionEvent::GameTreasure:
+        return QObject::tr("Chasse au trésor : trésor n° %1 trouvé en %2").arg(e.count).arg(where);
+    case MotionEvent::GameOver:
+        return QObject::tr("Chasse au trésor : terminé, %1 trésor(s) trouvé(s) en %2 s")
+            .arg(e.count)
+            .arg(e.duration, 0, 'f', 0);
     }
     return {};
 }
@@ -2326,6 +2373,8 @@ QString eventTypeKey(MotionEvent::Type type)
     case MotionEvent::GameRed: return QStringLiteral("game_red");
     case MotionEvent::GameFault: return QStringLiteral("game_fault");
     case MotionEvent::GameWin: return QStringLiteral("game_win");
+    case MotionEvent::GameTreasure: return QStringLiteral("game_treasure");
+    case MotionEvent::GameOver: return QStringLiteral("game_over");
     }
     return {};
 }
@@ -2603,6 +2652,27 @@ void MainWindow::presentFrame(const FrameResult &result)
                 m_soleilDialog->setRunning(false);  // résultat affiché, nouvelle partie possible
         }
     }
+    // Jeu « Chasse au trésor ».
+    QString treasureRobotName;
+    if (m_treasure.isActive()) {
+        const TrackedObject *robot = nullptr;
+        for (const TrackedItem &item : m_tracked) {
+            if (item.id == m_treasure.robotId()) {
+                robot = &item.tracker->state();
+                treasureRobotName = item.name;
+            }
+        }
+        if (!robot)
+            treasureRobotName = tr("Le robot");
+        const std::vector<MotionEvent> treasureEvents =
+            m_treasure.update(robot, treasureRobotName, m_zones.zones(), image.size(), m_clock.elapsed());
+        frameEvents.insert(frameEvents.end(), treasureEvents.begin(), treasureEvents.end());
+        if (m_treasureDialog) {
+            m_treasureDialog->showState(m_treasure, treasureRobotName, m_clock.elapsed());
+            if (m_treasure.phase() == TreasureGame::Over)
+                m_treasureDialog->setRunning(false);  // résultat affiché, nouvelle partie possible
+        }
+    }
     const bool calibOn = result.options.calibOn;
     const std::vector<QPointF> &boardCorners = result.boardCorners;
     const bool boardFound = result.boardFound;
@@ -2654,6 +2724,9 @@ void MainWindow::presentFrame(const FrameResult &result)
             gamePtr = &gameJson;
         } else if (m_soleil.isActive()) {
             gameJson = m_soleil.toJson(soleilRobotName, m_clock.elapsed());
+            gamePtr = &gameJson;
+        } else if (m_treasure.isActive()) {
+            gameJson = m_treasure.toJson(treasureRobotName, m_clock.elapsed());
             gamePtr = &gameJson;
         }
         std::vector<ZoneEntry> zoneEntries;
@@ -2810,6 +2883,34 @@ void MainWindow::presentFrame(const FrameResult &result)
         }
         banner = m_soleil.bannerText(soleilRobotName, m_clock.elapsed());
         bannerColor = m_soleil.bannerColor(m_clock.elapsed());
+    } else if (m_treasure.isActive()) {
+        // Terrain (si c'est une zone) en pointillés dorés, et une étoile par trésor trouvé.
+        const QColor gold(255, 200, 0);
+        for (const Zone &z : m_zones.zones()) {
+            if (z.id != m_treasure.terrainZoneId())
+                continue;
+            QRectF r = ZoneManager::imageRect(z, image.size());
+            if (mirror)
+                r.moveLeft(width - r.right());
+            painter.setPen(QPen(gold, penWidth * 2, Qt::DashLine));
+            painter.drawRect(r);
+        }
+        const double starRadius = std::max(8.0, m_treasure.treasureRadius() * 0.5);
+        for (const QPointF &p : m_treasure.foundPositions()) {
+            const QPointF c = toDisplay(p);
+            QPolygonF star;
+            for (int k = 0; k < 10; ++k) {
+                const double a = -M_PI / 2 + k * M_PI / 5;
+                const double rr = k % 2 ? starRadius * 0.45 : starRadius;
+                star << c + QPointF(std::cos(a) * rr, std::sin(a) * rr);
+            }
+            painter.setPen(QPen(QColor(120, 80, 0), std::max(1, penWidth / 2)));
+            painter.setBrush(gold);
+            painter.drawPolygon(star);
+        }
+        painter.setBrush(Qt::NoBrush);
+        banner = m_treasure.bannerText(treasureRobotName, m_clock.elapsed());
+        bannerColor = m_treasure.bannerColor(m_clock.elapsed());
     }
     if (!banner.isEmpty()) {
         QFont bannerFont = font;

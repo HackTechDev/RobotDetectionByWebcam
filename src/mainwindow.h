@@ -11,6 +11,7 @@
 #include "zonemanager.h"
 #include "robotzonegame.h"
 #include "soleilgame.h"
+#include "treasuregame.h"
 
 #include <QCameraFormat>
 #include <QElapsedTimer>
@@ -161,6 +162,10 @@ private:
     // Menu Jeu : détection du robot (objet suivi) entièrement dans une zone.
     void openRobotZoneGame();
     void openSoleilGame();
+    void openTreasureGame();
+    // Un seul jeu à la fois : arrête les autres jeux que « keep ».
+    enum class GameKind { RobotZone, Soleil, Treasure };
+    void stopOtherGames(GameKind keep);
     void refreshGameChoices();
     void applySmoothingToTracker();
     void configureTracker(ObjectTracker &tracker) const;
@@ -273,6 +278,8 @@ private:
     RobotZoneGameDialog *m_gameDialog = nullptr;
     SoleilGame m_soleil;  // jeu « 1, 2, 3 Soleil »
     SoleilGameDialog *m_soleilDialog = nullptr;
+    TreasureGame m_treasure;  // jeu « Chasse au trésor »
+    TreasureGameDialog *m_treasureDialog = nullptr;
     QPushButton *m_zoneAddButton = nullptr;
     QPushButton *m_zoneConfirmButton = nullptr;
     QPushButton *m_zoneRemoveButton = nullptr;

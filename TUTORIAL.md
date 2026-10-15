@@ -15,7 +15,7 @@ Les parties s'enchaînent, mais vous pouvez vous arrêter après n'importe laque
 | [6. Mesurer sur le sol en millimètres](#6-mesurer-sur-le-sol-en-millimètres) | Tracer un rectangle au ruban adhésif, lire des positions en mm, définir des zones nommées, essayer le jeu | 25 min |
 | [7. Lisser les positions et mesurer la vitesse](#7-lisser-les-positions-et-mesurer-la-vitesse) | Mesurer une vitesse, voir une position prédite | 10 min |
 | [8. Envoyer les positions à un programme](#8-envoyer-les-positions-à-un-programme) | Recevoir les positions en Python, calculer un cap vers une cible | 20 min |
-| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot, jouer au « robot au garage » et à « 1, 2, 3 Soleil » sur un second écran | 35 min |
+| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot, jouer au « robot au garage », à « 1, 2, 3 Soleil » et à la chasse au trésor sur un second écran | 45 min |
 
 ---
 
@@ -55,7 +55,7 @@ cmake --build build -j
 
 ### 1.1 Faire le tour de l'écran
 
-- En **haut**, la barre de menus, avec le menu **Jeu** et ses deux jeux (parties 6.4, 9.5 et 9.6).
+- En **haut**, la barre de menus, avec le menu **Jeu** et ses trois jeux (parties 6.4 et 9.5 à 9.7).
 - À **gauche**, l'image de la caméra, sur laquelle les détections sont dessinées. Au lancement, **aucune détection automatique n'est active** : l'image est nue tant que vous n'activez pas le carré coloré ou les marqueurs, ou que vous n'encadrez pas un objet.
 - En **haut à droite**, le groupe **Webcam** : **Caméra**, **Résolution**, **Effet miroir** et les boutons **Capture**, **Vidéo**, **Joueur** et **Réglages de l'image...**.
 - Au **milieu à droite**, sept onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Zones**, **Suivi** et **Envoi UDP**.
@@ -498,7 +498,22 @@ Si des fautes sont comptées alors que le robot est bien arrêté, le cadre de s
 
 ✅ **Vérification** : une faute est comptée quand le robot roule pendant « Soleil ! », aucune quand il s'arrête à temps, et la partie se termine à l'arrivée avec le score.
 
-### 9.7 Montrer le jeu au joueur
+### 9.7 Jouer une partie : chasse au trésor
+
+Un trésor invisible est caché sur le terrain ; le joueur le cherche en suivant les indices « chaud / froid ».
+
+1. Facultatif : onglet **Zones**, tracez une zone **Terrain** qui couvre la zone de jeu, sans les bords ni les obstacles. Sans elle, le trésor peut être caché n'importe où dans l'image.
+2. Gardez le robot dans la liste des objets suivis (partie 9.5).
+3. Menu **Jeu**, **Chasse au trésor...** : choisissez **Robot**, **Terrain**, la **Durée** (**2 minutes** pour commencer) et la difficulté **Facile**, puis **Démarrer**.
+4. Lisez le bandeau : **Glacial** et **Froid** (bleu), **Tiède**, **Chaud**, puis **BRÛLANT** (rouge). « **▲ plus chaud** » indique que le robot se rapproche, « **▼ plus froid** » qu'il s'éloigne.
+5. Quand le robot passe sur le trésor, « **TRÉSOR TROUVÉ !** » s'affiche, une **étoile dorée** marque l'endroit, et un nouveau trésor est caché ailleurs.
+6. À la fin du temps, le bandeau bleu donne le total : « TERMINÉ ! 5 trésors trouvés ». Essayez ensuite en **Normal**, puis en **Difficile** : le trésor est plus petit.
+
+C'est le **centre** du robot qui doit passer sur le trésor : près du but, balayez lentement autour du point « BRÛLANT ». Le détail est dans le [guide](USER_GUIDE.md#88-jeu--chasse-au-trésor).
+
+✅ **Vérification** : les indices se réchauffent quand le robot s'approche du trésor, et chaque trésor trouvé laisse une étoile dorée sur l'image.
+
+### 9.8 Montrer le jeu au joueur
 
 Si un second écran est branché, le joueur peut suivre la partie sans voir les réglages :
 
@@ -510,11 +525,11 @@ Si un second écran est branché, le joueur peut suivre la partie sans voir les 
 
 La fenêtre du joueur et ses réglages sont mémorisés : elle se rouvre au lancement suivant si elle était ouverte. Des idées de jeux sont réunies dans [GAMES.md](GAMES.md).
 
-### 9.8 Quitter proprement
+### 9.9 Quitter proprement
 
 Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, une vidéo en cours est terminée proprement, et la webcam retrouve son exposition automatique et ses réglages d'origine pour les autres logiciels.
 
-✅ **Vérification finale** : le programme de pilotage reçoit en continu la position et le cap du robot, en millimètres, pendant qu'il se déplace, le jeu signale le robot garé entièrement dans le « Garage », et une partie de « 1, 2, 3 Soleil » se joue jusqu'à l'arrivée.
+✅ **Vérification finale** : le programme de pilotage reçoit en continu la position et le cap du robot, en millimètres, pendant qu'il se déplace, le jeu signale le robot garé entièrement dans le « Garage », une partie de « 1, 2, 3 Soleil » se joue jusqu'à l'arrivée, et la chasse au trésor guide le robot jusqu'aux trésors.
 
 ---
 
@@ -539,6 +554,7 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, u
 | Montrer le jeu au joueur | Bouton **Joueur** | Seconde fenêtre en plein écran sur l'autre écran |
 | Savoir si le robot est entièrement dans une zone | Menu **Jeu** | **Détection robot dans zone...**, choisir le robot et la zone, **Démarrer** |
 | Jouer à « 1, 2, 3 Soleil » | Menu **Jeu** | **1, 2, 3 Soleil...**, choisir le robot, l'arrivée et la difficulté, **Démarrer** |
+| Jouer à la chasse au trésor | Menu **Jeu** | **Chasse au trésor...**, choisir le robot, le terrain, la durée et la difficulté, **Démarrer** |
 
 ## Pour aller plus loin
 
