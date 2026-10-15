@@ -108,7 +108,7 @@ L'application sait aussi **capturer une image** ou **enregistrer une vidéo** de
   - **Suivi** : suivi d'un ou plusieurs objets quelconques désignés à la souris, journal de leurs mouvements, et lissage des positions des carrés et des marqueurs (voir [section 6](#6-suivre-des-objets-encadrés)). L'onglet défile s'il ne tient pas en hauteur ;
   - **Envoi UDP** : envoi des positions à un autre programme (voir [section 10](#10-envoyer-les-positions-à-un-autre-programme)).
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
-- **Menu Jeu**, en haut de la fenêtre : jeux construits sur le suivi et les zones, **Détection robot dans zone...** (voir [8.6](#86-jeu--détecter-le-robot-dans-une-zone)), **1, 2, 3 Soleil...** (voir [8.7](#87-jeu--1-2-3-soleil)) et **Chasse au trésor...** (voir [8.8](#88-jeu--chasse-au-trésor)). Un seul jeu tourne à la fois : en démarrer un arrête l'autre.
+- **Menu Jeu**, en haut de la fenêtre : jeux construits sur le suivi et les zones, **Détection robot dans zone...** (voir [8.6](#86-jeu--détecter-le-robot-dans-une-zone)), **1, 2, 3 Soleil...** (voir [8.7](#87-jeu--1-2-3-soleil)) et **Chasse au trésor...** (voir [8.8](#88-jeu--chasse-au-trésor)). Un seul jeu tourne à la fois : en démarrer un arrête les autres.
 - **Barre d'état**, tout en bas de la fenêtre : messages brefs, par exemple le chemin d'une image capturée ou d'une vidéo enregistrée.
 - **Quitter** : ferme l'application. Une fenêtre demande de confirmer : cliquez sur **Quitter** pour fermer, ou sur **Annuler** (ou appuyez sur Échap) pour continuer. La même confirmation s'affiche si vous fermez la fenêtre avec la croix de la barre de titre.
 
