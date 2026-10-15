@@ -614,6 +614,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Menu Jeu.
     QMenu *gameMenu = menuBar()->addMenu(tr("&Jeu"));
     gameMenu->addAction(tr("Détection robot dans zone..."), this, &MainWindow::openRobotZoneGame);
+    gameMenu->addAction(tr("1, 2, 3 Soleil..."), this, &MainWindow::openSoleilGame);
     resize(1100, 650);
 
     connect(m_colorButton, &QPushButton::clicked, this, &MainWindow::chooseColor);
@@ -1927,6 +1928,10 @@ void MainWindow::openRobotZoneGame()
             m_game.setZone(m_gameDialog->selectedZone());
         };
         connect(m_gameDialog, &RobotZoneGameDialog::startRequested, this, [this, applySelection] {
+            // Un seul jeu à la fois.
+            if (m_soleil.isActive() && m_soleilDialog)
+                m_soleilDialog->showStopped();
+            m_soleil.stop();
             applySelection();
             m_game.start(m_clock.elapsed());
             m_gameDialog->setRunning(true);
@@ -1952,16 +1957,49 @@ void MainWindow::openRobotZoneGame()
     m_gameDialog->activateWindow();
 }
 
+void MainWindow::openSoleilGame()
+{
+    if (!m_soleilDialog) {
+        m_soleilDialog = new SoleilGameDialog(this);
+        connect(m_soleilDialog, &SoleilGameDialog::startRequested, this, [this] {
+            // Un seul jeu à la fois.
+            m_game.stop();
+            if (m_gameDialog)
+                m_gameDialog->setRunning(false);
+            m_soleil.setRobot(m_soleilDialog->selectedRobot());
+            m_soleil.setFinishZone(m_soleilDialog->selectedZone());
+            m_soleil.setDifficulty(m_soleilDialog->difficulty());
+            // Même seuil de mouvement que le suivi (onglet Suivi).
+            m_soleil.setThresholds(m_motionMmSpin->value(), m_motionPxSpin->value());
+            m_soleil.start(m_clock.elapsed());
+            m_soleilDialog->setRunning(true);
+        });
+        connect(m_soleilDialog, &SoleilGameDialog::stopRequested, this, [this] {
+            m_soleil.stop();
+            m_soleilDialog->showStopped();
+            refreshGameChoices();
+        });
+    }
+    refreshGameChoices();
+    m_soleilDialog->show();
+    m_soleilDialog->raise();
+    m_soleilDialog->activateWindow();
+}
+
 void MainWindow::refreshGameChoices()
 {
-    if (!m_gameDialog)
+    if (!m_gameDialog && !m_soleilDialog)
         return;
     std::vector<std::pair<int, QString>> robots, zones;
     for (const TrackedItem &item : m_tracked)
         robots.emplace_back(item.id, item.name);
     for (const Zone &z : m_zones.zones())
         zones.emplace_back(z.id, z.name);
-    m_gameDialog->setChoices(robots, zones);
+    if (m_gameDialog)
+        m_gameDialog->setChoices(robots, zones);
+    // Pendant une partie, les choix sont figés.
+    if (m_soleilDialog && !m_soleil.isRunning())
+        m_soleilDialog->setChoices(robots, zones);
 }
 
 void MainWindow::saveZones() const
@@ -2257,6 +2295,18 @@ QString eventText(const MotionEvent &e)
         return QObject::tr("Jeu : entièrement dans la zone « %1 » en %2").arg(e.zoneName, where);
     case MotionEvent::GameExit:
         return QObject::tr("Jeu : n'est plus entièrement dans la zone « %1 »").arg(e.zoneName);
+    case MotionEvent::GameGreen:
+        return QObject::tr("1, 2, 3 Soleil : feu vert");
+    case MotionEvent::GameRed:
+        return QObject::tr("1, 2, 3 Soleil : « Soleil ! »");
+    case MotionEvent::GameFault:
+        return QObject::tr("1, 2, 3 Soleil : faute n° %1, a bougé en %2").arg(e.count).arg(where);
+    case MotionEvent::GameWin:
+        return QObject::tr("1, 2, 3 Soleil : arrivé dans « %1 » en %2 s, %3 faute(s), score %4 s")
+            .arg(e.zoneName)
+            .arg(e.duration, 0, 'f', 1)
+            .arg(e.count)
+            .arg(e.duration + e.count * SoleilGame::kPenaltySeconds, 0, 'f', 1);
     }
     return {};
 }
@@ -2272,6 +2322,10 @@ QString eventTypeKey(MotionEvent::Type type)
     case MotionEvent::ZoneExit: return QStringLiteral("zone_exit");
     case MotionEvent::GameEnter: return QStringLiteral("game_zone_enter");
     case MotionEvent::GameExit: return QStringLiteral("game_zone_exit");
+    case MotionEvent::GameGreen: return QStringLiteral("game_green");
+    case MotionEvent::GameRed: return QStringLiteral("game_red");
+    case MotionEvent::GameFault: return QStringLiteral("game_fault");
+    case MotionEvent::GameWin: return QStringLiteral("game_win");
     }
     return {};
 }
@@ -2297,7 +2351,7 @@ void MainWindow::logEvents(const std::vector<MotionEvent> &events)
         item->setData(Qt::UserRole, QVariantList{e.wallTimeMs, eventTypeKey(e.type), e.position.x(), e.position.y(),
                                                  e.onFloor ? QStringLiteral("mm") : QStringLiteral("px"),
                                                  e.distance, e.travelled, e.duration, e.objectId, e.objectName,
-                                                 e.zoneName});
+                                                 e.zoneName, e.count});
         m_eventList->insertItem(0, item);
     }
     while (m_eventList->count() > 500)
@@ -2316,14 +2370,14 @@ void MainWindow::saveEventLog()
         return;
     }
     QTextStream out(&file);
-    out << "heure;horodatage_ms;objet_id;objet;type;x;y;unite;deplacement;parcours;duree_s;zone\n";
+    out << "heure;horodatage_ms;objet_id;objet;type;x;y;unite;deplacement;parcours;duree_s;zone;compte\n";
     for (int i = m_eventList->count() - 1; i >= 0; --i) {  // du plus ancien au plus récent
         const QVariantList d = m_eventList->item(i)->data(Qt::UserRole).toList();
         out << QDateTime::fromMSecsSinceEpoch(d[0].toLongLong()).toString(Qt::ISODateWithMs) << ';' << d[0].toLongLong()
             << ';' << d[8].toInt() << ';' << d[9].toString().replace(';', ',') << ';' << d[1].toString() << ';' << QString::number(d[2].toDouble(), 'f', 1) << ';'
             << QString::number(d[3].toDouble(), 'f', 1) << ';' << d[4].toString() << ';'
             << QString::number(d[5].toDouble(), 'f', 1) << ';' << QString::number(d[6].toDouble(), 'f', 1) << ';'
-            << QString::number(d[7].toDouble(), 'f', 2) << ';' << d.value(10).toString().replace(';', ',') << '\n';
+            << QString::number(d[7].toDouble(), 'f', 2) << ';' << d.value(10).toString().replace(';', ',') << ';' << d.value(11).toInt() << '\n';
     }
 }
 
@@ -2528,6 +2582,27 @@ void MainWindow::presentFrame(const FrameResult &result)
         if (m_gameDialog)
             m_gameDialog->showState(m_game, gameRobotName, m_clock.elapsed());
     }
+    // Jeu « 1, 2, 3 Soleil ».
+    QString soleilRobotName;
+    if (m_soleil.isActive()) {
+        const TrackedObject *robot = nullptr;
+        for (const TrackedItem &item : m_tracked) {
+            if (item.id == m_soleil.robotId()) {
+                robot = &item.tracker->state();
+                soleilRobotName = item.name;
+            }
+        }
+        if (!robot)
+            soleilRobotName = tr("Le robot");
+        const std::vector<MotionEvent> soleilEvents =
+            m_soleil.update(robot, soleilRobotName, m_zones.zones(), image.size(), m_clock.elapsed());
+        frameEvents.insert(frameEvents.end(), soleilEvents.begin(), soleilEvents.end());
+        if (m_soleilDialog) {
+            m_soleilDialog->showState(m_soleil, soleilRobotName, m_clock.elapsed());
+            if (m_soleil.phase() == SoleilGame::Won)
+                m_soleilDialog->setRunning(false);  // résultat affiché, nouvelle partie possible
+        }
+    }
     const bool calibOn = result.options.calibOn;
     const std::vector<QPointF> &boardCorners = result.boardCorners;
     const bool boardFound = result.boardFound;
@@ -2572,13 +2647,14 @@ void MainWindow::presentFrame(const FrameResult &result)
         std::vector<TrackedEntry> trackedEntries;
         for (const TrackedItem &item : m_tracked)
             trackedEntries.push_back({item.id, item.name, &item.tracker->state()});
-        GameEntry gameEntry;
-        const GameEntry *gamePtr = nullptr;
+        QJsonObject gameJson;
+        const QJsonObject *gamePtr = nullptr;
         if (m_game.isRunning()) {
-            gameEntry = {m_game.robotId(), gameRobotName, m_game.zoneId(), m_game.robotFound(),
-                         m_game.state() == RobotZoneGame::Inside, m_game.insideZoneId(), m_game.insideZoneName(),
-                         m_game.timeInside(m_clock.elapsed()), m_game.entries()};
-            gamePtr = &gameEntry;
+            gameJson = m_game.toJson(gameRobotName, m_clock.elapsed());
+            gamePtr = &gameJson;
+        } else if (m_soleil.isActive()) {
+            gameJson = m_soleil.toJson(soleilRobotName, m_clock.elapsed());
+            gamePtr = &gameJson;
         }
         std::vector<ZoneEntry> zoneEntries;
         const bool floorReady = m_floor.isReady();
@@ -2693,8 +2769,10 @@ void MainWindow::presentFrame(const FrameResult &result)
         }
         painter.setBrush(Qt::NoBrush);
     }
-    // Jeu : zone atteinte entourée en vert, et bandeau d'état en haut de l'image (visible aussi dans
-    // la fenêtre du joueur).
+    // Jeux : zone visée mise en évidence, et bandeau d'état en haut de l'image (visible aussi dans la
+    // fenêtre du joueur).
+    QString banner;
+    QColor bannerColor;
     if (m_game.isRunning()) {
         for (const Zone &z : m_zones.zones()) {
             if (z.id != m_game.insideZoneId())
@@ -2705,8 +2783,6 @@ void MainWindow::presentFrame(const FrameResult &result)
             painter.setPen(QPen(QColor(40, 220, 80), penWidth * 3));
             painter.drawRect(r);
         }
-        QString banner;
-        QColor bannerColor;
         switch (m_game.state()) {
         case RobotZoneGame::Inside:
             banner = tr("%1 : DANS LA ZONE « %2 »").arg(gameRobotName, m_game.insideZoneName());
@@ -2721,6 +2797,21 @@ void MainWindow::presentFrame(const FrameResult &result)
             bannerColor = QColor(224, 142, 11);
             break;
         }
+    } else if (m_soleil.isActive()) {
+        // Zone d'arrivée : contour blanc épais en pointillés (« ligne d'arrivée »).
+        for (const Zone &z : m_zones.zones()) {
+            if (z.id != m_soleil.finishZoneId())
+                continue;
+            QRectF r = ZoneManager::imageRect(z, image.size());
+            if (mirror)
+                r.moveLeft(width - r.right());
+            painter.setPen(QPen(Qt::white, penWidth * 2, Qt::DashLine));
+            painter.drawRect(r);
+        }
+        banner = m_soleil.bannerText(soleilRobotName, m_clock.elapsed());
+        bannerColor = m_soleil.bannerColor(m_clock.elapsed());
+    }
+    if (!banner.isEmpty()) {
         QFont bannerFont = font;
         bannerFont.setPixelSize(font.pixelSize() * 2);
         bannerFont.setBold(true);

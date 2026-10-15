@@ -8,6 +8,8 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
+#include <cmath>
+
 namespace {
 
 constexpr qint64 kConfirmMs = 200;
@@ -110,6 +112,23 @@ std::vector<MotionEvent> RobotZoneGame::update(const TrackedObject *robot, const
     }
     m_state = m_insideZoneId != 0 ? Inside : (m_robotFound ? Outside : Lost);
     return events;
+}
+
+QJsonObject RobotZoneGame::toJson(const QString &robotName, qint64 timeMs) const
+{
+    QJsonObject g{{QStringLiteral("mode"), QStringLiteral("robot_in_zone")},
+                  {QStringLiteral("robot_id"), m_robotId},
+                  {QStringLiteral("robot"), robotName},
+                  {QStringLiteral("target_zone_id"), m_zoneId},
+                  {QStringLiteral("found"), m_robotFound},
+                  {QStringLiteral("inside"), m_state == Inside},
+                  {QStringLiteral("time_inside_s"), std::round(timeInside(timeMs) * 10) / 10},
+                  {QStringLiteral("entries"), m_entries}};
+    if (m_state == Inside) {
+        g.insert(QStringLiteral("zone_id"), m_insideZoneId);
+        g.insert(QStringLiteral("zone"), m_insideZoneName);
+    }
+    return g;
 }
 
 RobotZoneGameDialog::RobotZoneGameDialog(QWidget *parent)

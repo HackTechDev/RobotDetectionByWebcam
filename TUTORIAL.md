@@ -15,7 +15,7 @@ Les parties s'enchaînent, mais vous pouvez vous arrêter après n'importe laque
 | [6. Mesurer sur le sol en millimètres](#6-mesurer-sur-le-sol-en-millimètres) | Tracer un rectangle au ruban adhésif, lire des positions en mm, définir des zones nommées, essayer le jeu | 25 min |
 | [7. Lisser les positions et mesurer la vitesse](#7-lisser-les-positions-et-mesurer-la-vitesse) | Mesurer une vitesse, voir une position prédite | 10 min |
 | [8. Envoyer les positions à un programme](#8-envoyer-les-positions-à-un-programme) | Recevoir les positions en Python, calculer un cap vers une cible | 20 min |
-| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot, jouer une partie « robot au garage » sur un second écran | 30 min |
+| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot, jouer au « robot au garage » et à « 1, 2, 3 Soleil » sur un second écran | 35 min |
 
 ---
 
@@ -55,7 +55,7 @@ cmake --build build -j
 
 ### 1.1 Faire le tour de l'écran
 
-- En **haut**, la barre de menus, avec le menu **Jeu** (parties 6.4 et 9.5).
+- En **haut**, la barre de menus, avec le menu **Jeu** et ses deux jeux (parties 6.4 et 9.5).
 - À **gauche**, l'image de la caméra, sur laquelle les détections sont dessinées. Au lancement, **aucune détection automatique n'est active** : l'image est nue tant que vous n'activez pas le carré coloré ou les marqueurs, ou que vous n'encadrez pas un objet.
 - En **haut à droite**, le groupe **Webcam** : **Caméra**, **Résolution**, **Effet miroir** et les boutons **Capture**, **Vidéo**, **Joueur** et **Réglages de l'image...**.
 - Au **milieu à droite**, sept onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Zones**, **Suivi** et **Envoi UDP**.
@@ -480,6 +480,8 @@ Le jeu **Détection robot dans zone** vérifie que le robot est **entièrement**
 
 Si votre programme de pilotage écoute l'envoi UDP, il reçoit aussi l'état de la partie (objet `game`) et les événements `game_zone_enter` et `game_zone_exit` : de quoi compter les points ou déclencher un son. Le détail est dans le [guide](USER_GUIDE.md#86-jeu--détecter-le-robot-dans-une-zone).
 
+**Une autre partie : 1, 2, 3 Soleil.** Gardez le robot suivi et tracez une zone **Arrivée** à l'autre bout de la zone de jeu. Menu **Jeu**, **1, 2, 3 Soleil...** : choisissez **Robot**, **Arrivée** et la difficulté **Facile**, puis **Démarrer**. Après le compte à rebours, pilotez le robot seulement quand le bandeau affiche **AVANCEZ !** (vert), et arrêtez-le dès que **SOLEIL !** (rouge) apparaît : s'il bouge encore après le temps de réaction, « FAUTE ! » s'affiche et 5 s s'ajoutent au score. À l'arrivée, le bandeau bleu donne le temps, les fautes et le score. Si des fautes sont comptées alors que le robot est arrêté, augmentez le **seuil de mouvement** (onglet **Suivi**). Le détail est dans le [guide](USER_GUIDE.md#87-jeu--1-2-3-soleil).
+
 ### 9.6 Montrer le jeu au joueur
 
 Si un second écran est branché, le joueur peut suivre la partie sans voir les réglages :
@@ -520,6 +522,7 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, u
 | Récupérer les positions dans un programme | Onglet **Envoi UDP** | **Envoyer les positions**, puis `python3 tools/udp_receiver.py` |
 | Montrer le jeu au joueur | Bouton **Joueur** | Seconde fenêtre en plein écran sur l'autre écran |
 | Savoir si le robot est entièrement dans une zone | Menu **Jeu** | **Détection robot dans zone...**, choisir le robot et la zone, **Démarrer** |
+| Jouer à « 1, 2, 3 Soleil » | Menu **Jeu** | **1, 2, 3 Soleil...**, choisir le robot, l'arrivée et la difficulté, **Démarrer** |
 
 ## Pour aller plus loin
 

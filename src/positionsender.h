@@ -7,6 +7,7 @@
 #include "zonemanager.h"
 
 #include <QHostAddress>
+#include <QJsonObject>
 #include <QSize>
 #include <QString>
 #include <QUdpSocket>
@@ -29,20 +30,6 @@ struct ZoneEntry
     std::vector<QPointF> floorCorners;
 };
 
-// Jeu en cours à envoyer (« Détection robot dans zone »).
-struct GameEntry
-{
-    int robotId = 0;
-    QString robot;
-    int targetZoneId = 0;   // 0 : n'importe quelle zone
-    bool found = false;
-    bool inside = false;
-    int zoneId = 0;         // zone où se trouve le robot (0 : aucune)
-    QString zone;
-    double timeInside = 0;  // en secondes
-    int entries = 0;
-};
-
 // Envoie les résultats de détection en JSON, un datagramme UDP par image.
 class PositionSender
 {
@@ -58,7 +45,7 @@ public:
               const std::vector<DetectedMarker> *markers, const std::vector<TrackedEntry> *tracked = nullptr,
               const std::vector<const SmoothedTrack *> *tracks = nullptr,
               const std::vector<MotionEvent> *events = nullptr, const std::vector<ZoneEntry> *zones = nullptr,
-              const GameEntry *game = nullptr);
+              const QJsonObject *game = nullptr);
 
     qint64 sentCount() const { return m_sentCount; }
     qint64 lastSize() const { return m_lastSize; }
@@ -71,7 +58,7 @@ public:
                                    const std::vector<TrackedEntry> *tracked = nullptr,
                                    const std::vector<const SmoothedTrack *> *tracks = nullptr,
                                    const std::vector<MotionEvent> *events = nullptr, const std::vector<ZoneEntry> *zones = nullptr,
-              const GameEntry *game = nullptr);
+              const QJsonObject *game = nullptr);
 
 private:
     QUdpSocket m_socket;

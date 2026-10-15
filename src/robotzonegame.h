@@ -4,6 +4,7 @@
 #include "zonemanager.h"
 
 #include <QDialog>
+#include <QJsonObject>
 #include <QString>
 #include <vector>
 
@@ -41,6 +42,8 @@ public:
     QString insideZoneName() const { return m_insideZoneName; }
     double timeInside(qint64 timeMs) const;  // en secondes, depuis le départ
     int entries() const { return m_entries; }
+    // État de la partie pour l'envoi UDP (objet « game »).
+    QJsonObject toJson(const QString &robotName, qint64 timeMs) const;
 
 private:
     int m_robotId = 0;

@@ -68,7 +68,7 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
                                         const std::vector<TrackedEntry> *tracked,
                                         const std::vector<const SmoothedTrack *> *tracks,
                                         const std::vector<MotionEvent> *events,
-                                        const std::vector<ZoneEntry> *zones, const GameEntry *game)
+                                        const std::vector<ZoneEntry> *zones, const QJsonObject *game)
 {
     QJsonObject msg;
     msg.insert(QStringLiteral("frame"), frame);
@@ -180,7 +180,8 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
 
     // Événements de l'objet suivi survenus à cette image (chacun n'est envoyé qu'une fois).
     if (events && !events->empty()) {
-        static const char *types[] = {"motion_start", "motion_stop", "lost", "found", "zone_enter", "zone_exit", "game_zone_enter", "game_zone_exit"};
+        static const char *types[] = {"motion_start", "motion_stop", "lost", "found", "zone_enter", "zone_exit", "game_zone_enter", "game_zone_exit",
+                                      "game_green", "game_red", "game_fault", "game_win"};
         QJsonArray list;
         for (const MotionEvent &e : *events) {
             QJsonObject o{{QStringLiteral("type"), QString::fromLatin1(types[e.type])},
@@ -192,6 +193,13 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
                 || e.type == MotionEvent::GameExit) {
                 o.insert(QStringLiteral("zone_id"), e.zoneId);
                 o.insert(QStringLiteral("zone"), e.zoneName);
+            }
+            if (e.type == MotionEvent::GameFault || e.type == MotionEvent::GameWin)
+                o.insert(e.type == MotionEvent::GameFault ? QStringLiteral("fault") : QStringLiteral("faults"), e.count);
+            if (e.type == MotionEvent::GameWin) {
+                o.insert(QStringLiteral("zone_id"), e.zoneId);
+                o.insert(QStringLiteral("zone"), e.zoneName);
+                o.insert(QStringLiteral("elapsed_s"), std::round(e.duration * 10) / 10);
             }
             if (e.type == MotionEvent::MotionStop) {
                 const QString suffix = e.onFloor ? QStringLiteral("_mm") : QStringLiteral("_px");
@@ -227,22 +235,9 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
         msg.insert(QStringLiteral("zones"), list);
     }
 
-    // Jeu « Détection robot dans zone » en cours.
-    if (game) {
-        QJsonObject g{{QStringLiteral("mode"), QStringLiteral("robot_in_zone")},
-                      {QStringLiteral("robot_id"), game->robotId},
-                      {QStringLiteral("robot"), game->robot},
-                      {QStringLiteral("target_zone_id"), game->targetZoneId},
-                      {QStringLiteral("found"), game->found},
-                      {QStringLiteral("inside"), game->inside},
-                      {QStringLiteral("time_inside_s"), std::round(game->timeInside * 10) / 10},
-                      {QStringLiteral("entries"), game->entries}};
-        if (game->inside) {
-            g.insert(QStringLiteral("zone_id"), game->zoneId);
-            g.insert(QStringLiteral("zone"), game->zone);
-        }
-        msg.insert(QStringLiteral("game"), g);
-    }
+    // Jeu en cours : état fourni par le jeu (champ « mode » : robot_in_zone, soleil...).
+    if (game)
+        msg.insert(QStringLiteral("game"), *game);
 
     return QJsonDocument(msg).toJson(QJsonDocument::Compact);
 }
@@ -251,7 +246,7 @@ bool PositionSender::send(const QSize &imageSize, const std::vector<DetectedSqua
                           const std::vector<DetectedMarker> *markers, const std::vector<TrackedEntry> *tracked,
                           const std::vector<const SmoothedTrack *> *tracks,
                           const std::vector<MotionEvent> *events, const std::vector<ZoneEntry> *zones,
-                          const GameEntry *game)
+                          const QJsonObject *game)
 {
     if (m_address.isNull())
         return false;

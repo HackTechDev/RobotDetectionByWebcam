@@ -54,7 +54,9 @@ def describe(msg):
     names = {"motion_start": "DÉBUT DE MOUVEMENT", "motion_stop": "FIN DE MOUVEMENT",
              "lost": "OBJET PERDU", "found": "OBJET RETROUVÉ",
              "zone_enter": "ENTRE DANS LA ZONE", "zone_exit": "SORT DE LA ZONE",
-             "game_zone_enter": "JEU : ENTIÈREMENT DANS LA ZONE", "game_zone_exit": "JEU : SORT DE LA ZONE"}
+             "game_zone_enter": "JEU : ENTIÈREMENT DANS LA ZONE", "game_zone_exit": "JEU : SORT DE LA ZONE",
+             "game_green": "SOLEIL : FEU VERT", "game_red": "SOLEIL : « SOLEIL ! »",
+             "game_fault": "SOLEIL : FAUTE", "game_win": "SOLEIL : ARRIVÉE"}
     for e in msg.get("events", []):
         unit = "mm" if "position_mm" in e else "px"
         x, y = e.get("position_mm") or e.get("position_px")
@@ -73,8 +75,12 @@ def describe(msg):
     # Jeu « Détection robot dans zone » en cours (objet « game »).
     game = msg.get("game")
     if game:
-        state = f"dans « {game['zone']} »" if game["inside"] else ("hors zone" if game["found"] else "non trouvé")
-        parts.append(f"jeu : {game['robot']} {state}, {game['time_inside_s']:.1f} s, {game['entries']} entrée(s)")
+        if game["mode"] == "soleil":
+            parts.append(f"jeu 1, 2, 3 Soleil : {game['phase']}, {game['elapsed_s']:.1f} s, "
+                         f"{game['faults']} faute(s), score {game['score_s']:.1f} s")
+        else:
+            state = f"dans « {game['zone']} »" if game["inside"] else ("hors zone" if game["found"] else "non trouvé")
+            parts.append(f"jeu : {game['robot']} {state}, {game['time_inside_s']:.1f} s, {game['entries']} entrée(s)")
 
     # Vitesses issues du lissage (liste « tracks »).
     for t in msg.get("tracks", []):
