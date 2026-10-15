@@ -7,15 +7,15 @@ Les parties s'enchaînent, mais vous pouvez vous arrêter après n'importe laque
 | Partie | Ce que vous allez faire | Durée estimée |
 |---|---|---|
 | [0. Préparer](#0-préparer) | Réunir le matériel, compiler l'application | 15 min |
-| [1. Prendre en main la caméra](#1-prendre-en-main-la-caméra) | Choisir la résolution, régler l'image | 10 min |
+| [1. Prendre en main la caméra](#1-prendre-en-main-la-caméra) | Choisir la résolution, régler l'image, capturer une image et une vidéo | 15 min |
 | [2. Détecter un carré coloré](#2-détecter-un-carré-coloré) | Repérer un carré de papier rouge, puis blanc | 15 min |
 | [3. Utiliser les marqueurs ArUco](#3-utiliser-les-marqueurs-aruco) | Imprimer et détecter des marqueurs numérotés | 15 min |
-| [4. Suivre des objets quelconques](#4-suivre-des-objets-quelconques) | Encadrer une tasse puis un second objet, suivre leurs trajectoires et leurs mouvements | 10 min |
+| [4. Suivre des objets quelconques](#4-suivre-des-objets-quelconques) | Encadrer une tasse puis un second objet, suivre leurs trajectoires, essayer les réseaux de neurones | 15 min |
 | [5. Calibrer la caméra](#5-calibrer-la-caméra) | Mesurer l'objectif avec un damier, obtenir la position 3D | 20 min |
-| [6. Mesurer sur le sol en millimètres](#6-mesurer-sur-le-sol-en-millimètres) | Tracer un rectangle au ruban adhésif, lire des positions en mm | 15 min |
+| [6. Mesurer sur le sol en millimètres](#6-mesurer-sur-le-sol-en-millimètres) | Tracer un rectangle au ruban adhésif, lire des positions en mm, définir des zones nommées | 20 min |
 | [7. Lisser les positions et mesurer la vitesse](#7-lisser-les-positions-et-mesurer-la-vitesse) | Mesurer une vitesse, voir une position prédite | 10 min |
 | [8. Envoyer les positions à un programme](#8-envoyer-les-positions-à-un-programme) | Recevoir les positions en Python, calculer un cap vers une cible | 20 min |
-| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot | 20 min |
+| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot, montrer le jeu au joueur sur un second écran | 25 min |
 
 ---
 
@@ -31,6 +31,8 @@ Les parties s'enchaînent, mais vous pouvez vous arrêter après n'importe laque
 - Un **carton rigide** de format A4 ou plus, pour coller le damier de calibration.
 - Un objet quelconque à suivre : une tasse, une petite voiture...
 - Pour la partie 8 : **Python 3**, déjà installé sur la plupart des systèmes Linux.
+- Facultatif, pour la partie 9 : un **second écran**, tourné vers le joueur.
+- Facultatif, pour la partie 4 : une **connexion Internet**, pour télécharger les modèles des méthodes de suivi Nano et Vit (2,4 Mo en tout).
 
 ### Compiler et lancer l'application
 
@@ -54,8 +56,8 @@ cmake --build build -j
 ### 1.1 Faire le tour de l'écran
 
 - À **gauche**, l'image de la caméra, sur laquelle les détections sont dessinées.
-- En **haut à droite**, le groupe **Webcam** : **Caméra**, **Résolution**, **Effet miroir** et le bouton **Réglages de l'image...**.
-- Au **milieu à droite**, six onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Suivi** et **Envoi UDP**.
+- En **haut à droite**, le groupe **Webcam** : **Caméra**, **Résolution**, **Effet miroir** et les boutons **Capture**, **Vidéo**, **Joueur** et **Réglages de l'image...**.
+- Au **milieu à droite**, sept onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Zones**, **Suivi** et **Envoi UDP**.
 - En **bas à droite**, le panneau **Résultat**, qui affiche les mesures, et le bouton **Quitter**.
 
 ### 1.2 Choisir la résolution
@@ -74,14 +76,23 @@ Dans une pièce peu éclairée, beaucoup de webcams tombent à 15 images par sec
 2. Dans **Exposition**, passez le **Mode** sur **Manuelle**.
 3. Déplacez le curseur **Temps de pose** vers **20 à 30 ms**. La ligne « Appliqué par la caméra » indique la valeur réellement utilisée : la caméra l'arrondit.
 4. Regardez le nombre d'images par seconde dans **Résultat** : il doit approcher 30. L'image devient plus sombre ; si elle l'est trop, allongez un peu la pose ou éclairez la pièce.
-5. Dans **Autres réglages**, à droite, réglez **Fréquence du secteur** sur **50 Hz** si vous êtes en Europe (60 Hz en Amérique du Nord) : les bandes qui défilent sous un éclairage artificiel disparaissent. Les autres curseurs (luminosité, contraste, gain...) indiquent « (défaut) » à la valeur d'usine.
+5. Dans **Autres réglages**, à droite, réglez **Fréquence du secteur** sur **50 Hz** si vous êtes en Europe (60 Hz en Amérique du Nord) : les bandes qui défilent sous un éclairage artificiel disparaissent. Les autres curseurs (luminosité, contraste, gain...) indiquent « (défaut) » à la valeur d'usine. Si votre webcam propose **Ralentir les images en exposition auto.**, décocher cette case lui évite de descendre à 15 images par seconde dans une pièce sombre, même en exposition automatique.
 6. Pour l'instant, cliquez sur **Tout en automatique**, puis sur **Fermer**. Nous reviendrons à ces réglages dans la partie 9.
 
 ### 1.4 Essayer l'effet miroir
 
 Cochez **Effet miroir** : l'image se retourne, comme dans un miroir, ce qui est plus naturel quand on se place face à la caméra. Ce réglage ne change **que l'affichage** : les mesures restent celles de l'image réelle. Décochez-le pour la suite.
 
-✅ **Vérification** : l'image est fluide et vous savez où trouver la résolution, les réglages de l'image et le panneau **Résultat**.
+### 1.5 Capturer une image et une vidéo
+
+1. Cliquez sur **Capture** (ou appuyez sur **F12**). L'image est enregistrée aussitôt, sans rien demander, et son chemin s'affiche quelques secondes en bas de la fenêtre, par exemple `~/Images/RobotDetectionByWebcam/capture_20261015_101530_123.png`.
+2. Cliquez sur la **petite flèche** à droite de **Capture**, puis sur **Ouvrir le dossier des captures** : le gestionnaire de fichiers montre l'image, en pleine résolution.
+3. Cliquez sur **Vidéo** (ou **F9**). Le bouton devient rouge et affiche **■ Arrêter** avec la durée. Bougez la main devant la caméra quelques secondes.
+4. Cliquez de nouveau sur **Vidéo**. Le bouton affiche **Finalisation...** une à deux secondes, puis le chemin de la vidéo MP4 s'affiche en bas de la fenêtre. Ouvrez-la avec votre lecteur vidéo.
+
+Ces deux boutons enregistrent l'image de la caméra telle quelle. Leur menu (petite flèche) propose aussi l'image ou la vidéo **avec les détections** dessinées (**Maj+F12**, **Maj+F9**) : pratique pour garder une trace d'un essai. Le détail est dans le [guide](USER_GUIDE.md#capturer-une-image).
+
+✅ **Vérification** : l'image est fluide, vous savez où trouver la résolution, les réglages de l'image et le panneau **Résultat**, et une image et une vidéo sont enregistrées dans le dossier des captures.
 
 ---
 
@@ -184,9 +195,17 @@ ID 1 : (320, 241) px, côté 82 px, 0.0°
    - une **flèche** indique le sens du déplacement.
 8. Le panneau **Résultat** affiche `Tasse : en mouvement`, puis `immobile` quand vous la lâchez, avec sa position, sa vitesse et sa direction. Le second objet a son propre paragraphe. Faites défiler l'onglet **Suivi** jusqu'au **Journal des événements** : un « Début de mouvement », puis une « Fin de mouvement » avec la distance parcourue et la durée, y sont inscrits.
 9. Cachez entièrement la tasse avec la main : le cadre passe en pointillés, d'abord « Objet (prédit) », puis **rouge** avec « Objet perdu ». L'application cherche alors la tasse dans toute l'image. Retirez la main, ou reposez la tasse **ailleurs** : le suivi reprend tout seul, et le panneau indique « retrouvé automatiquement 1 fois ». Pendant le suivi, la **confiance** affichée dans **Résultat** indique à quel point le cadre ressemble encore à la tasse.
-10. Cliquez sur **Tout retirer**.
+10. **Sortez la tasse de l'image** par un bord, en restant vous-même devant la caméra. Le cadre devient rouge avec « (hors du champ) » : le suivi s'arrête, au lieu de s'accrocher à votre main ou à votre visage. Le panneau **Résultat** indique que la tasse est recherchée le long des bords. Faites-la revenir par un bord : le suivi reprend.
+11. Cliquez sur **Tout retirer**.
 
-✅ **Vérification** : les deux objets sont suivis en même temps, chacun dans sa couleur, et l'état de la tasse passe de « en mouvement » à « immobile ».
+**Essayer les réseaux de neurones** (facultatif) :
+
+1. Dans la liste **Méthode**, choisissez **Nano (réseau de neurones)**.
+2. La première fois, une fenêtre propose de télécharger son modèle (1,7 Mo) : cliquez sur **Télécharger**. Il est enregistré une fois pour toutes.
+3. Ajoutez de nouveau la tasse, puis faites-la **tourner** sur elle-même et approchez-la de la caméra : Nano résiste mieux que CSRT aux changements d'aspect, et il est plus rapide.
+4. Essayez aussi **Vit (réseau de neurones)** (modèle de 0,7 Mo), puis revenez à la méthode de votre choix. Les méthodes sont comparées dans le [guide](USER_GUIDE.md#61-ajouter-des-objets).
+
+✅ **Vérification** : les deux objets sont suivis en même temps, chacun dans sa couleur, l'état de la tasse passe de « en mouvement » à « immobile », et la tasse sortie de l'image est signalée « hors du champ ».
 
 **À retenir** : ce suivi ne demande aucune préparation, mais il peut perdre un objet, ne donne pas son orientation, et chaque objet ralentit un peu l'application. Pour un robot, les marqueurs ArUco restent plus fiables. Les limites sont détaillées dans le [guide](USER_GUIDE.md#63-limites).
 
@@ -285,6 +304,21 @@ ID 1 : (322, 245) px, côté 64 px, 0.4°
 
 **À retenir** : le repère est défini **au niveau de la table**. Un marqueur collé en hauteur sur un robot sera légèrement décalé. Le [guide](USER_GUIDE.md#84-précision-et-limites) explique comment limiter cet effet.
 
+### 6.4 Définir des zones
+
+Une **zone** est un rectangle fixe de l'image, avec un nom. L'application indique ce qui s'y trouve et signale chaque entrée et chaque sortie : de quoi faire un « garage », une ligne d'arrivée ou un but.
+
+1. Ouvrez l'onglet **Zones** et cliquez sur **Ajouter une zone**.
+2. Tracez un rectangle sur la **moitié gauche** du rectangle de ruban adhésif, ajustez-le avec ses poignées, puis appuyez sur **Entrée**.
+3. Nommez-la **Garage**, puis cliquez sur **OK**. La zone s'affiche teintée, avec son nom.
+4. Posez le marqueur **1** dans la zone. Sous la liste, la ligne devient `Garage : ArUco 1`, et la zone se teinte plus fortement.
+5. Sortez le marqueur de la zone. Faites défiler l'onglet **Suivi** jusqu'au **Journal des événements** : `ArUco 1 : Entre dans la zone « Garage »`, puis `Sort de la zone « Garage »`, y sont inscrits.
+6. Double-cliquez sur **Garage** dans la liste pour la renommer si vous le souhaitez.
+
+Les zones surveillent aussi les objets suivis (partie 4) et le carré principal. Elles sont mémorisées pour cette caméra. Le détail est dans le [guide](USER_GUIDE.md#85-définir-des-zones).
+
+✅ **Vérification** : l'entrée et la sortie du marqueur dans la zone « Garage » sont inscrites dans le journal.
+
 ---
 
 ## 7. Lisser les positions et mesurer la vitesse
@@ -331,7 +365,7 @@ Une ligne s'affiche par image :
 image 812 | carré (310, 242) px 12° | sol X 288 Y 196 mm | ArUco 1 (402, 250) px 0° | sol X 412 Y 198 mm cap 90° | carré vitesse 0 mm/s | ArUco 1 vitesse 85 mm/s
 ```
 
-Si des objets sont suivis (partie 4), leurs débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
+Si des objets sont suivis (partie 4), leurs débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Les zones (partie 6.4) aussi : `zone Garage : ArUco 1`, et `*** ArUco 1 : ENTRE DANS LA ZONE « Garage » (152, 210) mm` à chaque entrée. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
 
 ### 8.3 Écrire son propre programme : aller vers une cible
 
@@ -429,9 +463,21 @@ Pour envoyer les positions à un autre ordinateur ou à une carte (Raspberry Pi.
    - que le marqueur reste détecté sur toute la zone, y compris dans les coins ;
    - que les positions **prédites** sont rares. Si elles sont fréquentes, le marqueur est trop petit, trop flou ou mal éclairé.
 
-### 9.5 Quitter proprement
+### 9.5 Montrer le jeu au joueur
 
-Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, et la webcam retrouve son exposition automatique et ses réglages d'origine pour les autres logiciels.
+Si un second écran est branché, le joueur peut suivre la partie sans voir les réglages :
+
+1. Cliquez sur **Joueur**. Une seconde fenêtre s'ouvre **en plein écran sur l'autre écran**, avec la vidéo seule, sur fond noir. Avec un seul écran, elle s'ouvre en fenêtre normale.
+2. Elle montre les **détections** (zones, marqueurs, trajectoires) : le joueur voit son robot entrer dans le « Garage ». Pour la vidéo brute, décochez **Afficher les détections** dans le menu du bouton (petite flèche).
+3. Si le joueur fait face à la caméra, cochez **Retourner l'image (miroir)** dans le même menu.
+4. Pour choisir un autre écran, utilisez **Écran** dans ce menu. Dans la fenêtre du joueur, un double-clic ou **F11** bascule le plein écran, et **Échap** le quitte.
+5. Pour garder un souvenir de la partie, enregistrez-la avec **Vidéo avec les détections** (**Maj+F9**).
+
+La fenêtre du joueur et ses réglages sont mémorisés : elle se rouvre au lancement suivant si elle était ouverte. Des idées de jeux sont réunies dans [GAMES.md](GAMES.md).
+
+### 9.6 Quitter proprement
+
+Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, une vidéo en cours est terminée proprement, et la webcam retrouve son exposition automatique et ses réglages d'origine pour les autres logiciels.
 
 ✅ **Vérification finale** : le programme de pilotage reçoit en continu la position et le cap du robot, en millimètres, pendant qu'il se déplace.
 
@@ -442,18 +488,24 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, e
 | Je veux... | Où | Comment |
 |---|---|---|
 | Une image plus fluide | **Réglages de l'image...** | Exposition manuelle, 20 à 30 ms |
+| Enregistrer une image | Bouton **Capture** | Un clic ou **F12** (avec les détections : **Maj+F12**) |
+| Enregistrer une vidéo | Bouton **Vidéo** | Un clic ou **F9** pour démarrer, de nouveau pour arrêter (avec les détections : **Maj+F9**) |
 | Détecter un carré de couleur | Onglet **Carré coloré** | Cliquer sur le carré dans l'image |
 | Détecter un carré blanc, gris ou noir | Onglet **Carré coloré** | Cliquer dessus : le type « Blanc, gris ou noir » est choisi |
 | Imprimer un marqueur | Onglet **ArUco** | **Générer un marqueur...** |
 | Suivre un ou plusieurs objets | Onglet **Suivi** | **Ajouter des objets**, tracer un rectangle par objet en validant chacun avec **Entrée**, puis **Échap** |
+| Suivre un objet qui change d'aspect | Onglet **Suivi** | **Méthode** Nano ou Vit (modèle téléchargé au premier choix) |
 | Savoir quand un objet suivi bouge | Onglet **Suivi** | **Journal des événements**, ou liste `events` en UDP |
+| Savoir ce qui entre dans une zone | Onglet **Zones** | **Ajouter une zone**, tracer le rectangle, le nommer |
 | La position 3D d'un marqueur | Onglet **Calibration** | Calibrer une fois avec le damier |
 | Des positions en mm sur le sol | Onglet **Sol** | **Définir les 4 points** d'un rectangle connu |
 | La vitesse d'un marqueur | Onglet **Suivi** | Groupe **Lissage des carrés et marqueurs** |
 | Récupérer les positions dans un programme | Onglet **Envoi UDP** | **Envoyer les positions**, puis `python3 tools/udp_receiver.py` |
+| Montrer le jeu au joueur | Bouton **Joueur** | Seconde fenêtre en plein écran sur l'autre écran |
 
 ## Pour aller plus loin
 
 - Le [guide utilisateur](USER_GUIDE.md) détaille chaque réglage et contient une [section de dépannage](USER_GUIDE.md#12-questions-fréquentes-et-dépannage).
 - Le [README](README.md) explique l'installation et le fonctionnement interne des détections.
 - [IMPROVEMENTS.md](IMPROVEMENTS.md) liste les fonctionnalités et les améliorations envisagées.
+- [GAMES.md](GAMES.md) propose des idées de jeux avec un petit robot.
