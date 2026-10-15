@@ -54,7 +54,7 @@ Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchée
 
 Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution. Ce basculement est mémorisé avec la résolution.
 
-Les réglages sont répartis en sept onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Zones**, **Suivi** et **Envoi UDP**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps. Elles sont **désactivées à chaque lancement** (leur état n'est pas mémorisé) : au départ, seuls les objets encadrés à la main dans l'onglet « Suivi » sont suivis.
+Les réglages sont répartis en sept onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Zones**, **Suivi** et **Envoi UDP**. Le menu **Jeu**, en haut de la fenêtre, regroupe les jeux, et une barre d'état, en bas, affiche les messages brefs (chemin d'une capture...). Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps. Elles sont **désactivées à chaque lancement** (leur état n'est pas mémorisé) : au départ, seuls les objets encadrés à la main dans l'onglet « Suivi » sont suivis.
 
 ### Caméra, réglages et fermeture
 
@@ -341,5 +341,6 @@ tools/
 - **Le damier n'est pas détecté** : il doit être entièrement visible avec sa marge blanche. Vérifier que le nombre de **coins intérieurs** saisi correspond au damier (un damier de 10 × 7 cases a 9 × 6 coins intérieurs). Éviter les reflets.
 - **Erreur RMS élevée** : damier gondolé, images floues ou vues trop semblables. Recommencer avec « Effacer les captures ».
 - **Distances fausses d'un facteur constant** : vérifier la « Taille du marqueur » et le « Côté d'une case », mesurés à la règle sur les impressions.
+- **Le jeu indique « hors zone » alors que le robot est dans la zone** : le cadre de suivi du robot doit tenir entièrement dans la zone. Réencadrer le robot au plus près, ou tracer une zone un peu plus grande. Seuls les objets suivis (onglet « Suivi ») peuvent jouer le rôle du robot.
 - **Repartir de zéro** : supprimer le fichier de la caméra dans `~/.config/RobotDetectionByWebcam/calibrations/` (calibration) ou `settings.ini` (réglages, y compris les repères du sol et les zones).
 - **Erreur de compilation sur `aruco_detector.hpp`** : la version d'OpenCV est antérieure à 4.7. Installer une version plus récente.

@@ -13,7 +13,7 @@ Pour l'installation et la compilation, voir le [README](README.md). Pour une dé
 5. [Suivre des marqueurs ArUco](#5-suivre-des-marqueurs-aruco)
 6. [Suivre des objets encadrés](#6-suivre-des-objets-encadrés)
 7. [Calibrer la caméra](#7-calibrer-la-caméra)
-8. [Définir le repère du sol](#8-définir-le-repère-du-sol)
+8. [Définir le repère du sol](#8-définir-le-repère-du-sol), les [zones](#85-définir-des-zones) et le [jeu](#86-jeu--détecter-le-robot-dans-une-zone)
 9. [Lire les résultats](#9-lire-les-résultats)
 10. [Envoyer les positions à un autre programme](#10-envoyer-les-positions-à-un-autre-programme)
 11. [Conseils pour une détection fiable](#11-conseils-pour-une-détection-fiable)
@@ -39,7 +39,8 @@ Quelle que soit la méthode, l'application peut aussi :
 - donner la **position 3D** des marqueurs, une fois la caméra calibrée (section 7) ;
 - **lisser** les positions et calculer les **vitesses** (section 6.4) ;
 - **envoyer** toutes les mesures à un autre programme, par exemple celui qui pilote le robot (section 10) ;
-- signaler ce qui entre dans des **zones** nommées de l'image et en sort (section 8.5).
+- signaler ce qui entre dans des **zones** nommées de l'image et en sort (section 8.5) ;
+- faire **jouer** le robot : le menu **Jeu** signale quand il est entièrement dans une zone (section 8.6).
 
 L'application sait aussi **capturer une image** ou **enregistrer une vidéo** de la webcam, et afficher la vidéo seule dans une **fenêtre pour le joueur**, sur un second écran (section 3).
 
@@ -64,7 +65,9 @@ L'application sait aussi **capturer une image** ou **enregistrer une vidéo** de
 ## 3. L'écran principal
 
 ```
-┌───────────────────────────────────────┬───────────────────────────────┐
+┌───────────────────────────────────────────────────────────────────────┐
+│ Jeu                                            (barre de menus)       │
+├───────────────────────────────────────┬───────────────────────────────┤
 │                                       │ Webcam                        │
 │                                       │   Caméra     [........... ▼]  │
 │                                       │   Résolution [........... ▼]  │
@@ -82,7 +85,9 @@ L'application sait aussi **capturer une image** ou **enregistrer une vidéo** de
 │                                       │   marqueurs...                │
 │                                       │                               │
 │                                       │         [ Quitter ]           │
-└───────────────────────────────────────┴───────────────────────────────┘
+├───────────────────────────────────────┴───────────────────────────────┤
+│ Capture enregistrée : ...                      (barre d'état)         │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Zone d'image** (à gauche) : l'image de la caméra, avec les détections dessinées : carrés, marqueurs, damier, repère du sol, objet suivi et trajectoires. Un clic sur l'image choisit la couleur du carré, sauf pendant l'ajout d'objets à suivre (onglet **Suivi**) ou la saisie des points du sol (onglet **Sol**). Pendant ces deux saisies, la touche **Échap** annule.
@@ -931,6 +936,14 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Choisissez l'écran dans le menu du bouton **Joueur** (petite flèche), **Écran**. Le choix est mémorisé.
 - Si l'écran choisi est débranché, la fenêtre s'ouvre sur l'autre écran que celui de la fenêtre principale.
 
+**Le jeu indique « hors zone » alors que le robot est dans la zone**
+- Le robot doit être **entièrement** dans la zone : c'est son **cadre de suivi** qui compte. Si le cadre est plus large que le robot, ou s'il a glissé sur le décor, il peut dépasser de la zone. Retirez le robot de la liste des objets suivis et encadrez-le de nouveau, au plus près.
+- La zone est trop petite pour le cadre : tracez-la un peu plus grande que le robot.
+- Vérifiez la **Zone** choisie dans la fenêtre du jeu : avec une zone précise, les autres zones ne comptent pas.
+
+**Le robot n'apparaît pas dans la liste du jeu**
+- Le jeu ne connaît que les **objets suivis** (onglet **Suivi**) : un robot repéré seulement par un marqueur ArUco ou par le carré coloré n'y figure pas. Ajoutez-le avec **Ajouter des objets**.
+
 **Pas de position au sol**
 - Le repère n'est pas défini : l'onglet **Sol** indique `Repère du sol non défini`. Suivez la [section 8](#8-définir-le-repère-du-sol).
 - Le panneau **Résultat** affiche `Pas de position au sol : repère défini en ...` : la résolution choisie n'a pas le même format d'image que lors de la définition du repère.
@@ -1017,6 +1030,6 @@ Le fichier contient aussi une option sans équivalent dans l'interface : `hideLi
 
 La résolution, les réglages de l'image et le repère du sol sont enregistrés dès qu'on les modifie. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
 
-Ne sont **pas** mémorisés : l'**activation des détections du carré coloré et des marqueurs ArUco**, désactivées à chaque lancement pour que seuls les objets encadrés à la main soient suivis, et, car ils ne servent que ponctuellement, **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, les objets suivis et le journal des événements.
+Ne sont **pas** mémorisés : l'**activation des détections du carré coloré et des marqueurs ArUco**, désactivées à chaque lancement pour que seuls les objets encadrés à la main soient suivis, et, car ils ne servent que ponctuellement, la partie de jeu en cours (robot, zone visée, compteurs), **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, les objets suivis et le journal des événements.
 
 Pour revenir aux réglages par défaut, fermez l'application et supprimez le fichier `settings.ini`. Les calibrations, enregistrées à part dans le dossier `calibrations/`, sont conservées. (Les repères du sol et les zones, eux, sont dans `settings.ini` et sont donc effacés. Les images et vidéos capturées et les modèles Nano et Vit ne sont pas touchés.)
