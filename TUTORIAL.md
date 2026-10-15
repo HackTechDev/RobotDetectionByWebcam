@@ -55,7 +55,7 @@ cmake --build build -j
 
 ### 1.1 Faire le tour de l'écran
 
-- En **haut**, la barre de menus, avec le menu **Jeu** et ses deux jeux (parties 6.4 et 9.5).
+- En **haut**, la barre de menus, avec le menu **Jeu** et ses deux jeux (parties 6.4, 9.5 et 9.6).
 - À **gauche**, l'image de la caméra, sur laquelle les détections sont dessinées. Au lancement, **aucune détection automatique n'est active** : l'image est nue tant que vous n'activez pas le carré coloré ou les marqueurs, ou que vous n'encadrez pas un objet.
 - En **haut à droite**, le groupe **Webcam** : **Caméra**, **Résolution**, **Effet miroir** et les boutons **Capture**, **Vidéo**, **Joueur** et **Réglages de l'image...**.
 - Au **milieu à droite**, sept onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Zones**, **Suivi** et **Envoi UDP**.
@@ -321,6 +321,8 @@ Les zones surveillent aussi les objets suivis (partie 4) et le carré principal.
 
 **Essayer le jeu** : ajoutez une tasse comme objet suivi (partie 4), puis ouvrez le menu **Jeu**, **Détection robot dans zone...**. Choisissez la tasse comme **Robot** et **Garage** comme **Zone**, puis cliquez sur **Démarrer**. Poussez la tasse dans la zone : le bandeau en haut de l'image passe au vert seulement quand elle y est **entièrement**, et le temps passé dans la zone s'écoule. Sortez-la à moitié : le bandeau repasse au rouge. Le détail est dans le [guide](USER_GUIDE.md#86-jeu--détecter-le-robot-dans-une-zone).
 
+Le second jeu du menu, **1, 2, 3 Soleil...**, se prête aussi à un essai avec la tasse : choisissez **Garage** comme **Arrivée**, démarrez, poussez la tasse au feu vert et lâchez-la dès que « SOLEIL ! » s'affiche. Il est présenté en détail dans la partie 9.6.
+
 ✅ **Vérification** : l'entrée et la sortie du marqueur dans la zone « Garage » sont inscrites dans le journal, et le jeu ne passe au vert que quand la tasse est entièrement dans la zone.
 
 ---
@@ -480,9 +482,23 @@ Le jeu **Détection robot dans zone** vérifie que le robot est **entièrement**
 
 Si votre programme de pilotage écoute l'envoi UDP, il reçoit aussi l'état de la partie (objet `game`) et les événements `game_zone_enter` et `game_zone_exit` : de quoi compter les points ou déclencher un son. Le détail est dans le [guide](USER_GUIDE.md#86-jeu--détecter-le-robot-dans-une-zone).
 
-**Une autre partie : 1, 2, 3 Soleil.** Gardez le robot suivi et tracez une zone **Arrivée** à l'autre bout de la zone de jeu. Menu **Jeu**, **1, 2, 3 Soleil...** : choisissez **Robot**, **Arrivée** et la difficulté **Facile**, puis **Démarrer**. Après le compte à rebours, pilotez le robot seulement quand le bandeau affiche **AVANCEZ !** (vert), et arrêtez-le dès que **SOLEIL !** (rouge) apparaît : s'il bouge encore après le temps de réaction, « FAUTE ! » s'affiche et 5 s s'ajoutent au score. À l'arrivée, le bandeau bleu donne le temps, les fautes et le score. Si des fautes sont comptées alors que le robot est arrêté, augmentez le **seuil de mouvement** (onglet **Suivi**). Le détail est dans le [guide](USER_GUIDE.md#87-jeu--1-2-3-soleil).
+### 9.6 Jouer une partie : 1, 2, 3 Soleil
 
-### 9.6 Montrer le jeu au joueur
+Le robot doit atteindre une **arrivée** en n'avançant qu'au **feu vert**. S'il bouge pendant « Soleil ! », c'est une faute.
+
+1. Onglet **Zones** : tracez une zone **Arrivée** à l'**autre bout** de la zone de jeu, un peu plus grande que le robot.
+2. Gardez le robot dans la liste des objets suivis (partie 9.5), et placez-le loin de l'arrivée.
+3. Menu **Jeu**, **1, 2, 3 Soleil...** : choisissez **Robot**, **Arrivée** et la difficulté **Facile** pour commencer, puis **Démarrer**.
+4. Un compte à rebours s'affiche : « départ dans 3, 2, 1 ». Puis le chrono démarre.
+5. Pilotez le robot **seulement** quand le bandeau affiche **AVANCEZ !** (vert). Dès que **SOLEIL !** (rouge) apparaît, arrêtez-le : vous avez un court temps de réaction (0,8 s en facile).
+6. Laissez-le rouler exprès pendant un « Soleil ! » : le bandeau passe au violet, **FAUTE !**, et 5 s s'ajoutent au score. La fenêtre du jeu compte les fautes.
+7. Amenez le robot **entièrement** dans l'arrivée (entourée de pointillés blancs) : le bandeau devient bleu, « GAGNÉ ! », avec le temps, les fautes et le score. Le plus petit score gagne : à vous de battre ce record en **Normal**, puis en **Difficile**.
+
+Si des fautes sont comptées alors que le robot est bien arrêté, le cadre de suivi tremble un peu : augmentez le **seuil de mouvement** (onglet **Suivi**) et relancez la partie. Le détail, avec les durées de chaque difficulté, est dans le [guide](USER_GUIDE.md#87-jeu--1-2-3-soleil).
+
+✅ **Vérification** : une faute est comptée quand le robot roule pendant « Soleil ! », aucune quand il s'arrête à temps, et la partie se termine à l'arrivée avec le score.
+
+### 9.7 Montrer le jeu au joueur
 
 Si un second écran est branché, le joueur peut suivre la partie sans voir les réglages :
 
@@ -494,11 +510,11 @@ Si un second écran est branché, le joueur peut suivre la partie sans voir les 
 
 La fenêtre du joueur et ses réglages sont mémorisés : elle se rouvre au lancement suivant si elle était ouverte. Des idées de jeux sont réunies dans [GAMES.md](GAMES.md).
 
-### 9.7 Quitter proprement
+### 9.8 Quitter proprement
 
 Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, une vidéo en cours est terminée proprement, et la webcam retrouve son exposition automatique et ses réglages d'origine pour les autres logiciels.
 
-✅ **Vérification finale** : le programme de pilotage reçoit en continu la position et le cap du robot, en millimètres, pendant qu'il se déplace, et le jeu signale le robot garé entièrement dans le « Garage ».
+✅ **Vérification finale** : le programme de pilotage reçoit en continu la position et le cap du robot, en millimètres, pendant qu'il se déplace, le jeu signale le robot garé entièrement dans le « Garage », et une partie de « 1, 2, 3 Soleil » se joue jusqu'à l'arrivée.
 
 ---
 
