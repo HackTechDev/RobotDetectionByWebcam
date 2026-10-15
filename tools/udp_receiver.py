@@ -53,7 +53,8 @@ def describe(msg):
     # Événements des objets suivis (liste « events »).
     names = {"motion_start": "DÉBUT DE MOUVEMENT", "motion_stop": "FIN DE MOUVEMENT",
              "lost": "OBJET PERDU", "found": "OBJET RETROUVÉ",
-             "zone_enter": "ENTRE DANS LA ZONE", "zone_exit": "SORT DE LA ZONE"}
+             "zone_enter": "ENTRE DANS LA ZONE", "zone_exit": "SORT DE LA ZONE",
+             "game_zone_enter": "JEU : ENTIÈREMENT DANS LA ZONE", "game_zone_exit": "JEU : SORT DE LA ZONE"}
     for e in msg.get("events", []):
         unit = "mm" if "position_mm" in e else "px"
         x, y = e.get("position_mm") or e.get("position_px")
@@ -68,6 +69,12 @@ def describe(msg):
     # Zones et leurs occupants (liste « zones »).
     for z in msg.get("zones", []):
         parts.append(f"zone {z['name']} : {', '.join(z['occupants']) or 'vide'}")
+
+    # Jeu « Détection robot dans zone » en cours (objet « game »).
+    game = msg.get("game")
+    if game:
+        state = f"dans « {game['zone']} »" if game["inside"] else ("hors zone" if game["found"] else "non trouvé")
+        parts.append(f"jeu : {game['robot']} {state}, {game['time_inside_s']:.1f} s, {game['entries']} entrée(s)")
 
     # Vitesses issues du lissage (liste « tracks »).
     for t in msg.get("tracks", []):

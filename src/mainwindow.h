@@ -9,6 +9,7 @@
 #include "positionsender.h"
 #include "squaredetector.h"
 #include "zonemanager.h"
+#include "robotzonegame.h"
 
 #include <QCameraFormat>
 #include <QElapsedTimer>
@@ -156,6 +157,9 @@ private:
     void updateZoneList();
     void saveZones() const;
     void addZone(const QRect &displayRect);
+    // Menu Jeu : détection du robot (objet suivi) entièrement dans une zone.
+    void openRobotZoneGame();
+    void refreshGameChoices();
     void applySmoothingToTracker();
     void configureTracker(ObjectTracker &tracker) const;
     void onTrackAlgorithmChosen(int index);
@@ -263,6 +267,8 @@ private:
     bool m_floorPicking = false;
     bool m_zonePicking = false;  // tracé d'une zone en cours (sélection d'un rectangle)
     ZoneManager m_zones;
+    RobotZoneGame m_game;
+    RobotZoneGameDialog *m_gameDialog = nullptr;
     QPushButton *m_zoneAddButton = nullptr;
     QPushButton *m_zoneConfirmButton = nullptr;
     QPushButton *m_zoneRemoveButton = nullptr;

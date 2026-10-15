@@ -103,6 +103,7 @@ L'application sait aussi **capturer une image** ou **enregistrer une vidéo** de
   - **Suivi** : suivi d'un ou plusieurs objets quelconques désignés à la souris, journal de leurs mouvements, et lissage des positions des carrés et des marqueurs (voir [section 6](#6-suivre-des-objets-encadrés)). L'onglet défile s'il ne tient pas en hauteur ;
   - **Envoi UDP** : envoi des positions à un autre programme (voir [section 10](#10-envoyer-les-positions-à-un-autre-programme)).
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
+- **Menu Jeu**, en haut de la fenêtre : jeux construits sur le suivi et les zones, pour l'instant **Détection robot dans zone...** (voir [8.6](#86-jeu--détecter-le-robot-dans-une-zone)).
 - **Barre d'état**, tout en bas de la fenêtre : messages brefs, par exemple le chemin d'une image capturée ou d'une vidéo enregistrée.
 - **Quitter** : ferme l'application. Une fenêtre demande de confirmer : cliquez sur **Quitter** pour fermer, ou sur **Annuler** (ou appuyez sur Échap) pour continuer. La même confirmation s'affiche si vous fermez la fenêtre avec la croix de la barre de titre.
 
@@ -454,7 +455,7 @@ L'application signale les moments où chaque objet suivi **se met en mouvement**
 
 Un seuil plus petit signale les moindres déplacements, mais risque de réagir au tremblement du cadre. Un seuil plus grand ne signale que les vrais déplacements.
 
-**Effacer** vide le journal. **Enregistrer...** l'exporte en **CSV** (séparateur `;`), du plus ancien au plus récent, avec les colonnes `heure`, `horodatage_ms`, `objet_id`, `objet` (nom), `type` (`motion_start`, `motion_stop`, `lost`, `found`, `zone_enter`, `zone_exit`), `x`, `y`, `unite` (`mm` ou `px`), `deplacement`, `parcours`, `duree_s` et `zone` (nom de la zone, pour les entrées et sorties). Le journal garde les 500 derniers événements et n'est pas conservé entre deux lancements.
+**Effacer** vide le journal. **Enregistrer...** l'exporte en **CSV** (séparateur `;`), du plus ancien au plus récent, avec les colonnes `heure`, `horodatage_ms`, `objet_id`, `objet` (nom), `type` (`motion_start`, `motion_stop`, `lost`, `found`, `zone_enter`, `zone_exit`), `x`, `y`, `unite` (`mm` ou `px`), `deplacement`, `parcours`, `duree_s` et `zone` (nom de la zone, pour les entrées et sorties, y compris celles du jeu : `game_zone_enter`, `game_zone_exit`). Le journal garde les 500 derniers événements et n'est pas conservé entre deux lancements.
 
 Les événements sont aussi envoyés en UDP, dans la liste `events` (voir [10.3](#103-format-des-messages)).
 
@@ -630,6 +631,31 @@ La zone s'affiche sur l'image, teintée de sa couleur, avec son nom. La teinte s
 - Une zone tracée sur l'image ne suit pas la perspective du sol : vue de biais, une zone rectangulaire au sol apparaît comme un trapèze. Tracez le rectangle qui l'englobe. Si le repère du sol est défini, les coins de la zone sur le sol sont envoyés en UDP.
 - **Effet miroir** : sans effet sur les zones, le tracé est converti automatiquement.
 
+### 8.6 Jeu : détecter le robot dans une zone
+
+Le menu **Jeu**, **Détection robot dans zone...**, ouvre une petite fenêtre qui indique en permanence si le robot est **entièrement** dans une zone : il ne suffit pas que son centre y soit, tout son cadre doit être à l'intérieur.
+
+**Préparer**
+1. Ajoutez le robot comme **objet suivi** : onglet **Suivi**, **Ajouter des objets**, rectangle autour du robot, **Entrée** (voir [section 6](#6-suivre-des-objets-encadrés)). Encadrez-le au plus près : c'est ce cadre qui doit tenir dans la zone.
+2. Tracez au moins une **zone** (voir [8.5](#85-définir-des-zones)), plus grande que le robot.
+
+Tant que l'un des deux manque, la fenêtre de jeu l'indique et **Démarrer** reste grisé.
+
+**Jouer**
+1. Choisissez le **Robot** (parmi les objets suivis) et la **Zone** : une zone précise, ou **N'importe quelle zone**.
+2. Cliquez sur **Démarrer**.
+3. L'état s'affiche en grand dans la fenêtre de jeu et en **bandeau en haut de l'image**, donc aussi dans la [fenêtre du joueur](#fenêtre-du-joueur) :
+   - **vert** : « Robot est dans la zone « Garage » ». La zone atteinte est entourée d'un trait vert épais ;
+   - **rouge** : « hors zone », y compris quand le robot est à cheval sur le bord ;
+   - **orange** : « non trouvé », quand le robot n'est plus suivi (perdu, sorti de l'image).
+4. Sous l'état, le **temps passé dans la zone** et le **nombre d'entrées** depuis le départ. **Remettre à zéro** remet ces compteurs à zéro sans arrêter le jeu.
+5. **Arrêter** termine la partie. Changer de robot ou de zone pendant la partie la recommence.
+
+**Bon à savoir**
+- L'état ne change qu'après **0,2 s** de stabilité : un cadre qui tremble sur le bord ne provoque pas une suite d'entrées et de sorties. Une position seulement prédite (robot caché un instant) ne change rien.
+- Chaque entrée et chaque sortie est inscrite dans le **Journal des événements** (`Jeu : entièrement dans la zone « Garage »`) et envoyée en UDP (`game_zone_enter`, `game_zone_exit`). Pendant la partie, chaque message UDP contient aussi l'objet `game` (voir [10.3](#103-format-des-messages)).
+- La précision dépend du cadre du suivi : un cadre trop large fait paraître le robot « hors zone » alors qu'il est dedans. Resélectionnez-le au plus près si besoin.
+
 ---
 
 ## 9. Lire les résultats
@@ -759,10 +785,11 @@ Chaque image traitée produit **un message**, sur une seule ligne. Voici un exem
 | `corners` | Les 4 coins `[x, y]`, en pixels. Pour un marqueur, le premier est le coin d'origine (point rouge à l'écran). |
 | `id` | Identifiant du marqueur |
 | `floor` | Uniquement si le repère du sol est défini : `position_mm` `[X, Y]` sur le sol, et `heading_deg` (cap d'un marqueur) ou `angle_deg` (angle d'un carré, de 0 à 90), voir [8.3](#83-lire-les-positions-au-sol) |
-| `events` | Uniquement quand un événement survient à cette image (voir [6.5](#65-événements-de-mouvement) et [8.5](#85-définir-des-zones)). Chaque événement n'est envoyé qu'une fois, avec `object_id` et `name` (l'objet concerné : numéro et nom d'un objet suivi, identifiant d'un marqueur et « ArUco 7 », ou 0 et « Carré »), `type` (`motion_start`, `motion_stop`, `lost`, `found`, `zone_enter` ou `zone_exit` ; pour ces deux derniers s'ajoutent `zone_id` et `zone`, le nom de la zone), `timestamp_ms` (heure de l'événement) et `position_mm` (sur le sol) ou `position_px` (dans l'image). Pour `motion_stop` s'ajoutent `distance_mm` (ou `_px`), `travelled_mm` (ou `_px`) et `duration_s`. |
+| `events` | Uniquement quand un événement survient à cette image (voir [6.5](#65-événements-de-mouvement) et [8.5](#85-définir-des-zones)). Chaque événement n'est envoyé qu'une fois, avec `object_id` et `name` (l'objet concerné : numéro et nom d'un objet suivi, identifiant d'un marqueur et « ArUco 7 », ou 0 et « Carré »), `type` (`motion_start`, `motion_stop`, `lost`, `found`, `zone_enter`, `zone_exit`, ou `game_zone_enter` et `game_zone_exit` pour le jeu de la [section 8.6](#86-jeu--détecter-le-robot-dans-une-zone) ; pour ces quatre derniers s'ajoutent `zone_id` et `zone`, le nom de la zone), `timestamp_ms` (heure de l'événement) et `position_mm` (sur le sol) ou `position_px` (dans l'image). Pour `motion_stop` s'ajoutent `distance_mm` (ou `_px`), `travelled_mm` (ou `_px`) et `duration_s`. |
 | `tracks` | Uniquement si le lissage est actif (voir [6.4](#64-lisser-les-positions-des-carrés-et-des-marqueurs)) : une entrée par carré principal ou marqueur suivi, avec `type` (`square` ou `marker`), `id` (marqueur), `predicted` (non détecté dans cette image), `position_px` lissée, `velocity_px_s`, `speed_px_s`, `angle_deg` lissé et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s`, `direction_deg` et `heading_deg` (marqueur) ou `angle_deg` (carré) |
 | `tracked` | Uniquement si au moins un objet est suivi (voir [section 6](#6-suivre-des-objets-encadrés)) : une **liste**, avec une entrée par objet. Chaque entrée contient `id` (numéro de l'objet), `name` (son nom), `found` (trouvé ou perdu), `predicted` (perdu depuis peu, position prédite), `confidence` (indice de confiance, de 0 à 1), `drifted` (perdu parce que le cadre ne ressemble plus à l'objet ou a sauté ailleurs), `out_of_view` (sorti de l'image : recherché seulement le long des bords), `reacquired` (retrouvé à cette image par la recherche dans toute l'image), `reacquisitions` (nombre de reprises automatiques depuis la sélection), `center` (position lissée), `box` `[x, y, largeur, hauteur]` en pixels, `moving`, `velocity_px_s` `[vx, vy]`, `speed_px_s`, `direction_deg` et, si le repère du sol est défini, `floor` avec `position_mm`, `velocity_mm_s`, `speed_mm_s` et `direction_deg` |
 | `zones` | Uniquement si au moins une zone est définie (voir [8.5](#85-définir-des-zones)) : une entrée par zone, avec `id`, `name`, `box` `[x, y, largeur, hauteur]` en pixels, `occupants` (noms de ce qui s'y trouve) et, si le repère du sol est défini, `floor_corners_mm` (les 4 coins sur le sol, en mm) |
+| `game` | Uniquement pendant une partie du jeu « Détection robot dans zone » (voir [8.6](#86-jeu--détecter-le-robot-dans-une-zone)) : `mode` (`robot_in_zone`), `robot_id` et `robot` (numéro et nom de l'objet suivi), `target_zone_id` (zone visée, 0 pour n'importe laquelle), `found` (robot suivi), `inside` (entièrement dans une zone), `zone_id` et `zone` (si `inside`), `time_inside_s` (temps passé dans la zone) et `entries` (nombre d'entrées) |
 | `pose` | Uniquement si la caméra est calibrée : `position_mm` `[X, Y, Z]`, `rotation_deg` `[X, Y, Z]` et `distance_mm`, comme dans le panneau Résultat (voir [9.2](#92-position-3d-dun-marqueur-en-mm-après-calibration) et [9.3](#93-rotations-dun-marqueur-en-degrés-après-calibration)) |
 
 Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont celles de l'image réelle de la caméra, même avec l'effet miroir.

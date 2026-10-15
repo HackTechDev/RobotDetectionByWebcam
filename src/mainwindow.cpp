@@ -40,6 +40,7 @@
 #include <QStatusBar>
 #include <QToolButton>
 #include <QMenu>
+#include <QMenuBar>
 #include <QActionGroup>
 #include <QGuiApplication>
 #include <QScreen>
@@ -609,6 +610,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(quitButton, &QPushButton::clicked, this, &QWidget::close);
 
     setCentralWidget(central);
+
+    // Menu Jeu.
+    QMenu *gameMenu = menuBar()->addMenu(tr("&Jeu"));
+    gameMenu->addAction(tr("Détection robot dans zone..."), this, &MainWindow::openRobotZoneGame);
     resize(1100, 650);
 
     connect(m_colorButton, &QPushButton::clicked, this, &MainWindow::chooseColor);
@@ -1890,6 +1895,7 @@ void MainWindow::updateZoneList()
         item->setFlags(item->flags() | Qt::ItemIsEditable);
         m_zoneList->addItem(item);
     }
+    refreshGameChoices();
 }
 
 void MainWindow::updateZoneStatus()
@@ -1910,6 +1916,52 @@ void MainWindow::updateZoneStatus()
                                  ? tr("Aucune zone.")
                                  : tr("<b style='color:#080'>%n zone(s)</b>", nullptr, int(m_zones.zones().size())));
     }
+}
+
+void MainWindow::openRobotZoneGame()
+{
+    if (!m_gameDialog) {
+        m_gameDialog = new RobotZoneGameDialog(this);
+        auto applySelection = [this] {
+            m_game.setRobot(m_gameDialog->selectedRobot());
+            m_game.setZone(m_gameDialog->selectedZone());
+        };
+        connect(m_gameDialog, &RobotZoneGameDialog::startRequested, this, [this, applySelection] {
+            applySelection();
+            m_game.start(m_clock.elapsed());
+            m_gameDialog->setRunning(true);
+        });
+        connect(m_gameDialog, &RobotZoneGameDialog::stopRequested, this, [this] {
+            m_game.stop();
+            m_gameDialog->setRunning(false);
+            refreshGameChoices();
+        });
+        connect(m_gameDialog, &RobotZoneGameDialog::resetRequested, this,
+                [this] { m_game.resetCounters(m_clock.elapsed()); });
+        connect(m_gameDialog, &RobotZoneGameDialog::selectionChanged, this, [this, applySelection] {
+            // Autre robot ou autre zone pendant la partie : on repart de zéro.
+            if (m_game.isRunning()) {
+                applySelection();
+                m_game.start(m_clock.elapsed());
+            }
+        });
+    }
+    refreshGameChoices();
+    m_gameDialog->show();
+    m_gameDialog->raise();
+    m_gameDialog->activateWindow();
+}
+
+void MainWindow::refreshGameChoices()
+{
+    if (!m_gameDialog)
+        return;
+    std::vector<std::pair<int, QString>> robots, zones;
+    for (const TrackedItem &item : m_tracked)
+        robots.emplace_back(item.id, item.name);
+    for (const Zone &z : m_zones.zones())
+        zones.emplace_back(z.id, z.name);
+    m_gameDialog->setChoices(robots, zones);
 }
 
 void MainWindow::saveZones() const
@@ -2083,6 +2135,7 @@ void MainWindow::onObjectRenamed(QListWidgetItem *listItem)
             }
         }
     }
+    refreshGameChoices();
 }
 
 void MainWindow::onSelectionPointClicked(const QPoint &displayPos)
@@ -2173,6 +2226,7 @@ void MainWindow::updateTrackStatus()
                    "le nombre d'images par seconde, ou choisissez KCF pour les prochains objets.</i>");
     }
     m_trackLabel->setText(text);
+    refreshGameChoices();
 }
 
 namespace {
@@ -2199,6 +2253,10 @@ QString eventText(const MotionEvent &e)
         return QObject::tr("Entre dans la zone « %1 » en %2").arg(e.zoneName, where);
     case MotionEvent::ZoneExit:
         return QObject::tr("Sort de la zone « %1 » (dernière position %2)").arg(e.zoneName, where);
+    case MotionEvent::GameEnter:
+        return QObject::tr("Jeu : entièrement dans la zone « %1 » en %2").arg(e.zoneName, where);
+    case MotionEvent::GameExit:
+        return QObject::tr("Jeu : n'est plus entièrement dans la zone « %1 »").arg(e.zoneName);
     }
     return {};
 }
@@ -2212,6 +2270,8 @@ QString eventTypeKey(MotionEvent::Type type)
     case MotionEvent::Found: return QStringLiteral("found");
     case MotionEvent::ZoneEnter: return QStringLiteral("zone_enter");
     case MotionEvent::ZoneExit: return QStringLiteral("zone_exit");
+    case MotionEvent::GameEnter: return QStringLiteral("game_zone_enter");
+    case MotionEvent::GameExit: return QStringLiteral("game_zone_exit");
     }
     return {};
 }
@@ -2224,7 +2284,8 @@ void MainWindow::logEvents(const std::vector<MotionEvent> &events)
     for (const MotionEvent &e : events) {
         const QString time = QDateTime::fromMSecsSinceEpoch(e.wallTimeMs).toString(QStringLiteral("HH:mm:ss.z"));
         auto *item = new QListWidgetItem(QStringLiteral("%1  %2 : %3").arg(time, e.objectName, eventText(e)));
-        if (e.type == MotionEvent::ZoneEnter || e.type == MotionEvent::ZoneExit) {
+        if (e.type == MotionEvent::ZoneEnter || e.type == MotionEvent::ZoneExit || e.type == MotionEvent::GameEnter
+            || e.type == MotionEvent::GameExit) {
             item->setIcon(colorIcon(m_zones.colorOf(e.zoneId)));
         } else {
             for (const TrackedItem &tracked : m_tracked) {
@@ -2449,6 +2510,24 @@ void MainWindow::presentFrame(const FrameResult &result)
     } else if (!m_zoneOccupancyLabel->text().isEmpty()) {
         m_zoneOccupancyLabel->clear();
     }
+    // Jeu « Détection robot dans zone ».
+    QString gameRobotName;
+    if (m_game.isRunning()) {
+        const TrackedObject *robot = nullptr;
+        for (const TrackedItem &item : m_tracked) {
+            if (item.id == m_game.robotId()) {
+                robot = &item.tracker->state();
+                gameRobotName = item.name;
+            }
+        }
+        if (!robot)
+            gameRobotName = tr("Le robot");
+        const std::vector<MotionEvent> gameEvents =
+            m_game.update(robot, gameRobotName, m_zones.zones(), image.size(), m_clock.elapsed());
+        frameEvents.insert(frameEvents.end(), gameEvents.begin(), gameEvents.end());
+        if (m_gameDialog)
+            m_gameDialog->showState(m_game, gameRobotName, m_clock.elapsed());
+    }
     const bool calibOn = result.options.calibOn;
     const std::vector<QPointF> &boardCorners = result.boardCorners;
     const bool boardFound = result.boardFound;
@@ -2493,6 +2572,14 @@ void MainWindow::presentFrame(const FrameResult &result)
         std::vector<TrackedEntry> trackedEntries;
         for (const TrackedItem &item : m_tracked)
             trackedEntries.push_back({item.id, item.name, &item.tracker->state()});
+        GameEntry gameEntry;
+        const GameEntry *gamePtr = nullptr;
+        if (m_game.isRunning()) {
+            gameEntry = {m_game.robotId(), gameRobotName, m_game.zoneId(), m_game.robotFound(),
+                         m_game.state() == RobotZoneGame::Inside, m_game.insideZoneId(), m_game.insideZoneName(),
+                         m_game.timeInside(m_clock.elapsed()), m_game.entries()};
+            gamePtr = &gameEntry;
+        }
         std::vector<ZoneEntry> zoneEntries;
         const bool floorReady = m_floor.isReady();
         for (const Zone &z : m_zones.zones()) {
@@ -2507,7 +2594,7 @@ void MainWindow::presentFrame(const FrameResult &result)
         m_sender.send(image.size(), squaresOn ? &squares : nullptr, markersOn ? &markers : nullptr,
                       trackedEntries.empty() ? nullptr : &trackedEntries,
                       m_smoothBox->isChecked() ? &tracks : nullptr, frameEvents.empty() ? nullptr : &frameEvents,
-                      zoneEntries.empty() ? nullptr : &zoneEntries);
+                      zoneEntries.empty() ? nullptr : &zoneEntries, gamePtr);
         QString text = tr("Destination : <b>%1</b><br>Messages envoyés : %2 (dernier : %3 octets)")
                            .arg(m_sender.targetDescription())
                            .arg(m_sender.sentCount())
@@ -2605,6 +2692,50 @@ void MainWindow::presentFrame(const FrameResult &result)
             painter.drawText(r.topLeft() + QPointF(penWidth * 2, font.pixelSize() + penWidth), label);
         }
         painter.setBrush(Qt::NoBrush);
+    }
+    // Jeu : zone atteinte entourée en vert, et bandeau d'état en haut de l'image (visible aussi dans
+    // la fenêtre du joueur).
+    if (m_game.isRunning()) {
+        for (const Zone &z : m_zones.zones()) {
+            if (z.id != m_game.insideZoneId())
+                continue;
+            QRectF r = ZoneManager::imageRect(z, image.size());
+            if (mirror)
+                r.moveLeft(width - r.right());
+            painter.setPen(QPen(QColor(40, 220, 80), penWidth * 3));
+            painter.drawRect(r);
+        }
+        QString banner;
+        QColor bannerColor;
+        switch (m_game.state()) {
+        case RobotZoneGame::Inside:
+            banner = tr("%1 : DANS LA ZONE « %2 »").arg(gameRobotName, m_game.insideZoneName());
+            bannerColor = QColor(26, 154, 58);
+            break;
+        case RobotZoneGame::Outside:
+            banner = tr("%1 : hors zone").arg(gameRobotName);
+            bannerColor = QColor(201, 48, 44);
+            break;
+        case RobotZoneGame::Lost:
+            banner = tr("%1 : non trouvé").arg(gameRobotName);
+            bannerColor = QColor(224, 142, 11);
+            break;
+        }
+        QFont bannerFont = font;
+        bannerFont.setPixelSize(font.pixelSize() * 2);
+        bannerFont.setBold(true);
+        painter.setFont(bannerFont);
+        const QFontMetrics fm(bannerFont);
+        const QRectF box(display.width() / 2.0 - fm.horizontalAdvance(banner) / 2.0 - penWidth * 4, penWidth * 2,
+                         fm.horizontalAdvance(banner) + penWidth * 8, fm.height() + penWidth * 2);
+        bannerColor.setAlpha(210);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(bannerColor);
+        painter.drawRoundedRect(box, penWidth * 2, penWidth * 2);
+        painter.setPen(Qt::white);
+        painter.drawText(box, Qt::AlignCenter, banner);
+        painter.setBrush(Qt::NoBrush);
+        painter.setFont(font);
     }
 
     // Repère du sol : contour de la zone et noms des axes, ou points en cours de saisie.

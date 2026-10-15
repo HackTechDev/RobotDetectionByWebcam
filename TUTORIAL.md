@@ -317,7 +317,9 @@ Une **zone** est un rectangle fixe de l'image, avec un nom. L'application indiqu
 
 Les zones surveillent aussi les objets suivis (partie 4) et le carré principal. Elles sont mémorisées pour cette caméra. Le détail est dans le [guide](USER_GUIDE.md#85-définir-des-zones).
 
-✅ **Vérification** : l'entrée et la sortie du marqueur dans la zone « Garage » sont inscrites dans le journal.
+**Essayer le jeu** : ajoutez une tasse comme objet suivi (partie 4), puis ouvrez le menu **Jeu**, **Détection robot dans zone...**. Choisissez la tasse comme **Robot** et **Garage** comme **Zone**, puis cliquez sur **Démarrer**. Poussez la tasse dans la zone : le bandeau en haut de l'image passe au vert seulement quand elle y est **entièrement**, et le temps passé dans la zone s'écoule. Sortez-la à moitié : le bandeau repasse au rouge. Le détail est dans le [guide](USER_GUIDE.md#86-jeu--détecter-le-robot-dans-une-zone).
+
+✅ **Vérification** : l'entrée et la sortie du marqueur dans la zone « Garage » sont inscrites dans le journal, et le jeu ne passe au vert que quand la tasse est entièrement dans la zone.
 
 ---
 
@@ -503,6 +505,7 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, u
 | La vitesse d'un marqueur | Onglet **Suivi** | Groupe **Lissage des carrés et marqueurs** |
 | Récupérer les positions dans un programme | Onglet **Envoi UDP** | **Envoyer les positions**, puis `python3 tools/udp_receiver.py` |
 | Montrer le jeu au joueur | Bouton **Joueur** | Seconde fenêtre en plein écran sur l'autre écran |
+| Savoir si le robot est entièrement dans une zone | Menu **Jeu** | **Détection robot dans zone...**, choisir le robot et la zone, **Démarrer** |
 
 ## Pour aller plus loin
 

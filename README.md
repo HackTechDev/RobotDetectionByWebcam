@@ -13,7 +13,8 @@ Pour chacun, l'application donne la position dans l'image, ainsi que la taille e
 - **envoyer** toutes les mesures en JSON sur UDP à un autre programme, par exemple celui qui pilote le robot ;
 - signaler ce qui entre dans des **zones** nommées de l'image et en sort ;
 - **capturer une image** ou **enregistrer une vidéo** de la webcam ;
-- afficher la vidéo seule dans une **fenêtre pour le joueur**, en plein écran sur un second écran.
+- afficher la vidéo seule dans une **fenêtre pour le joueur**, en plein écran sur un second écran ;
+- proposer des **jeux** (menu **Jeu**) : pour l'instant, détecter quand le robot est entièrement dans une zone.
 
 Les objets encadrés peuvent être suivis par les trackers classiques d'OpenCV (CSRT, KCF) ou par des **réseaux de neurones** (Nano, Vit), plus robustes. Les réglages de la webcam (exposition, balance des blancs, luminosité, gain, fréquence du secteur...) se font depuis l'application.
 
@@ -151,6 +152,10 @@ Le repère est propre à chaque caméra, comme la calibration. Il fonctionne san
 
 L'onglet « Zones » définit des rectangles fixes de l'image, chacun avec un nom : on clique sur « Ajouter une zone », on trace le rectangle (ajustable avec ses poignées), on valide, puis on le nomme. Les zones se renomment dans la liste (double-clic) et sont mémorisées pour chaque caméra, en fraction de l'image (valables pour toute résolution du même format). L'application indique ce qui se trouve dans chaque zone (objets suivis, marqueurs ArUco, carré principal, d'après leur centre) et inscrit chaque entrée et sortie dans le journal des événements (`zone_enter`, `zone_exit`). Une sortie n'est signalée qu'après 0,3 s hors de la zone, avec une marge de 1 % de l'image : un point qui tremble sur le bord ou un marqueur manqué sur une image ne crée pas de fausses sorties. Les zones, leurs occupants et, si le repère du sol est défini, leurs coins sur le sol en mm sont envoyés en UDP (liste `zones`). Le code est dans `src/zonemanager.cpp`.
 
+### Jeu : détection du robot dans une zone
+
+Le menu « Jeu », « Détection robot dans zone... », ouvre une fenêtre où l'on choisit le robot (un objet suivi) et la zone visée (ou n'importe laquelle). Le robot est « dans la zone » quand son cadre de suivi y est **entièrement contenu** (`QRectF::contains`), pas seulement son centre. L'état (dans la zone, hors zone, non trouvé) ne change qu'après 0,2 s de stabilité, et une position seulement prédite ne le modifie pas. Il s'affiche en grand dans la fenêtre de jeu et en bandeau sur l'image (donc aussi dans la fenêtre du joueur), avec le temps passé dans la zone et le nombre d'entrées. Les entrées et sorties vont dans le journal (`game_zone_enter`, `game_zone_exit`) et l'état de la partie est envoyé en UDP (objet `game`). Le code est dans `src/robotzonegame.cpp`.
+
 ### Suivi d'objets encadrés
 
 Dans l'onglet « Suivi », cliquer sur « Ajouter des objets », puis tracer un rectangle autour de chaque objet, ou cliquer dessus : un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Valider l'objet », touche Entrée ou double-clic. On reste en mode ajout pour l'objet suivant ; Échap ou « Terminer l'ajout » termine. Chaque objet a un numéro, un nom modifiable (double-clic dans la liste des objets) et une couleur. « Retirer » arrête le suivi de l'objet sélectionné dans la liste, « Tout retirer » celui de tous les objets. Chaque objet est suivi d'image en image par son propre tracker OpenCV :
@@ -175,7 +180,7 @@ Le groupe « Lissage des carrés et marqueurs » de l'onglet « Suivi » suit da
 
 L'onglet « Envoi UDP » envoie les résultats à un autre programme, par exemple celui qui pilote le robot : un message JSON par image traitée, en UDP, vers l'adresse et le port choisis (`127.0.0.1:5005` par défaut). Cocher « Envoyer les positions » pour l'activer.
 
-Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si le lissage est actif, la liste `tracks` donne la position lissée, la vitesse et l'état (détecté ou prédit) de chaque carré principal ou marqueur suivi. Si des objets sont suivis, la liste `tracked` donne pour chacun son numéro (`id`), son nom (`name`), son cadre, sa position, sa vitesse, sa direction, son état (trouvé, prédit, en mouvement), son indice de confiance et le nombre de reprises automatiques. La liste `events` signale les débuts et fins de mouvement, les pertes et les reprises de chaque objet, ainsi que les entrées et sorties de zone (`zone_enter`, `zone_exit`), une seule fois chacun, avec `object_id` et `name`. La liste `zones` donne pour chaque zone son rectangle, ses occupants et, si le repère du sol est défini, ses coins sur le sol. L'état `out_of_view` de chaque objet suivi indique qu'il est sorti de l'image. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
+Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si le lissage est actif, la liste `tracks` donne la position lissée, la vitesse et l'état (détecté ou prédit) de chaque carré principal ou marqueur suivi. Si des objets sont suivis, la liste `tracked` donne pour chacun son numéro (`id`), son nom (`name`), son cadre, sa position, sa vitesse, sa direction, son état (trouvé, prédit, en mouvement), son indice de confiance et le nombre de reprises automatiques. La liste `events` signale les débuts et fins de mouvement, les pertes et les reprises de chaque objet, ainsi que les entrées et sorties de zone (`zone_enter`, `zone_exit`), une seule fois chacun, avec `object_id` et `name`. Pendant une partie du jeu, l'objet `game` donne l'état du robot (dans une zone ou non), le temps passé dans la zone et le nombre d'entrées. La liste `zones` donne pour chaque zone son rectangle, ses occupants et, si le repère du sol est défini, ses coins sur le sol. L'état `out_of_view` de chaque objet suivi indique qu'il est sorti de l'image. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
 
 Pour tester la réception :
 
@@ -313,6 +318,7 @@ src/
 ├── v4l2controls.h/.cpp          accès direct aux réglages du pilote Linux des webcams (V4L2)
 ├── objecttracker.h/.cpp  suivi d'un objet (un par objet suivi) : sélection d'un clic, confiance, reprise, vitesse, événements
 ├── playerwindow.h/.cpp   fenêtre du joueur : vidéo seule, plein écran sur un second écran
+├── robotzonegame.h/.cpp  jeu « Détection robot dans zone » : règle, compteurs et fenêtre du jeu
 ├── zonemanager.h/.cpp    zones fixes nommées : occupation, entrées et sorties, mémorisation
 ├── trackermodels.h/.cpp  modèles des trackers Nano et Vit : emplacement, téléchargement vérifié
 └── motionfilter.h/.cpp  lissage dans le temps (filtre de Kalman) des carrés et des marqueurs

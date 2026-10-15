@@ -50,7 +50,8 @@ struct TrackedObject
 // Événement de mouvement de l'objet suivi, ou entrée et sortie d'une zone.
 struct MotionEvent
 {
-    enum Type { MotionStart, MotionStop, Lost, Found, ZoneEnter, ZoneExit };
+    // GameEnter et GameExit : jeu « Détection robot dans zone » (robot entièrement dans la zone).
+    enum Type { MotionStart, MotionStop, Lost, Found, ZoneEnter, ZoneExit, GameEnter, GameExit };
     Type type = MotionStart;
     qint64 timeMs = 0;      // horloge du suivi
     qint64 wallTimeMs = 0;  // heure réelle (ms depuis 1970), renseignée par l'application

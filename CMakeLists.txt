@@ -34,6 +34,8 @@ add_executable(RobotDetectionByWebcam
     src/zonemanager.cpp
     src/playerwindow.h
     src/playerwindow.cpp
+    src/robotzonegame.h
+    src/robotzonegame.cpp
     src/objecttracker.h
     src/objecttracker.cpp
     src/motionfilter.h
