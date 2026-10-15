@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "playerwindow.h"
 #include "trackermodels.h"
 #include "videowidget.h"
 
@@ -39,6 +40,10 @@
 #include <QStatusBar>
 #include <QToolButton>
 #include <QMenu>
+#include <QActionGroup>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QTimer>
 #include <QUrl>
 #include <QRegularExpression>
 #include <QScrollArea>
@@ -142,6 +147,7 @@ MainWindow::MainWindow(QWidget *parent)
             if (state == QMediaRecorder::StoppedState)
                 m_videoStopping = false;
             updateVideoButton();
+
             if (state == QMediaRecorder::StoppedState && !m_videoPath.isEmpty()
                 && recorder->error() == QMediaRecorder::NoError) {
                 statusBar()->showMessage(tr("Vidéo enregistrée : %1").arg(QDir::toNativeSeparators(m_videoPath)), 10000);
@@ -156,6 +162,65 @@ MainWindow::MainWindow(QWidget *parent)
         });
     }
     updateVideoButton();
+    // Fenêtre du joueur : un clic l'ouvre ou la ferme ; la flèche propose les options.
+    m_playerButton = new QToolButton(camBox);
+    m_playerButton->setText(tr("Joueur"));
+    m_playerButton->setCheckable(true);
+    m_playerButton->setToolTip(tr("Ouvre une seconde fenêtre avec la vidéo seule, en plein écran sur l'autre "
+                                  "écran, pour le joueur"));
+    m_playerButton->setPopupMode(QToolButton::MenuButtonPopup);
+    auto *playerMenu = new QMenu(m_playerButton);
+    m_playerDetectionsAction = playerMenu->addAction(tr("Afficher les détections"));
+    m_playerDetectionsAction->setCheckable(true);
+    m_playerDetectionsAction->setChecked(true);
+    m_playerDetectionsAction->setToolTip(tr("Zones, marqueurs, objets suivis... comme dans la fenêtre principale"));
+    m_playerFlipAction = playerMenu->addAction(tr("Retourner l'image (miroir)"));
+    m_playerFlipAction->setCheckable(true);
+    m_playerFullScreenAction = playerMenu->addAction(tr("Plein écran (F11)"));
+    m_playerFullScreenAction->setCheckable(true);
+    m_playerFullScreenAction->setChecked(true);
+    QMenu *screenMenu = playerMenu->addMenu(tr("Écran"));
+    connect(screenMenu, &QMenu::aboutToShow, this, [this, screenMenu] {
+        // Liste des écrans, refaite à chaque ouverture (écran branché ou débranché).
+        screenMenu->clear();
+        auto *group = new QActionGroup(screenMenu);
+        QAction *automatic = screenMenu->addAction(tr("Automatique (l'autre écran)"));
+        automatic->setCheckable(true);
+        automatic->setChecked(m_playerScreenName.isEmpty());
+        group->addAction(automatic);
+        connect(automatic, &QAction::triggered, this, [this] {
+            m_playerScreenName.clear();
+            if (m_playerWindow && m_playerWindow->isVisible())
+                m_playerWindow->showOn(playerScreen(), m_playerFullScreenAction->isChecked());
+        });
+        const QList<QScreen *> screens = QGuiApplication::screens();
+        for (int i = 0; i < screens.size(); ++i) {
+            QScreen *screen = screens[i];
+            QAction *action = screenMenu->addAction(tr("Écran %1 : %2 (%3 × %4)")
+                                                        .arg(i + 1)
+                                                        .arg(screen->name())
+                                                        .arg(screen->size().width())
+                                                        .arg(screen->size().height()));
+            action->setCheckable(true);
+            action->setChecked(screen->name() == m_playerScreenName);
+            group->addAction(action);
+            connect(action, &QAction::triggered, this, [this, name = screen->name()] {
+                m_playerScreenName = name;
+                if (m_playerWindow && m_playerWindow->isVisible())
+                    m_playerWindow->showOn(playerScreen(), m_playerFullScreenAction->isChecked());
+            });
+        }
+    });
+    m_playerButton->setMenu(playerMenu);
+    connect(m_playerButton, &QToolButton::toggled, this, &MainWindow::setPlayerWindowOpen);
+    connect(m_playerFlipAction, &QAction::toggled, this, [this](bool on) {
+        if (m_playerWindow)
+            m_playerWindow->setFlipped(on);
+    });
+    connect(m_playerFullScreenAction, &QAction::triggered, this, [this](bool on) {
+        if (m_playerWindow && m_playerWindow->isVisible())
+            m_playerWindow->setFullScreenMode(on);
+    });
     auto *camRow = new QWidget(camBox);
     auto *camRowLayout = new QHBoxLayout(camRow);
     camRowLayout->setContentsMargins(0, 0, 0, 0);
@@ -163,6 +228,7 @@ MainWindow::MainWindow(QWidget *parent)
     camRowLayout->addStretch();
     camRowLayout->addWidget(snapshotButton);
     camRowLayout->addWidget(m_videoButton);
+    camRowLayout->addWidget(m_playerButton);
     camRowLayout->addWidget(imageSettingsButton);
     camForm->addRow(camRow);
     m_cameraSettingsDialog = new CameraSettingsDialog(this);
@@ -830,6 +896,14 @@ void MainWindow::loadSettings()
     restoreGeometry(s.value(QStringLiteral("window/geometry")).toByteArray());
     m_tabs->setCurrentIndex(s.value(QStringLiteral("window/tab"), 0).toInt());
     m_mirrorCheck->setChecked(s.value(QStringLiteral("camera/mirror"), false).toBool());
+    m_playerDetectionsAction->setChecked(s.value(QStringLiteral("player/detections"), true).toBool());
+    m_playerFlipAction->setChecked(s.value(QStringLiteral("player/flip"), false).toBool());
+    m_playerFullScreenAction->setChecked(s.value(QStringLiteral("player/fullscreen"), true).toBool());
+    m_playerScreenName = s.value(QStringLiteral("player/screen")).toString();
+    if (s.value(QStringLiteral("player/open"), false).toBool()) {
+        // Rouverte une fois la fenêtre principale affichée (écran connu).
+        QTimer::singleShot(0, this, [this] { setPlayerWindowOpen(true); });
+    }
 
     m_squareBox->setChecked(s.value(QStringLiteral("square/enabled"), true).toBool());
     const QColor color(s.value(QStringLiteral("square/color")).toString());
@@ -897,6 +971,11 @@ void MainWindow::saveSettings() const
     if (m_camera)
         s.setValue(QStringLiteral("camera/device"), m_camera->cameraDevice().description());
     s.setValue(QStringLiteral("camera/mirror"), m_mirrorCheck->isChecked());
+    s.setValue(QStringLiteral("player/open"), m_playerWindow && m_playerWindow->isVisible());
+    s.setValue(QStringLiteral("player/detections"), m_playerDetectionsAction->isChecked());
+    s.setValue(QStringLiteral("player/flip"), m_playerFlipAction->isChecked());
+    s.setValue(QStringLiteral("player/fullscreen"), m_playerFullScreenAction->isChecked());
+    s.setValue(QStringLiteral("player/screen"), m_playerScreenName);
 
     s.setValue(QStringLiteral("square/enabled"), m_squareBox->isChecked());
     s.setValue(QStringLiteral("square/color"), m_targetColor.name());
@@ -964,6 +1043,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
     // Les réglages restent mémorisés dans la webcam : on la rend aux autres applications en
     // automatique, avec ses réglages d'origine. Ils seront réappliqués au prochain lancement.
     m_cameraSettingsDialog->restoreCamera();
+    if (m_playerWindow) {
+        const QSignalBlocker blocker(m_playerWindow);
+        m_playerWindow->close();
+    }
     QMainWindow::closeEvent(event);
 }
 
@@ -1397,6 +1480,47 @@ void MainWindow::saveCapture(bool withDetections)
         statusBar()->showMessage(tr("Capture enregistrée : %1").arg(QDir::toNativeSeparators(path)), 8000);
     else
         QMessageBox::warning(this, tr("Capture"), tr("Impossible d'enregistrer %1").arg(path));
+}
+
+QScreen *MainWindow::playerScreen() const
+{
+    // Écran choisi s'il est branché ; sinon un autre écran que celui de la fenêtre principale.
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    for (QScreen *screen : screens) {
+        if (screen->name() == m_playerScreenName)
+            return screen;
+    }
+    QScreen *mainScreen = screen();
+    for (QScreen *screen : screens) {
+        if (screen != mainScreen)
+            return screen;
+    }
+    return mainScreen;
+}
+
+void MainWindow::setPlayerWindowOpen(bool open)
+{
+    if (open) {
+        if (!m_playerWindow) {
+            m_playerWindow = new PlayerWindow(this);
+            m_playerWindow->setFlipped(m_playerFlipAction->isChecked());
+            connect(m_playerWindow, &PlayerWindow::closed, this, [this] {
+                const QSignalBlocker blocker(m_playerButton);
+                m_playerButton->setChecked(false);
+            });
+            connect(m_playerWindow, &PlayerWindow::fullScreenChanged, m_playerFullScreenAction, &QAction::setChecked);
+        }
+        if (!m_lastDisplay.isNull())
+            m_playerWindow->setImage(m_playerDetectionsAction->isChecked() ? m_lastDisplay : m_lastFrame);
+        // Seul écran : fenêtre normale, pour ne pas cacher la fenêtre principale.
+        const bool alone = playerScreen() == screen();
+        m_playerWindow->showOn(playerScreen(), m_playerFullScreenAction->isChecked() && !alone);
+    } else if (m_playerWindow) {
+        const QSignalBlocker blocker(m_playerWindow);  // pas de signal « closed » en retour
+        m_playerWindow->close();
+    }
+    const QSignalBlocker blocker(m_playerButton);
+    m_playerButton->setChecked(open);
 }
 
 void MainWindow::toggleVideo(bool withDetections)
@@ -2627,6 +2751,8 @@ void MainWindow::presentFrame(const FrameResult &result)
     painter.end();
     m_video->setImage(display);
     m_lastDisplay = display;
+    if (m_playerWindow && m_playerWindow->isVisible())
+        m_playerWindow->setImage(m_playerDetectionsAction->isChecked() ? display : image);
     if (m_overlayRecorder->recorderState() == QMediaRecorder::RecordingState) {
         // Image horodatée d'après l'heure réelle : la vidéo garde la vitesse du traitement. Si
         // l'enregistreur est en retard, l'image est sautée.

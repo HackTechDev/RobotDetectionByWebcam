@@ -86,6 +86,7 @@ Quelle que soit la méthode, l'application peut aussi :
   - **Résolution** : la taille des images de la caméra, avec leur format (4:3, 16:9...) et le nombre maximal d'images par seconde annoncé par la caméra. Voir [Choisir la résolution](#choisir-la-résolution) ;
   - **Capture** : enregistre aussitôt l'image de la webcam en PNG (touche **F12**). Voir [Capturer une image](#capturer-une-image) ;
   - **Vidéo** : démarre et arrête l'enregistrement d'une vidéo de la webcam en MP4 (touche **F9**). Voir [Enregistrer une vidéo](#enregistrer-une-vidéo) ;
+  - **Joueur** : ouvre une seconde fenêtre avec la vidéo seule, en plein écran sur l'autre écran, pour le joueur. Voir [Fenêtre du joueur](#fenêtre-du-joueur) ;
   - **Réglages de l'image...** : exposition, balance des blancs, luminosité, contraste, gain, fréquence du secteur... Voir [Régler l'image de la webcam](#régler-limage-de-la-webcam) ;
   - **Effet miroir** : retourne l'image affichée, comme dans un miroir. C'est pratique quand on se place face à la caméra. Cette option ne change **que l'affichage** : les détections et les mesures restent celles de l'image réelle de la caméra (voir [section 9.1](#91-coordonnées-dans-limage-en-pixels)).
 - **Onglets** :
@@ -143,6 +144,21 @@ Le bouton **Vidéo**, à droite de **Capture**, enregistre une vidéo au format 
 Les vidéos vont dans le même dossier que les images capturées (par défaut `~/Images/RobotDetectionByWebcam/`, voir [Capturer une image](#capturer-une-image)), avec un nom horodaté : `video_20261014_215256.mp4`, ou `video_20261014_215305_detections.mp4`.
 
 L'enregistrement s'arrête de lui-même si vous changez de caméra ou de résolution, et à la fermeture de l'application, qui attend que le fichier soit terminé. Une vidéo en 1280 × 960 occupe environ 1 Mo par seconde.
+
+### Fenêtre du joueur
+
+Le bouton **Joueur**, à droite de **Vidéo**, ouvre une seconde fenêtre qui ne montre **que la vidéo**, sur fond noir, sans aucun réglage. Elle est faite pour un second écran tourné vers le joueur, pendant que vous gardez la fenêtre principale sur le vôtre.
+
+- **Un clic sur Joueur** ouvre la fenêtre, un nouveau clic la ferme. Le bouton reste enfoncé tant qu'elle est ouverte.
+- Elle s'ouvre **en plein écran sur l'autre écran** que celui de la fenêtre principale. Avec un seul écran, elle s'ouvre en fenêtre normale, pour ne pas cacher la fenêtre principale.
+- Dans la fenêtre du joueur : **double-clic** ou **F11** bascule le plein écran, **Échap** le quitte. En plein écran, le pointeur de la souris est masqué.
+- **La petite flèche** à droite du bouton ouvre un menu :
+  - **Afficher les détections** (coché par défaut) : zones, marqueurs, objets suivis, trajectoires... comme dans la fenêtre principale. Décochez pour la vidéo brute de la caméra ;
+  - **Retourner l'image (miroir)** : pratique quand le joueur est face à la caméra. Ce réglage est indépendant de l'**Effet miroir** de la fenêtre principale ; avec les détections affichées, les deux s'additionnent ;
+  - **Plein écran** ;
+  - **Écran** : **Automatique** (l'autre écran) ou un écran précis, choisi dans la liste des écrans branchés.
+
+Ces choix sont mémorisés, ainsi que l'ouverture de la fenêtre : si elle était ouverte en quittant l'application, elle se rouvre au lancement suivant. Si l'écran choisi n'est plus branché, elle s'ouvre sur l'autre écran.
 
 ### Régler l'image de la webcam
 
@@ -918,6 +934,7 @@ Si un modèle a été supprimé, l'application revient à **CSRT** au lancement 
 L'application retrouve au lancement les réglages de la fois précédente :
 
 - **Webcam** : caméra choisie (si elle est branchée), résolution, exposition, balance des blancs et autres réglages de l'image (pour chaque caméra) et effet miroir ;
+- **Fenêtre du joueur** : ouverte ou non, détections, miroir, plein écran et écran choisi ;
 - **Carré coloré** : activation, couleur et tous les curseurs ;
 - **ArUco** : activation, dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;

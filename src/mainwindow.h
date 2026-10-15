@@ -34,6 +34,9 @@ class QMediaCaptureSession;
 class QMediaRecorder;
 class QToolButton;
 class QVideoFrameInput;
+class QAction;
+class QScreen;
+class PlayerWindow;
 class QPushButton;
 class QShortcut;
 class QSlider;
@@ -123,6 +126,9 @@ private:
     // Vidéo : flux de la webcam (enregistré par Qt Multimedia) ou images affichées, avec les
     // détections (envoyées une à une à un second enregistreur).
     void startVideo(bool withDetections);
+    // Fenêtre du joueur : la vidéo seule, sur un second écran.
+    void setPlayerWindowOpen(bool open);
+    QScreen *playerScreen() const;
     void stopVideo();
     void toggleVideo(bool withDetections);
     void updateVideoButton();
@@ -273,6 +279,12 @@ private:
     QColor m_targetColor;
     QImage m_lastFrame;  // dernière image affichée (les clics portent sur elle)
     QToolButton *m_videoButton = nullptr;
+    PlayerWindow *m_playerWindow = nullptr;
+    QToolButton *m_playerButton = nullptr;
+    QAction *m_playerDetectionsAction = nullptr;
+    QAction *m_playerFlipAction = nullptr;
+    QAction *m_playerFullScreenAction = nullptr;
+    QString m_playerScreenName;  // écran choisi pour la fenêtre du joueur (vide : automatique)
     QMediaRecorder *m_recorder = nullptr;         // vidéo de la webcam
     QMediaCaptureSession *m_overlaySession = nullptr;  // vidéo avec les détections
     QVideoFrameInput *m_frameInput = nullptr;

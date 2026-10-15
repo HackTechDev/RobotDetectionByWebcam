@@ -13,6 +13,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - **Réglages de l'image** : exposition automatique ou temps de pose manuel entre les vraies limites de la caméra (valeur appliquée affichée), balance des blancs automatique ou température manuelle, et tous les autres réglages fournis par le pilote V4L2 (luminosité, contraste, gain, fréquence du secteur, voyant...), avec des noms français. La webcam retrouve son état d'origine à la fermeture.
 - **Capture d'image** en un clic (F12) : image de la webcam en pleine résolution, ou image avec les détections (Maj+F12), enregistrée en PNG horodaté dans un dossier choisi.
 - **Enregistrement vidéo** en MP4 (F9) : flux de la webcam en pleine résolution, ou images affichées avec les détections (Maj+F9).
+- **Fenêtre du joueur** : vidéo seule, sur fond noir, en plein écran sur un second écran, avec ou sans les détections, retournable en miroir.
 - **Effet miroir**, appliqué seulement à l'affichage : les détections et les mesures restent celles de l'image réelle de la caméra.
 
 ### Détection
