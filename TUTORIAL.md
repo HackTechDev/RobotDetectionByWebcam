@@ -321,7 +321,7 @@ Les zones surveillent aussi les objets suivis (partie 4) et le carré principal.
 
 **Essayer le jeu** : ajoutez une tasse comme objet suivi (partie 4), puis ouvrez le menu **Jeu**, **Détection robot dans zone...**. Choisissez la tasse comme **Robot** et **Garage** comme **Zone**, puis cliquez sur **Démarrer**. Poussez la tasse dans la zone : le bandeau en haut de l'image passe au vert seulement quand elle y est **entièrement**, et le temps passé dans la zone s'écoule. Sortez-la à moitié : le bandeau repasse au rouge. Le détail est dans le [guide](USER_GUIDE.md#86-jeu--détecter-le-robot-dans-une-zone).
 
-Le second jeu du menu, **1, 2, 3 Soleil...**, se prête aussi à un essai avec la tasse : choisissez **Garage** comme **Arrivée**, démarrez, poussez la tasse au feu vert et lâchez-la dès que « SOLEIL ! » s'affiche. Il est présenté en détail dans la partie 9.6.
+Le second jeu du menu, **1, 2, 3 Soleil...**, se prête aussi à un essai avec la tasse : choisissez **Garage** comme **Arrivée**, démarrez, poussez la tasse au feu vert et lâchez-la dès que « SOLEIL ! » s'affiche. Il est présenté en détail dans la partie 9.6. Le troisième, **Chasse au trésor...**, aussi : démarrez-le avec la tasse comme robot et **Toute l'image** comme terrain, puis promenez la tasse en suivant les indices du bandeau, de « Glacial » à « BRÛLANT », jusqu'à ce qu'une étoile dorée apparaisse (partie 9.7).
 
 ✅ **Vérification** : l'entrée et la sortie du marqueur dans la zone « Garage » sont inscrites dans le journal, et le jeu ne passe au vert que quand la tasse est entièrement dans la zone.
 
@@ -371,7 +371,7 @@ Une ligne s'affiche par image :
 image 812 | carré (310, 242) px 12° | sol X 288 Y 196 mm | ArUco 1 (402, 250) px 0° | sol X 412 Y 198 mm cap 90° | carré vitesse 0 mm/s | ArUco 1 vitesse 85 mm/s
 ```
 
-Si des objets sont suivis (partie 4), leurs débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Les zones (partie 6.4) aussi : `zone Garage : ArUco 1`, et `*** ArUco 1 : ENTRE DANS LA ZONE « Garage » (152, 210) mm` à chaque entrée. Pendant une partie du jeu, l'état s'ajoute à chaque ligne, par exemple `jeu : Tasse dans « Garage », 3.4 s, 2 entrée(s)`. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
+Si des objets sont suivis (partie 4), leurs débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Les zones (partie 6.4) aussi : `zone Garage : ArUco 1`, et `*** ArUco 1 : ENTRE DANS LA ZONE « Garage » (152, 210) mm` à chaque entrée. Pendant une partie d'un jeu, son état s'ajoute à chaque ligne, par exemple `jeu : Tasse dans « Garage », 3.4 s, 2 entrée(s)`, `jeu 1, 2, 3 Soleil : green, 12.4 s, 1 faute(s), score 17.4 s` ou `jeu chasse au trésor : hot, 2 trésor(s), 54 s restantes`. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
 
 ### 8.3 Écrire son propre programme : aller vers une cible
 
@@ -510,6 +510,8 @@ Un trésor invisible est caché sur le terrain ; le joueur le cherche en suivant
 6. À la fin du temps, le bandeau bleu donne le total : « TERMINÉ ! 5 trésors trouvés ». Essayez ensuite en **Normal**, puis en **Difficile** : le trésor est plus petit.
 
 C'est le **centre** du robot qui doit passer sur le trésor : près du but, balayez lentement autour du point « BRÛLANT ». Le détail est dans le [guide](USER_GUIDE.md#88-jeu--chasse-au-trésor).
+
+**Pour aller plus loin : un robot autonome.** Pendant la partie, chaque message UDP contient la position du trésor, en pixels (`game` → `treasure_px`). En partant de `cible.py` (partie 8.3), remplacez la cible fixe par cette position et la position du marqueur par le centre de l'objet suivi (`tracked` → `center`, en pixels aussi) : votre programme sait alors vers où diriger le robot, sans les indices.
 
 ✅ **Vérification** : les indices se réchauffent quand le robot s'approche du trésor, et chaque trésor trouvé laisse une étoile dorée sur l'image.
 
