@@ -12,10 +12,10 @@ Les parties s'enchaînent, mais vous pouvez vous arrêter après n'importe laque
 | [3. Utiliser les marqueurs ArUco](#3-utiliser-les-marqueurs-aruco) | Imprimer et détecter des marqueurs numérotés | 15 min |
 | [4. Suivre des objets quelconques](#4-suivre-des-objets-quelconques) | Encadrer une tasse puis un second objet, suivre leurs trajectoires, essayer les réseaux de neurones | 15 min |
 | [5. Calibrer la caméra](#5-calibrer-la-caméra) | Mesurer l'objectif avec un damier, obtenir la position 3D | 20 min |
-| [6. Mesurer sur le sol en millimètres](#6-mesurer-sur-le-sol-en-millimètres) | Tracer un rectangle au ruban adhésif, lire des positions en mm, définir des zones nommées | 20 min |
+| [6. Mesurer sur le sol en millimètres](#6-mesurer-sur-le-sol-en-millimètres) | Tracer un rectangle au ruban adhésif, lire des positions en mm, définir des zones nommées, essayer le jeu | 25 min |
 | [7. Lisser les positions et mesurer la vitesse](#7-lisser-les-positions-et-mesurer-la-vitesse) | Mesurer une vitesse, voir une position prédite | 10 min |
 | [8. Envoyer les positions à un programme](#8-envoyer-les-positions-à-un-programme) | Recevoir les positions en Python, calculer un cap vers une cible | 20 min |
-| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot, montrer le jeu au joueur sur un second écran | 25 min |
+| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot, jouer une partie « robot au garage » sur un second écran | 30 min |
 
 ---
 
@@ -55,10 +55,12 @@ cmake --build build -j
 
 ### 1.1 Faire le tour de l'écran
 
-- À **gauche**, l'image de la caméra, sur laquelle les détections sont dessinées.
+- En **haut**, la barre de menus, avec le menu **Jeu** (parties 6.4 et 9.5).
+- À **gauche**, l'image de la caméra, sur laquelle les détections sont dessinées. Au lancement, **aucune détection automatique n'est active** : l'image est nue tant que vous n'activez pas le carré coloré ou les marqueurs, ou que vous n'encadrez pas un objet.
 - En **haut à droite**, le groupe **Webcam** : **Caméra**, **Résolution**, **Effet miroir** et les boutons **Capture**, **Vidéo**, **Joueur** et **Réglages de l'image...**.
 - Au **milieu à droite**, sept onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Zones**, **Suivi** et **Envoi UDP**.
 - En **bas à droite**, le panneau **Résultat**, qui affiche les mesures, et le bouton **Quitter**.
+- Tout en **bas**, la **barre d'état** : messages brefs, comme le chemin d'une image capturée.
 
 ### 1.2 Choisir la résolution
 
@@ -367,7 +369,7 @@ Une ligne s'affiche par image :
 image 812 | carré (310, 242) px 12° | sol X 288 Y 196 mm | ArUco 1 (402, 250) px 0° | sol X 412 Y 198 mm cap 90° | carré vitesse 0 mm/s | ArUco 1 vitesse 85 mm/s
 ```
 
-Si des objets sont suivis (partie 4), leurs débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Les zones (partie 6.4) aussi : `zone Garage : ArUco 1`, et `*** ArUco 1 : ENTRE DANS LA ZONE « Garage » (152, 210) mm` à chaque entrée. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
+Si des objets sont suivis (partie 4), leurs débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Les zones (partie 6.4) aussi : `zone Garage : ArUco 1`, et `*** ArUco 1 : ENTRE DANS LA ZONE « Garage » (152, 210) mm` à chaque entrée. Pendant une partie du jeu, l'état s'ajoute à chaque ligne, par exemple `jeu : Tasse dans « Garage », 3.4 s, 2 entrée(s)`. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
 
 ### 8.3 Écrire son propre programme : aller vers une cible
 
@@ -466,23 +468,35 @@ Pour envoyer les positions à un autre ordinateur ou à une carte (Raspberry Pi.
    - que le marqueur reste détecté sur toute la zone, y compris dans les coins ;
    - que les positions **prédites** sont rares. Si elles sont fréquentes, le marqueur est trop petit, trop flou ou mal éclairé.
 
-### 9.5 Montrer le jeu au joueur
+### 9.5 Jouer une partie : le robot au garage
+
+Le jeu **Détection robot dans zone** vérifie que le robot est **entièrement** garé dans une zone. Il s'appuie sur le suivi d'objets encadrés (partie 4) : le marqueur ArUco reste utile pour le pilotage, mais c'est le **cadre de suivi** du robot qui compte pour le jeu.
+
+1. Onglet **Zones** : tracez une zone **Garage** un peu plus grande que le robot, dans un coin de la zone de jeu (partie 6.4).
+2. Onglet **Suivi** : **Ajouter des objets**, tracez un rectangle **au plus près** du robot, appuyez sur **Entrée**, puis **Échap**. Renommez-le « Robot » (double-clic dans la liste). Choisissez de préférence la méthode **Nano**, qui suit mieux un robot qui tourne.
+3. Menu **Jeu**, **Détection robot dans zone...** : choisissez **Robot** et **Garage**, puis **Démarrer**.
+4. Pilotez le robot jusqu'au garage. Le bandeau en haut de l'image passe au **vert**, « Robot : DANS LA ZONE « Garage » », seulement quand le robot y est **entièrement**, et le garage est entouré de vert. À cheval sur le bord, il reste **rouge**.
+5. Le **temps passé dans la zone** et le **nombre d'entrées** s'affichent dans la fenêtre du jeu. **Remettre à zéro** repart de zéro pour la manche suivante, **Arrêter** termine la partie.
+
+Si votre programme de pilotage écoute l'envoi UDP, il reçoit aussi l'état de la partie (objet `game`) et les événements `game_zone_enter` et `game_zone_exit` : de quoi compter les points ou déclencher un son. Le détail est dans le [guide](USER_GUIDE.md#86-jeu--détecter-le-robot-dans-une-zone).
+
+### 9.6 Montrer le jeu au joueur
 
 Si un second écran est branché, le joueur peut suivre la partie sans voir les réglages :
 
 1. Cliquez sur **Joueur**. Une seconde fenêtre s'ouvre **en plein écran sur l'autre écran**, avec la vidéo seule, sur fond noir. Avec un seul écran, elle s'ouvre en fenêtre normale.
-2. Elle montre les **détections** (zones, marqueurs, trajectoires) : le joueur voit son robot entrer dans le « Garage ». Pour la vidéo brute, décochez **Afficher les détections** dans le menu du bouton (petite flèche).
+2. Elle montre les **détections** (zones, marqueurs, trajectoires) et le **bandeau du jeu** : le joueur voit son robot entrer dans le « Garage » et le bandeau passer au vert. Pour la vidéo brute, décochez **Afficher les détections** dans le menu du bouton (petite flèche).
 3. Si le joueur fait face à la caméra, cochez **Retourner l'image (miroir)** dans le même menu.
 4. Pour choisir un autre écran, utilisez **Écran** dans ce menu. Dans la fenêtre du joueur, un double-clic ou **F11** bascule le plein écran, et **Échap** le quitte.
 5. Pour garder un souvenir de la partie, enregistrez-la avec **Vidéo avec les détections** (**Maj+F9**).
 
 La fenêtre du joueur et ses réglages sont mémorisés : elle se rouvre au lancement suivant si elle était ouverte. Des idées de jeux sont réunies dans [GAMES.md](GAMES.md).
 
-### 9.6 Quitter proprement
+### 9.7 Quitter proprement
 
 Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, une vidéo en cours est terminée proprement, et la webcam retrouve son exposition automatique et ses réglages d'origine pour les autres logiciels.
 
-✅ **Vérification finale** : le programme de pilotage reçoit en continu la position et le cap du robot, en millimètres, pendant qu'il se déplace.
+✅ **Vérification finale** : le programme de pilotage reçoit en continu la position et le cap du robot, en millimètres, pendant qu'il se déplace, et le jeu signale le robot garé entièrement dans le « Garage ».
 
 ---
 
