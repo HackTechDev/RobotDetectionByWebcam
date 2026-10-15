@@ -10,7 +10,12 @@ Pour chacun, l'application donne la position dans l'image, ainsi que la taille e
 - donner les positions **en millimètres sur le sol**, après avoir cliqué les 4 coins d'un rectangle connu ;
 - donner la **position 3D** et l'orientation des marqueurs ArUco, une fois la caméra **calibrée** avec un damier ;
 - **lisser** les positions et calculer les **vitesses** (filtre de Kalman) ;
-- **envoyer** toutes les mesures en JSON sur UDP à un autre programme, par exemple celui qui pilote le robot.
+- **envoyer** toutes les mesures en JSON sur UDP à un autre programme, par exemple celui qui pilote le robot ;
+- signaler ce qui entre dans des **zones** nommées de l'image et en sort ;
+- **capturer une image** ou **enregistrer une vidéo** de la webcam ;
+- afficher la vidéo seule dans une **fenêtre pour le joueur**, en plein écran sur un second écran.
+
+Les objets encadrés peuvent être suivis par les trackers classiques d'OpenCV (CSRT, KCF) ou par des **réseaux de neurones** (Nano, Vit), plus robustes. Les réglages de la webcam (exposition, balance des blancs, luminosité, gain, fréquence du secteur...) se font depuis l'application.
 
 Pour découvrir l'application pas à pas, suivez le [tutoriel](TUTORIAL.md). Le mode d'emploi détaillé (réglages, calibration pas à pas, lecture des résultats, dépannage) se trouve dans le [guide utilisateur](USER_GUIDE.md).
 
@@ -20,8 +25,8 @@ La liste complète des fonctionnalités et des améliorations envisagées se tro
 
 - Linux avec une webcam (`/dev/video*`)
 - CMake ≥ 3.16 et un compilateur C++17 (g++ ou clang)
-- Qt 6 : modules **Widgets**, **Multimedia** (capture et affichage) et **Network** (envoi UDP)
-- OpenCV ≥ 4.7 : modules **core**, **imgproc**, **calib3d**, **objdetect**, **video** et **tracking** (détection, calibration et suivi). ArUco fait partie d'`objdetect` depuis la 4.7. `tracking` vient des modules contrib (paquet `libopencv-contrib-dev`, installé avec `libopencv-dev`).
+- Qt 6 : modules **Widgets**, **Multimedia** (capture, affichage et enregistrement vidéo, avec le moteur FFmpeg de Qt), **Network** (envoi UDP, téléchargement des modèles) et **Concurrent** (traitement dans un fil séparé)
+- OpenCV ≥ 4.7 : modules **core**, **imgproc**, **calib3d**, **objdetect**, **video** et **tracking** (détection, calibration et suivi). ArUco fait partie d'`objdetect` depuis la 4.7. `tracking` vient des modules contrib (paquet `libopencv-contrib-dev`, installé avec `libopencv-dev`). Les trackers Nano et Vit du module `video` demandent un OpenCV compilé avec le module **dnn** (c'est le cas des paquets Debian et Ubuntu).
 
 Sur Debian/Ubuntu :
 
@@ -48,7 +53,7 @@ Choisir la caméra dans la liste déroulante si plusieurs webcams sont branchée
 
 Pour chaque résolution, l'application choisit le format vidéo le plus rapide. Certaines webcams, comme la Logitech C270, envoient toujours leur résolution maximale en MJPEG, quelle que soit la résolution demandée. L'application le détecte et passe alors automatiquement au format non compressé (YUYV) de la même résolution. Ce basculement est mémorisé avec la résolution.
 
-Les réglages sont répartis en six onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Suivi** et **Envoi UDP**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps.
+Les réglages sont répartis en sept onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Zones**, **Suivi** et **Envoi UDP**. Dans les deux premiers, la case « Activer la détection » active ou désactive la détection correspondante. Les deux détections peuvent tourner en même temps. Elles sont **désactivées à chaque lancement** (leur état n'est pas mémorisé) : au départ, seuls les objets encadrés à la main dans l'onglet « Suivi » sont suivis.
 
 ### Caméra, réglages et fermeture
 
@@ -62,7 +67,7 @@ Le bouton « Réglages de l'image... » ouvre une fenêtre pour régler l'**expo
 
 L'option « Effet miroir » retourne seulement l'image affichée. Les détections se font toujours sur l'image réelle de la caméra : les marqueurs ArUco et le damier restent reconnus, et toutes les mesures (coordonnées, angles, pose 3D, positions au sol) restent dans le repère réel de la caméra, que le miroir soit activé ou non. Les clics sur l'image (couleur, sélection d'un objet, points du sol) sont convertis automatiquement.
 
-Les réglages (caméra, résolution, réglages de l'image, miroir, couleur et curseurs, dictionnaire et taille des marqueurs, damier, repère du sol, méthode, trajectoire et seuils du suivi, lissage, envoi UDP, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. Les réglages propres à chaque caméra sont regroupés dans la section `[cameras]` sous un nom lisible : le nom de la caméra réduit aux lettres et aux chiffres, suivi de l'identifiant USB s'il y figure (« UVC Camera (046d:0825) » devient `UVC_Camera_046d_0825`, au lieu du nom encodé par Qt `UVC%20Camera%20%28046d%3A0825%29` des versions précédentes, renommé automatiquement au premier lancement). La résolution, les réglages de l'image et le repère du sol sont enregistrés dès qu'on les modifie, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
+Les réglages (caméra, résolution, réglages de l'image, miroir, dossier des captures, fenêtre du joueur, couleur et curseurs, dictionnaire et taille des marqueurs, damier, repère du sol, zones, méthode, trajectoire et seuils du suivi, lissage, envoi UDP, taille de la fenêtre) sont enregistrés dans `~/.config/RobotDetectionByWebcam/settings.ini` et restaurés au lancement suivant. Les réglages propres à chaque caméra sont regroupés dans la section `[cameras]` sous un nom lisible : le nom de la caméra réduit aux lettres et aux chiffres, suivi de l'identifiant USB s'il y figure (« UVC Camera (046d:0825) » devient `UVC_Camera_046d_0825`, au lieu du nom encodé par Qt `UVC%20Camera%20%28046d%3A0825%29` des versions précédentes, renommé automatiquement au premier lancement). La résolution, les réglages de l'image, le repère du sol et les zones sont enregistrés dès qu'on les modifie, le reste à la fermeture de l'application. Supprimer ce fichier rétablit les réglages par défaut.
 
 Le bouton « Quitter », en bas à droite, ferme l'application après une confirmation. La même confirmation s'affiche avec la croix de la fenêtre.
 
@@ -170,7 +175,7 @@ Le groupe « Lissage des carrés et marqueurs » de l'onglet « Suivi » suit da
 
 L'onglet « Envoi UDP » envoie les résultats à un autre programme, par exemple celui qui pilote le robot : un message JSON par image traitée, en UDP, vers l'adresse et le port choisis (`127.0.0.1:5005` par défaut). Cocher « Envoyer les positions » pour l'activer.
 
-Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si le lissage est actif, la liste `tracks` donne la position lissée, la vitesse et l'état (détecté ou prédit) de chaque carré principal ou marqueur suivi. Si des objets sont suivis, la liste `tracked` donne pour chacun son numéro (`id`), son nom (`name`), son cadre, sa position, sa vitesse, sa direction, son état (trouvé, prédit, en mouvement), son indice de confiance et le nombre de reprises automatiques. La liste `events` signale les débuts et fins de mouvement, les pertes et les reprises de chaque objet, une seule fois chacun, avec `object_id` et `name`. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
+Chaque message contient le numéro d'image (`frame`), l'heure (`timestamp_ms`), la taille de l'image et les listes `squares` (le plus grand en premier) et `markers` (triés par identifiant), avec centre, côté, angle, coins, la position au sol (`floor`) si le repère du sol est défini et la pose 3D (`pose`) si la caméra est calibrée. Une liste est absente si la détection correspondante est désactivée. Si le lissage est actif, la liste `tracks` donne la position lissée, la vitesse et l'état (détecté ou prédit) de chaque carré principal ou marqueur suivi. Si des objets sont suivis, la liste `tracked` donne pour chacun son numéro (`id`), son nom (`name`), son cadre, sa position, sa vitesse, sa direction, son état (trouvé, prédit, en mouvement), son indice de confiance et le nombre de reprises automatiques. La liste `events` signale les débuts et fins de mouvement, les pertes et les reprises de chaque objet, ainsi que les entrées et sorties de zone (`zone_enter`, `zone_exit`), une seule fois chacun, avec `object_id` et `name`. La liste `zones` donne pour chaque zone son rectangle, ses occupants et, si le repère du sol est défini, ses coins sur le sol. L'état `out_of_view` de chaque objet suivi indique qu'il est sorti de l'image. Le format complet est décrit dans le [guide utilisateur](USER_GUIDE.md#103-format-des-messages).
 
 Pour tester la réception :
 
@@ -297,7 +302,7 @@ IMPROVEMENTS.md          fonctionnalités réalisées et améliorations envisag�
 GAMES.md                 idées de jeux avec un petit robot
 src/
 ├── main.cpp             point d'entrée
-├── mainwindow.h/.cpp    fenêtre, caméra (QCamera + QVideoSink), réglages, affichage des résultats
+├── mainwindow.h/.cpp    fenêtre, caméra (QCamera + QVideoSink), réglages, affichage des résultats, capture et vidéo
 ├── videowidget.h/.cpp   affichage de l'image en gardant ses proportions, clics, sélection et ajustement du cadre
 ├── squaredetector.h/.cpp  détection du carré coloré (OpenCV)
 ├── markerdetector.h/.cpp  détection, génération et pose 3D des marqueurs ArUco (OpenCV)
@@ -317,7 +322,9 @@ tools/
 
 ## Dépannage
 
-- **Une autre application trouve la webcam très sombre ou très claire** : l'application a été arrêtée brutalement avec une exposition manuelle, réglage que la webcam garde en mémoire. La relancer puis la quitter normalement remet la webcam en automatique.
+- **Une autre application trouve la webcam très sombre ou très claire** : l'application a été arrêtée brutalement avec une exposition manuelle (ou la luminosité, le gain... modifiés), réglages que la webcam garde en mémoire. La relancer puis la quitter normalement remet la webcam en automatique, avec ses réglages d'origine.
+- **Vidéo enregistrée illisible** : l'application a été arrêtée brutalement pendant l'enregistrement, et le fichier MP4 n'a pas été terminé. Arrêter la vidéo avec le bouton « Vidéo » ou quitter avec « Quitter », qui attend la fin du fichier.
+- **Le modèle Nano ou Vit ne se télécharge pas** : sans connexion, télécharger les fichiers ONNX ailleurs (adresses dans le [guide](USER_GUIDE.md#modèles-des-réseaux-de-neurones)) et les copier dans `~/.local/share/RobotDetectionByWebcam/models/` ou dans `models/` à côté de l'exécutable.
 - **`Could not find a package configuration file provided by "OpenCV"`** : installer `libopencv-dev`. Pour une installation d'OpenCV compilée à la main, ajouter `-DOpenCV_DIR=<prefix>/lib/cmake/opencv4` à la commande `cmake`.
 - **« Aucune webcam détectée »** : vérifier `ls /dev/video*` et que l'utilisateur appartient au groupe `video` (`groups`).
 - **Messages dans la console** : par défaut, l'application masque deux types de messages sans gravité, la version de FFmpeg utilisée par Qt Multimedia (`qt.multimedia.ffmpeg`) et les « Corrupt JPEG data » (`qt.gui.imageio.jpeg`) que produisent certaines webcams en MJPEG. Pour les réafficher, mettre `hideLibraryMessages=false` dans la section `[logging]` de `~/.config/RobotDetectionByWebcam/settings.ini`. La variable d'environnement `QT_LOGGING_RULES` reste prioritaire, par exemple `QT_LOGGING_RULES="qt.gui.imageio.jpeg.warning=true" ./build/RobotDetectionByWebcam`.
@@ -328,5 +335,5 @@ tools/
 - **Le damier n'est pas détecté** : il doit être entièrement visible avec sa marge blanche. Vérifier que le nombre de **coins intérieurs** saisi correspond au damier (un damier de 10 × 7 cases a 9 × 6 coins intérieurs). Éviter les reflets.
 - **Erreur RMS élevée** : damier gondolé, images floues ou vues trop semblables. Recommencer avec « Effacer les captures ».
 - **Distances fausses d'un facteur constant** : vérifier la « Taille du marqueur » et le « Côté d'une case », mesurés à la règle sur les impressions.
-- **Repartir de zéro** : supprimer le fichier de la caméra dans `~/.config/RobotDetectionByWebcam/calibrations/` (calibration) ou `settings.ini` (réglages, y compris les repères du sol).
+- **Repartir de zéro** : supprimer le fichier de la caméra dans `~/.config/RobotDetectionByWebcam/calibrations/` (calibration) ou `settings.ini` (réglages, y compris les repères du sol et les zones).
 - **Erreur de compilation sur `aruco_detector.hpp`** : la version d'OpenCV est antérieure à 4.7. Installer une version plus récente.

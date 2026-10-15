@@ -104,7 +104,7 @@ Ces deux boutons enregistrent l'image de la caméra telle quelle. Leur menu (pet
 
 1. Découpez un carré d'environ **5 × 5 cm** dans la feuille rouge.
 2. Posez-le sur un fond **uni et non rouge** (une table, une feuille grise...), bien visible par la caméra.
-3. Ouvrez l'onglet **Carré coloré** et vérifiez que **Activer la détection** est coché.
+3. Ouvrez l'onglet **Carré coloré** et cochez **Activer la détection** : au lancement, les détections automatiques sont toujours désactivées.
 4. **Cliquez sur le carré** dans l'image. Le bouton **Couleur** prend sa couleur, le **Type** passe sur « Couleur vive (teinte) » et les seuils se règlent seuls.
 
 Le carré est entouré **en vert**, avec ses coordonnées en pixels au-dessus. Le panneau **Résultat** affiche :
@@ -161,7 +161,7 @@ Mesurez à la règle **le côté de la partie noire** d'un marqueur, sans la mar
 
 ### 3.3 Les détecter
 
-1. Montrez le marqueur **1** à la caméra.
+1. Dans l'onglet **ArUco**, cochez **Activer la détection** (désactivée à chaque lancement), puis montrez le marqueur **1** à la caméra.
 2. Il est entouré **en magenta**, avec son numéro. Un **point rouge** marque son coin d'origine (en haut à gauche quand il est droit), et un trait va du centre vers son bord supérieur.
 3. Le panneau **Résultat** affiche :
 
@@ -456,9 +456,10 @@ Pour envoyer les positions à un autre ordinateur ou à une carte (Raspberry Pi.
 
 ### 9.4 Lancer le suivi
 
-1. Activez **Envoyer les positions** (onglet **Envoi UDP**), avec l'adresse de la machine qui pilote le robot.
-2. Lancez votre programme de pilotage, par exemple une version de `cible.py` qui envoie les ordres au robot au lieu de les afficher.
-3. Pendant que le robot roule, vérifiez :
+1. Cochez **Activer la détection** dans l'onglet **ArUco** : les détections automatiques sont désactivées à chaque lancement de l'application.
+2. Activez **Envoyer les positions** (onglet **Envoi UDP**), avec l'adresse de la machine qui pilote le robot.
+3. Lancez votre programme de pilotage, par exemple une version de `cible.py` qui envoie les ordres au robot au lieu de les afficher.
+4. Pendant que le robot roule, vérifiez :
    - le **nombre d'images par seconde** dans **Résultat** (idéalement 25 à 30) ;
    - que le marqueur reste détecté sur toute la zone, y compris dans les coins ;
    - que les positions **prédites** sont rares. Si elles sont fréquentes, le marqueur est trop petit, trop flou ou mal éclairé.

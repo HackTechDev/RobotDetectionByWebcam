@@ -240,7 +240,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     auto *detBox = new QGroupBox(tr("Activer la détection"), tabs);
     detBox->setCheckable(true);
-    detBox->setChecked(true);
+    detBox->setChecked(false);  // détections automatiques : désactivées à chaque lancement
     m_squareBox = detBox;
     auto *detForm = new QFormLayout(detBox);
     m_squareForm = detForm;
@@ -269,7 +269,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_arucoBox = new QGroupBox(tr("Activer la détection"), tabs);
     m_arucoBox->setCheckable(true);
-    m_arucoBox->setChecked(true);
+    m_arucoBox->setChecked(false);
     auto *arucoForm = new QFormLayout(m_arucoBox);
     m_dictCombo = new QComboBox(m_arucoBox);
     m_dictCombo->addItems(MarkerDetector::dictionaryNames());
@@ -905,7 +905,9 @@ void MainWindow::loadSettings()
         QTimer::singleShot(0, this, [this] { setPlayerWindowOpen(true); });
     }
 
-    m_squareBox->setChecked(s.value(QStringLiteral("square/enabled"), true).toBool());
+    // Carré et ArUco ne sont pas réactivés : au lancement, seuls les objets encadrés à la main sont
+    // suivis ; les détections automatiques se cochent pour la séance.
+    m_squareBox->setChecked(false);
     const QColor color(s.value(QStringLiteral("square/color")).toString());
     if (color.isValid())
         setTargetColor(color);
@@ -922,7 +924,7 @@ void MainWindow::loadSettings()
     restoreSlider(m_areaSlider, "minArea");
     restoreSlider(m_fillSlider, "minFill");
 
-    m_arucoBox->setChecked(s.value(QStringLiteral("aruco/enabled"), true).toBool());
+    m_arucoBox->setChecked(false);
     const int dict = m_dictCombo->findText(s.value(QStringLiteral("aruco/dictionary")).toString());
     if (dict >= 0)
         m_dictCombo->setCurrentIndex(dict);
@@ -977,7 +979,7 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("player/fullscreen"), m_playerFullScreenAction->isChecked());
     s.setValue(QStringLiteral("player/screen"), m_playerScreenName);
 
-    s.setValue(QStringLiteral("square/enabled"), m_squareBox->isChecked());
+    s.remove(QStringLiteral("square/enabled"));  // plus mémorisé (anciennes versions)
     s.setValue(QStringLiteral("square/color"), m_targetColor.name());
     s.setValue(QStringLiteral("square/hueTolerance"), m_hueTolSlider->value());
     s.setValue(QStringLiteral("square/satMin"), m_satSlider->value());
@@ -990,7 +992,7 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("square/minArea"), m_areaSlider->value());
     s.setValue(QStringLiteral("square/minFill"), m_fillSlider->value());
 
-    s.setValue(QStringLiteral("aruco/enabled"), m_arucoBox->isChecked());
+    s.remove(QStringLiteral("aruco/enabled"));
     s.setValue(QStringLiteral("aruco/dictionary"), m_dictCombo->currentText());
     s.setValue(QStringLiteral("aruco/markerLength"), m_markerLengthSpin->value());
 

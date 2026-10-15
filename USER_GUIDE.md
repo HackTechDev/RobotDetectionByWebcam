@@ -38,7 +38,10 @@ Quelle que soit la méthode, l'application peut aussi :
 - donner les positions **en millimètres sur le sol** (section 8) ;
 - donner la **position 3D** des marqueurs, une fois la caméra calibrée (section 7) ;
 - **lisser** les positions et calculer les **vitesses** (section 6.4) ;
-- **envoyer** toutes les mesures à un autre programme, par exemple celui qui pilote le robot (section 10).
+- **envoyer** toutes les mesures à un autre programme, par exemple celui qui pilote le robot (section 10) ;
+- signaler ce qui entre dans des **zones** nommées de l'image et en sort (section 8.5).
+
+L'application sait aussi **capturer une image** ou **enregistrer une vidéo** de la webcam, et afficher la vidéo seule dans une **fenêtre pour le joueur**, sur un second écran (section 3).
 
 ---
 
@@ -50,9 +53,10 @@ Quelle que soit la méthode, l'application peut aussi :
    ./build/RobotDetectionByWebcam
    ```
 3. L'image de la webcam s'affiche à gauche. Si plusieurs caméras sont branchées, choisissez la bonne dans la liste **Caméra**.
-4. Les deux détections sont actives dès le lancement :
-   - **carré coloré** : montrez un carré rouge à la caméra, ou cliquez sur votre carré dans l'image pour choisir sa couleur ;
-   - **ArUco** : montrez un marqueur du dictionnaire « 4x4 (50) » (voir [section 5](#5-suivre-des-marqueurs-aruco) pour en imprimer un).
+4. Au lancement, **aucune détection automatique n'est active** : rien n'est repéré tant que vous ne le demandez pas. Au choix :
+   - **objet quelconque** : onglet **Suivi**, **Ajouter des objets**, puis tracez un rectangle autour de l'objet et appuyez sur **Entrée** (voir [section 6](#6-suivre-des-objets-encadrés)) ;
+   - **carré coloré** : onglet **Carré coloré**, cochez **Activer la détection**, puis cliquez sur votre carré dans l'image pour choisir sa couleur ;
+   - **ArUco** : onglet **ArUco**, cochez **Activer la détection**, puis montrez un marqueur du dictionnaire « 4x4 (50) » (voir [section 5](#5-suivre-des-marqueurs-aruco) pour en imprimer un).
 5. Les résultats s'affichent sur l'image et dans le panneau **Résultat**, en bas à droite.
 
 ---
@@ -64,7 +68,8 @@ Quelle que soit la méthode, l'application peut aussi :
 │                                       │ Webcam                        │
 │                                       │   Caméra     [........... ▼]  │
 │                                       │   Résolution [........... ▼]  │
-│                                       │   [ ] Effet miroir [Réglages] │
+│                                       │   [ ] Effet miroir            │
+│                                       │ [Capture][Vidéo][Joueur][Rég.]│
 │          Image de la webcam           ├───────────────────────────────┤
 │      (avec les détections dessinées)  │ Carré|ArUco|Cal.|Sol|Zones|...│
 │                                       │                               │
@@ -98,6 +103,7 @@ Quelle que soit la méthode, l'application peut aussi :
   - **Suivi** : suivi d'un ou plusieurs objets quelconques désignés à la souris, journal de leurs mouvements, et lissage des positions des carrés et des marqueurs (voir [section 6](#6-suivre-des-objets-encadrés)). L'onglet défile s'il ne tient pas en hauteur ;
   - **Envoi UDP** : envoi des positions à un autre programme (voir [section 10](#10-envoyer-les-positions-à-un-autre-programme)).
 - **Résultat** : taille de l'image, nombre d'images par seconde (i/s) et mesures détaillées.
+- **Barre d'état**, tout en bas de la fenêtre : messages brefs, par exemple le chemin d'une image capturée ou d'une vidéo enregistrée.
 - **Quitter** : ferme l'application. Une fenêtre demande de confirmer : cliquez sur **Quitter** pour fermer, ou sur **Annuler** (ou appuyez sur Échap) pour continuer. La même confirmation s'affiche si vous fermez la fenêtre avec la croix de la barre de titre.
 
 ### Choisir la résolution
@@ -214,7 +220,7 @@ Ils sont enregistrés **dans la webcam elle-même**. Quand vous quittez l'applic
 
 ### 4.2 Régler la détection
 
-1. Ouvrez l'onglet **Carré coloré** et vérifiez que **Activer la détection** est coché.
+1. Ouvrez l'onglet **Carré coloré** et cochez **Activer la détection** (elle est désactivée à chaque lancement).
 2. **Choisissez la couleur** :
    - **le plus simple : cliquez sur le carré dans l'image**. L'application prend la couleur moyenne autour du clic, choisit le **Type** adapté (voir ci-dessous) et règle automatiquement les seuils ;
    - ou cliquez sur le bouton **Couleur** (il affiche la couleur actuelle) pour la choisir dans une palette.
@@ -269,6 +275,8 @@ L'angle d'un carré va de 0° à 90°. Un carré tourné de 90° est identique �
 ## 5. Suivre des marqueurs ArUco
 
 Un marqueur ArUco est un carré noir et blanc qui contient un code. Chaque marqueur porte un **identifiant** (un numéro). On peut ainsi suivre plusieurs robots en même temps et savoir lequel est lequel.
+
+Dans l'onglet **ArUco**, cochez **Activer la détection** : comme celle du carré coloré, elle est désactivée à chaque lancement.
 
 ### 5.1 Choisir un dictionnaire
 
@@ -784,7 +792,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 **Éclairage**
 - Un éclairage **homogène et stable** est le facteur le plus important.
 - Évitez le soleil direct, les ombres marquées et les spots qui créent des reflets.
-- Évitez les éclairages qui scintillent (certains néons ou LED bon marché).
+- Évitez les éclairages qui scintillent (certains néons ou LED bon marché). Si des bandes défilent sur l'image, réglez la **Fréquence du secteur** sur **50 Hz** en Europe (60 Hz en Amérique du Nord), dans **Réglages de l'image...**, **Autres réglages**.
 
 **Caméra**
 - Fixez la caméra solidement : si elle bouge, toutes les positions bougent.
@@ -799,6 +807,7 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Le traitement des images (détections, suivi, lissage) se fait dans un **fil d'exécution séparé** : l'interface reste réactive même quand le traitement est lent. Si la caméra va plus vite que le traitement, les images intermédiaires sont ignorées et l'affichage montre toujours l'image la plus récente traitée. Le nombre d'images par seconde affiché est celui des images traitées.
 - Choisissez une **résolution plus basse** (liste **Résolution**) : la détection est plus rapide.
 - Désactivez les détections inutiles (case **Activer la détection** de chaque onglet) et le **Mode calibration** pour gagner en vitesse.
+- L'**enregistrement d'une vidéo** (bouton **Vidéo**) occupe aussi le processeur, surtout la vidéo avec les détections : si le nombre d'images par seconde chute pendant l'enregistrement, baissez la résolution.
 - Le suivi d'objets avec **CSRT** demande environ 25 ms de calcul par image **et par objet**. Les objets sont suivis en parallèle sur les cœurs du processeur, mais leur coût s'additionne quand même : passez à **Nano** (environ 10 ms par objet) ou **KCF** (environ 5 ms), ou retirez les objets qui ne servent plus.
 
 ---
@@ -875,6 +884,26 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Un objet uni, petit ou qui ressemble au fond se suit mal : ajoutez-lui un motif contrasté, ou utilisez un marqueur ArUco.
 - Si l'objet bouge vite, réduisez le flou avec une exposition manuelle courte (**Réglages de l'image...**).
 
+**La sélection passe sur ma main ou mon visage quand l'objet sort de l'image**
+- L'objet devrait être signalé « **hors du champ** » (cadre rouge) : le suivi s'arrête alors et l'objet n'est plus cherché que le long des bords. Si le cadre glisse quand même sur autre chose, c'est que l'objet a été perdu loin du bord (caché par la main avant de sortir, par exemple) : retirez-le de la liste et ajoutez-le de nouveau quand il revient.
+- Évitez de sortir l'objet de l'image en le tenant juste devant votre visage : il est plus facile à distinguer devant un fond neutre.
+
+**Le téléchargement du modèle Nano ou Vit échoue**
+- Vérifiez la connexion Internet. Sans connexion, téléchargez les fichiers sur une autre machine (adresses dans la fenêtre de téléchargement et dans [Modèles des réseaux de neurones](#modèles-des-réseaux-de-neurones)), puis copiez-les dans `~/.local/share/RobotDetectionByWebcam/models/`.
+- « Empreinte différente » : le fichier reçu n'est pas celui attendu (téléchargement tronqué ou fichier modifié sur le serveur). Réessayez ; si le message persiste, signalez-le.
+
+**Une zone ne signale pas l'entrée d'un objet**
+- C'est le **centre** de l'objet qui compte : un objet à moitié dans la zone n'y est pas forcément.
+- Seuls les objets suivis, les marqueurs ArUco et le carré principal sont surveillés : un objet qui n'est ni encadré (onglet **Suivi**) ni porteur d'un marqueur n'est pas vu.
+- La caméra a bougé depuis le tracé : la zone ne correspond plus au même endroit. Retirez-la et tracez-la de nouveau.
+
+**La vidéo enregistrée est illisible**
+- L'application a été arrêtée brutalement (Ctrl+C, plantage) pendant l'enregistrement : le fichier n'a pas pu être terminé. Arrêtez toujours la vidéo avec le bouton **Vidéo**, ou quittez avec **Quitter**, qui attend la fin du fichier.
+
+**La fenêtre du joueur s'ouvre sur le mauvais écran**
+- Choisissez l'écran dans le menu du bouton **Joueur** (petite flèche), **Écran**. Le choix est mémorisé.
+- Si l'écran choisi est débranché, la fenêtre s'ouvre sur l'autre écran que celui de la fenêtre principale.
+
 **Pas de position au sol**
 - Le repère n'est pas défini : l'onglet **Sol** indique `Repère du sol non défini`. Suivez la [section 8](#8-définir-le-repère-du-sol).
 - Le panneau **Résultat** affiche `Pas de position au sol : repère défini en ...` : la résolution choisie n'a pas le même format d'image que lors de la définition du repère.
@@ -933,12 +962,13 @@ Si un modèle a été supprimé, l'application revient à **CSRT** au lancement 
 
 L'application retrouve au lancement les réglages de la fois précédente :
 
-- **Webcam** : caméra choisie (si elle est branchée), résolution, exposition, balance des blancs et autres réglages de l'image (pour chaque caméra) et effet miroir ;
+- **Webcam** : caméra choisie (si elle est branchée), résolution, exposition, balance des blancs et autres réglages de l'image (pour chaque caméra), effet miroir et dossier des captures ;
 - **Fenêtre du joueur** : ouverte ou non, détections, miroir, plein écran et écran choisi ;
-- **Carré coloré** : activation, couleur et tous les curseurs ;
-- **ArUco** : activation, dictionnaire et taille du marqueur ;
+- **Carré coloré** : couleur et tous les curseurs ;
+- **ArUco** : dictionnaire et taille du marqueur ;
 - **Calibration** : dimensions du damier et taille des cases ;
 - **Sol** : les 4 points du repère, les dimensions du rectangle et la hauteur des repères (pour chaque caméra), et l'affichage de la zone ;
+- **Zones** : les zones de chaque caméra (nom et rectangle) et leur affichage ;
 - **Suivi** : la méthode, l'affichage et la durée de la trajectoire, les seuils de mouvement (les objets suivis et le journal des événements, eux, ne sont pas mémorisés), et tous les réglages du lissage ;
 - **Envoi UDP** : activation, adresse et port ;
 - **Fenêtre** : taille, position et onglet ouvert.
@@ -960,6 +990,6 @@ Le fichier contient aussi une option sans équivalent dans l'interface : `hideLi
 
 La résolution, les réglages de l'image et le repère du sol sont enregistrés dès qu'on les modifie. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
 
-Ne sont **pas** mémorisés, car ils ne servent que ponctuellement : **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, les objets suivis et le journal des événements.
+Ne sont **pas** mémorisés : l'**activation des détections du carré coloré et des marqueurs ArUco**, désactivées à chaque lancement pour que seuls les objets encadrés à la main soient suivis, et, car ils ne servent que ponctuellement, **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, les objets suivis et le journal des événements.
 
-Pour revenir aux réglages par défaut, fermez l'application et supprimez le fichier `settings.ini`. Les calibrations, enregistrées à part dans le dossier `calibrations/`, sont conservées. (Les repères du sol, eux, sont dans `settings.ini` et sont donc effacés.)
+Pour revenir aux réglages par défaut, fermez l'application et supprimez le fichier `settings.ini`. Les calibrations, enregistrées à part dans le dossier `calibrations/`, sont conservées. (Les repères du sol et les zones, eux, sont dans `settings.ini` et sont donc effacés. Les images et vidéos capturées et les modèles Nano et Vit ne sont pas touchés.)
