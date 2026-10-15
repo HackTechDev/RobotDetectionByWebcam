@@ -967,17 +967,18 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 - Choisissez l'écran dans le menu du bouton **Joueur** (petite flèche), **Écran**. Le choix est mémorisé.
 - Si l'écran choisi est débranché, la fenêtre s'ouvre sur l'autre écran que celui de la fenêtre principale.
 
-**Le jeu indique « hors zone » alors que le robot est dans la zone**
+**« Détection robot dans zone » indique « hors zone » alors que le robot est dans la zone**
 - Le robot doit être **entièrement** dans la zone : c'est son **cadre de suivi** qui compte. Si le cadre est plus large que le robot, ou s'il a glissé sur le décor, il peut dépasser de la zone. Retirez le robot de la liste des objets suivis et encadrez-le de nouveau, au plus près.
 - La zone est trop petite pour le cadre : tracez-la un peu plus grande que le robot.
 - Vérifiez la **Zone** choisie dans la fenêtre du jeu : avec une zone précise, les autres zones ne comptent pas.
+- Même règle pour l'**arrivée** de « 1, 2, 3 Soleil » : la partie ne se termine que lorsque le robot est entièrement dans la zone d'arrivée.
 
 **« 1, 2, 3 Soleil » compte des fautes alors que le robot est arrêté**
 - Le cadre de suivi tremble un peu, surtout pour un objet peu texturé ou une image bruitée. Augmentez le **seuil de mouvement** dans l'onglet **Suivi**, puis relancez la partie.
 - Le robot met plus de temps à s'arrêter que le temps de réaction : choisissez une difficulté plus facile.
 
-**Le robot n'apparaît pas dans la liste du jeu**
-- Le jeu ne connaît que les **objets suivis** (onglet **Suivi**) : un robot repéré seulement par un marqueur ArUco ou par le carré coloré n'y figure pas. Ajoutez-le avec **Ajouter des objets**.
+**Le robot n'apparaît pas dans la liste d'un jeu**
+- Les deux jeux ne connaissent que les **objets suivis** (onglet **Suivi**) : un robot repéré seulement par un marqueur ArUco ou par le carré coloré n'y figure pas. Ajoutez-le avec **Ajouter des objets**.
 
 **Pas de position au sol**
 - Le repère n'est pas défini : l'onglet **Sol** indique `Repère du sol non défini`. Suivez la [section 8](#8-définir-le-repère-du-sol).

@@ -346,6 +346,7 @@ tools/
 - **Le damier n'est pas détecté** : il doit être entièrement visible avec sa marge blanche. Vérifier que le nombre de **coins intérieurs** saisi correspond au damier (un damier de 10 × 7 cases a 9 × 6 coins intérieurs). Éviter les reflets.
 - **Erreur RMS élevée** : damier gondolé, images floues ou vues trop semblables. Recommencer avec « Effacer les captures ».
 - **Distances fausses d'un facteur constant** : vérifier la « Taille du marqueur » et le « Côté d'une case », mesurés à la règle sur les impressions.
-- **Le jeu indique « hors zone » alors que le robot est dans la zone** : le cadre de suivi du robot doit tenir entièrement dans la zone. Réencadrer le robot au plus près, ou tracer une zone un peu plus grande. Seuls les objets suivis (onglet « Suivi ») peuvent jouer le rôle du robot.
+- **Un jeu indique « hors zone », ou « 1, 2, 3 Soleil » ne détecte pas l'arrivée, alors que le robot est dans la zone** : le cadre de suivi du robot doit tenir entièrement dans la zone. Réencadrer le robot au plus près, ou tracer une zone un peu plus grande. Dans les deux jeux, seuls les objets suivis (onglet « Suivi ») peuvent jouer le rôle du robot.
+- **« 1, 2, 3 Soleil » compte des fautes alors que le robot est arrêté** : le cadre de suivi tremble légèrement. Augmenter le seuil de mouvement (onglet « Suivi ») avant de démarrer la partie, ou choisir une difficulté plus facile (temps de réaction plus long).
 - **Repartir de zéro** : supprimer le fichier de la caméra dans `~/.config/RobotDetectionByWebcam/calibrations/` (calibration) ou `settings.ini` (réglages, y compris les repères du sol et les zones).
 - **Erreur de compilation sur `aruco_detector.hpp`** : la version d'OpenCV est antérieure à 4.7. Installer une version plus récente.
