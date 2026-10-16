@@ -866,6 +866,30 @@ Des objets ajoutés au suivi pendant la partie sont aussi à ramasser ; un objet
 
 **UDP** : événements `collect_in`, `collect_out` (`count` = objets dans la zone) et `collect_finish` ; objet `game` avec `mode` = `collect`, `robot_id`, `zone_id`, `in_zone` (numéros des objets dans la zone), `collected`, `total`, `remaining_s` et `finished`.
 
+### 8.17 Jeu : Jacques a dit
+
+Le menu **Jeu**, **Jacques a dit...** : l'application annonce des **ordres** que le robot doit exécuter, mais **seulement** s'ils commencent par « Jacques a dit ». Ce jeu a besoin du **cap** du robot : il utilise un **marqueur ArUco** collé sur le robot, bord supérieur vers l'avant (onglet **ArUco**, **Activer la détection** cochée). Aucune zone n'est nécessaire.
+
+**Jouer**
+1. Saisissez le numéro du **Marqueur du robot**, choisissez le **Nombre d'ordres** (5, 10 ou 15) et la **Difficulté** (6, 4 ou 3 s par ordre), puis **Démarrer**.
+2. Après « Attention... », un ordre s'affiche en **violet** avec le temps restant, par exemple « JACQUES A DIT : TOURNE À DROITE ! (3) » ou simplement « AVANCE ! (3) ». La couleur est la même dans les deux cas : rien ne trahit le piège.
+3. L'ordre est **jugé à la fin du temps**, en comparant la position et le cap du robot au début et à la fin :
+
+   | Ordre | Réussi si |
+   |---|---|
+   | **Avance** | le robot a avancé (dans sa direction) d'au moins **1,5 fois la taille du marqueur** |
+   | **Recule** | il a reculé d'au moins 1,5 fois la taille du marqueur |
+   | **Tourne à droite** | il a tourné de **60° à 120°** dans le sens des aiguilles d'une montre, à l'écran |
+   | **Tourne à gauche** | il a tourné de 60° à 120° dans l'autre sens |
+   | Ordre **sans « Jacques a dit »** | il n'a **pas bougé** : moins d'un demi-marqueur et moins de 20° |
+
+4. Le résultat s'affiche : « Bravo ! » ou « Bien ! Jacques n'avait rien dit » (vert), « Raté : tourné de 35° » ou « Piège ! Jacques n'avait rien dit » (rouge). Un marqueur non vu à la fin compte comme raté.
+5. Après le dernier ordre : « TERMINÉ ! 8 ordre(s) réussi(s) sur 10 ».
+
+Environ 7 ordres sur 10 commencent par « Jacques a dit ». Gauche et droite s'entendent **à l'écran**, sans effet miroir : avec une caméra au-dessus de la table, c'est aussi la gauche et la droite du robot vu d'en haut.
+
+**UDP** : événements `simon_good`, `simon_miss` (`count` = ordres réussis) et `simon_finish` ; objet `game` avec `mode` = `simon_says`, `marker_id`, `phase` (`pause`, `announce`, `result` ou `finished`), `order` (`forward`, `backward`, `turn_left` ou `turn_right`) et `simon` (vrai si « Jacques a dit ») pendant l'annonce et le résultat, `remaining_s` pendant l'annonce, `score`, `orders_done` et `orders_total`. Un programme qui pilote le robot peut donc jouer tout seul.
+
 ---
 
 ## 9. Lire les résultats

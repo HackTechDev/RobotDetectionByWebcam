@@ -104,6 +104,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 
 ### 8. Jacques a dit
 
+**Dans l'application** : menu **Jeu**, « Jacques a dit » (voir la [section 8.17 du guide](USER_GUIDE.md#817-jeu--jacques-a-dit)).
+
 **Principe.** Le programme annonce un ordre : « avance de 30 cm », « tourne d'un quart de tour », « arrête-toi ». La mesure dit si l'ordre a été respecté, en distance, en angle et au moment de l'arrêt. Un ordre sans « Jacques a dit » ne doit pas être exécuté.
 
 **Données.** Position et cap (marqueur ArUco), débuts et fins de mouvement.

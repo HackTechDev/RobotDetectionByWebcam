@@ -54,6 +54,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - **Menu Jeu**, « Chat et souris » : deux objets suivis, point au chat quand les cadres se touchent, refuge facultatif, rôles inversés à intervalle régulier.
 - **Menu Jeu**, « Football de table » : balle suivie poussée vers deux buts (zones), but pour l'équipe adverse, touche quand la balle sort de l'image, reprise après replacement ; match de 2 à 10 minutes.
 - **Menu Jeu**, « Ramassage » : pousser les objets suivis dans une zone de collecte avant la fin du temps, compte sur la position des objets.
+- **Menu Jeu**, « Jacques a dit » : ordres à exécuter seulement après « Jacques a dit » (marqueur ArUco pour le cap), jugés sur la position et le cap au début et à la fin du temps imparti ; ordres pièges.
 
 ### Intégration
 
