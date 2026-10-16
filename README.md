@@ -357,6 +357,17 @@ src/
 ├── treasuregame.h/.cpp   jeu « Chasse au trésor » : trésor caché, indices, score et fenêtre du jeu
 ├── soleilgame.h/.cpp     jeu « 1, 2, 3 Soleil » : phases, fautes, arrivée et fenêtre du jeu
 ├── robotzonegame.h/.cpp  jeu « Détection robot dans zone » : règle, compteurs et fenêtre du jeu
+├── gameframework.h/.cpp  cadre commun des autres jeux : classe Game, contexte, fenêtre construite à partir des réglages
+├── racegame.h/.cpp       jeu « Course contre la montre »
+├── parkinggame.h/.cpp    jeu « Le parking » (marqueur ArUco)
+├── wiregame.h/.cpp       jeu « Le fil électrique »
+├── curlinggame.h/.cpp    jeu « Curling »
+├── catmousegame.h/.cpp   jeu « Chat et souris »
+├── footballgame.h/.cpp   jeu « Football de table »
+├── collectgame.h/.cpp    jeu « Ramassage »
+├── simonsaysgame.h/.cpp  jeu « Jacques a dit » (marqueur ArUco)
+├── drawinggame.h/.cpp    jeu « Dessin au sol »
+├── minefieldgame.h/.cpp  jeu « Champ de mines »
 ├── zonemanager.h/.cpp    zones fixes nommées : occupation, entrées et sorties, mémorisation
 ├── trackermodels.h/.cpp  modèles des trackers Nano et Vit : emplacement, téléchargement vérifié
 └── motionfilter.h/.cpp  lissage dans le temps (filtre de Kalman) des carrés et des marqueurs
@@ -379,7 +390,9 @@ tools/
 - **Le damier n'est pas détecté** : il doit être entièrement visible avec sa marge blanche. Vérifier que le nombre de **coins intérieurs** saisi correspond au damier (un damier de 10 × 7 cases a 9 × 6 coins intérieurs). Éviter les reflets.
 - **Erreur RMS élevée** : damier gondolé, images floues ou vues trop semblables. Recommencer avec « Effacer les captures ».
 - **Distances fausses d'un facteur constant** : vérifier la « Taille du marqueur » et le « Côté d'une case », mesurés à la règle sur les impressions.
-- **Un jeu indique « hors zone », ou « 1, 2, 3 Soleil » ne détecte pas l'arrivée, alors que le robot est dans la zone** : le cadre de suivi du robot doit tenir entièrement dans la zone. Réencadrer le robot au plus près, ou tracer une zone un peu plus grande. Dans tous les jeux, seuls les objets suivis (onglet « Suivi ») peuvent jouer le rôle du robot.
+- **Un jeu indique « hors zone », ou « 1, 2, 3 Soleil » ne détecte pas l'arrivée, alors que le robot est dans la zone** : le cadre de suivi du robot doit tenir entièrement dans la zone. Réencadrer le robot au plus près, ou tracer une zone un peu plus grande. Le robot est toujours un objet suivi (onglet « Suivi »), sauf au parking et à « Jacques a dit », qui utilisent un marqueur ArUco pour connaître le cap.
+- **Le parking ou « Jacques a dit » affiche « Marqueur n° 7 non vu »** : cocher « Activer la détection » dans l'onglet « ArUco » (désactivée à chaque lancement), vérifier le dictionnaire et le numéro saisi dans la fenêtre du jeu.
+- **Un jeu refuse de démarrer** : le message indique ce qui manque (objet suivi, zone, deux objets ou deux zones différents, portes cochées...).
 - **« 1, 2, 3 Soleil » compte des fautes alors que le robot est arrêté** : le cadre de suivi tremble légèrement. Augmenter le seuil de mouvement (onglet « Suivi ») avant de démarrer la partie, ou choisir une difficulté plus facile (temps de réaction plus long).
 - **Repartir de zéro** : supprimer le fichier de la caméra dans `~/.config/RobotDetectionByWebcam/calibrations/` (calibration) ou `settings.ini` (réglages, y compris les repères du sol et les zones).
 - **Erreur de compilation sur `aruco_detector.hpp`** : la version d'OpenCV est antérieure à 4.7. Installer une version plus récente.

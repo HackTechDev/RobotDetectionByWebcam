@@ -40,7 +40,7 @@ Quelle que soit la méthode, l'application peut aussi :
 - **lisser** les positions et calculer les **vitesses** (section 6.4) ;
 - **envoyer** toutes les mesures à un autre programme, par exemple celui qui pilote le robot (section 10) ;
 - signaler ce qui entre dans des **zones** nommées de l'image et en sort (section 8.5) ;
-- faire **jouer** le robot : le menu **Jeu** signale quand il est entièrement dans une zone (section 8.6), arbitre une partie de « 1, 2, 3 Soleil » (section 8.7), ou le guide vers des trésors cachés (section 8.8).
+- faire **jouer** le robot : le menu **Jeu** propose treize jeux, qui arbitrent la partie et l'affichent en bandeau sur l'image : robot dans une zone (section 8.6), « 1, 2, 3 Soleil » (8.7), chasse au trésor (8.8), puis course contre la montre, parking, fil électrique, curling, chat et souris, football de table, ramassage, « Jacques a dit », dessin au sol et champ de mines (8.9 à 8.19).
 
 L'application sait aussi **capturer une image** ou **enregistrer une vidéo** de la webcam, et afficher la vidéo seule dans une **fenêtre pour le joueur**, sur un second écran (section 3).
 
@@ -1217,6 +1217,14 @@ Les valeurs sont arrondies au dixième. Comme à l'écran, les coordonnées sont
 
 **Le robot n'apparaît pas dans la liste d'un jeu**
 - Les jeux ne connaissent que les **objets suivis** (onglet **Suivi**) : un robot repéré seulement par un marqueur ArUco ou par le carré coloré n'y figure pas. Ajoutez-le avec **Ajouter des objets**.
+- Exceptions : **Le parking** et **Jacques a dit** utilisent un **marqueur ArUco** (pour le cap) ; on y saisit son numéro, sans liste.
+
+**Le parking ou « Jacques a dit » affiche « Marqueur n° 7 non vu »**
+- Cochez **Activer la détection** dans l'onglet **ArUco** : elle est désactivée à chaque lancement.
+- Vérifiez le **numéro** saisi dans la fenêtre du jeu et le **dictionnaire** de l'onglet **ArUco**, et que le marqueur est assez grand et net (voir la [section 5](#5-suivre-des-marqueurs-aruco)).
+
+**Un jeu refuse de démarrer**
+- Le message dit ce qui manque : un objet suivi, une zone, deux objets ou deux zones **différents** (chat et souris, football, champ de mines), au moins deux portes ou zones cochées (course, fil électrique), des objets à ramasser en plus du robot. Ajoutez-les dans les onglets **Suivi** et **Zones** : la fenêtre du jeu se met à jour toute seule.
 
 **Pas de position au sol**
 - Le repère n'est pas défini : l'onglet **Sol** indique `Repère du sol non défini`. Suivez la [section 8](#8-définir-le-repère-du-sol).
@@ -1304,6 +1312,6 @@ Le fichier contient aussi une option sans équivalent dans l'interface : `hideLi
 
 La résolution, les réglages de l'image et le repère du sol sont enregistrés dès qu'on les modifie. Les autres réglages sont enregistrés **à la fermeture de l'application**, une fois la fermeture confirmée. Si l'application est arrêtée brutalement (Ctrl+C dans le terminal, plantage), les changements de la session sont perdus.
 
-Ne sont **pas** mémorisés : l'**activation des détections du carré coloré et des marqueurs ArUco**, désactivées à chaque lancement pour que seuls les objets encadrés à la main soient suivis, et, car ils ne servent que ponctuellement, les parties de jeu (robot, zone, durée, difficulté, compteurs), **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, les objets suivis et le journal des événements.
+Ne sont **pas** mémorisés : l'**activation des détections du carré coloré et des marqueurs ArUco**, désactivées à chaque lancement pour que seuls les objets encadrés à la main soient suivis, et, car ils ne servent que ponctuellement, les parties de jeu (robot, zones, durée, difficulté, compteurs ; les records de la course et les meilleurs dessins sont conservés seulement jusqu'à la fermeture), **Afficher le masque**, **Mode calibration**, **Capture automatique**, les captures du damier en cours, les objets suivis et le journal des événements.
 
 Pour revenir aux réglages par défaut, fermez l'application et supprimez le fichier `settings.ini`. Les calibrations, enregistrées à part dans le dossier `calibrations/`, sont conservées. (Les repères du sol et les zones, eux, sont dans `settings.ini` et sont donc effacés. Les images et vidéos capturées et les modèles Nano et Vit ne sont pas touchés.)
