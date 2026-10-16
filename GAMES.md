@@ -40,6 +40,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 
 ### 2. Le parking
 
+**Dans l'application** : menu **Jeu**, « Le parking » (voir la [section 8.11 du guide](USER_GUIDE.md#811-jeu--le-parking)).
+
 **Principe.** Arrêter le robot dans une case dessinée au sol, avec le bon cap. Le score dépend de l'écart de position et d'angle, mesuré à l'arrêt. Les cases rétrécissent à chaque niveau.
 
 **Données.** Position et cap (marqueur ArUco), fin de mouvement.

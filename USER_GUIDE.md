@@ -755,6 +755,31 @@ Le **tracé** de la course est dessiné sur l'image. Le **record** est conservé
 
 **UDP** : événements `race_start`, `race_gate` (`count` = numéro de la porte), `race_penalty` et `race_finish` ; objet `game` avec `mode` = `race`, `robot_id`, `gates` (nombre de portes), `next_gate` (numéro de la prochaine porte), `next_zone_id`, `lap`, `laps`, `started`, `finished`, `elapsed_s` (pénalités comprises), `penalties` et `best_s`.
 
+### 8.11 Jeu : le parking
+
+Le menu **Jeu**, **Le parking...** : garer le robot dans une case, **tourné dans la bonne direction**. Ce jeu a besoin du **cap** du robot : il utilise un **marqueur ArUco** collé sur le robot, bord supérieur vers l'avant (onglet **ArUco**, **Activer la détection** cochée).
+
+**Préparer** : tracez la **place de parking** dans l'onglet **Zones**, nettement plus grande que le robot.
+
+**Jouer**
+1. Saisissez le numéro du **Marqueur du robot**, choisissez la **Place de parking** et le **Cap demandé** (vers le haut, la droite, le bas ou la gauche de l'écran), puis **Démarrer**.
+2. La **case cible** est entourée de **jaune** dans la place, avec une flèche qui montre le cap demandé. Le bandeau indique le niveau et l'écart de cap en direct.
+3. Garez le robot et **arrêtez-le** : le stationnement est jugé après **1 s d'immobilité dans la place**. Un arrêt ailleurs (pendant les manœuvres) n'est pas jugé.
+4. **Réussi** si le marqueur est **entièrement dans la case cible** et que son cap est à moins de la **tolérance** : « Bien garé ! +92 points » (vert). Les points (10 à 100) diminuent avec l'écart au centre de la case et l'écart de cap. Sinon : « Raté : pas entièrement dans la case » ou « Raté : cap décalé de 35° » (rouge). Pour réessayer, déplacez ou tournez le robot, puis arrêtez-le de nouveau.
+5. À chaque réussite, on passe au niveau suivant. Après le niveau 5 : « PARKING TERMINÉ ! 485 points » (bleu).
+
+| Niveau | Case cible (part de la place) | Tolérance de cap |
+|---|---|---|
+| 1 | 100 % | 30° |
+| 2 | 85 % | 25° |
+| 3 | 70 % | 20° |
+| 4 | 55 % | 15° |
+| 5 | 40 % | 10° |
+
+Si le marqueur n'est pas vu (détection ArUco désactivée, marqueur caché ou trop petit), le bandeau affiche « Marqueur n° 7 non vu » en orange.
+
+**UDP** : événements `parking_success` (`count` = points), `parking_miss` (`count` = essais ratés) et `parking_finish` (`count` = score) ; objet `game` avec `mode` = `parking`, `marker_id`, `zone_id`, `level`, `levels`, `score`, `misses`, `target_heading_deg` (angle du marqueur demandé : 0 vers le haut, 90 vers la droite), `tolerance_deg`, `seen`, `heading_error_deg`, `inside` et `finished`.
+
 ---
 
 ## 9. Lire les résultats

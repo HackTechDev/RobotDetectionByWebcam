@@ -48,6 +48,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - **Menu Jeu**, « 1, 2, 3 Soleil » : phases « Avancez ! » et « Soleil ! » aux durées aléatoires (trois difficultés), faute si le robot bouge pendant « Soleil ! » après le temps de réaction (+5 s), arrivée dans une zone, chrono et score.
 - **Menu Jeu**, « Chasse au trésor » : trésor invisible caché au hasard sur un terrain, indices « chaud / froid » avec tendance, étoile à chaque trésor trouvé, durée de 1 à 5 minutes, trois difficultés.
 - **Menu Jeu**, « Course contre la montre » : portes à franchir dans l'ordre sur 1 à 3 tours, chrono au premier mouvement, pénalité pour une mauvaise porte, record par parcours ; premier jeu du cadre commun (`gameframework`), qui construit la fenêtre de chaque jeu à partir de ses réglages.
+- **Menu Jeu**, « Le parking » : garer le robot (marqueur ArUco) dans une case avec le bon cap, jugé à l'arrêt ; 5 niveaux où la case rétrécit et la tolérance de cap se resserre ; points selon la précision.
 
 ### Intégration
 
