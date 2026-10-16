@@ -72,6 +72,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 
 ### 5. Chat et souris
 
+**Dans l'application** : menu **Jeu**, « Chat et souris » (voir la [section 8.14 du guide](USER_GUIDE.md#814-jeu--chat-et-souris)).
+
 **Principe.** Deux robots, ou un robot et un objet poussé à la main, sont suivis en même temps. Le « chat » marque un point quand la distance entre eux passe sous un seuil. Les rôles s'inversent toutes les 30 secondes.
 
 **Données.** Positions des deux objets (deux marqueurs, ou deux objets suivis).

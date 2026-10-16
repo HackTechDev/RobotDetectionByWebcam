@@ -813,6 +813,22 @@ Le menu **Jeu**, **Curling...** : chacun son tour, lancer le robot vers une **ci
 
 **UDP** : événements `curling_throw` (`count` = points du lancer) et `curling_finish` ; objet `game` avec `mode` = `curling`, `robot_id`, `state` (`placing`, `ready`, `moving`, `result` ou `finished`), `players`, `rounds`, `round`, `player` (joueur dont c'est le tour), `scores` (liste des totaux) et `last_points`.
 
+### 8.14 Jeu : chat et souris
+
+Le menu **Jeu**, **Chat et souris...** : deux objets suivis jouent l'un contre l'autre, deux robots ou un robot et un objet poussé à la main. Le **chat** marque un point quand il **touche** la souris.
+
+**Préparer** : ajoutez **deux objets suivis** (onglet **Suivi**), et, si vous voulez, tracez un **refuge** dans l'onglet **Zones**.
+
+**Jouer**
+1. Choisissez le **Joueur 1** (chat au départ), le **Joueur 2** (souris au départ), le **Refuge** (ou « Aucun refuge »), la **Durée** (1 à 5 minutes) et l'intervalle de **Changement de rôles** (20, 30 ou 60 s), puis **Démarrer**.
+2. Le chat est entouré de **rouge** avec « CHAT », la souris de **bleu** avec « SOURIS ». Le bandeau donne le chat, le temps restant et le score.
+3. Quand les **cadres** du chat et de la souris **se touchent**, le chat marque un point : « ATTRAPÉE ! +1 pour Rouge ». Il faut ensuite **se séparer** (et attendre 3 s) avant une nouvelle prise : un contact prolongé ne compte qu'une fois.
+4. La souris dont le **centre** est dans le **refuge** (teinté de vert) ne peut pas être attrapée : « souris au refuge ».
+5. À chaque intervalle, les **rôles s'inversent** : « CHANGEMENT DE RÔLES ! Bleu est le chat ». Les deux joueurs doivent se séparer avant la première prise.
+6. À la fin du temps : « TERMINÉ ! Rouge gagne 3 à 2 », ou « Égalité ».
+
+**UDP** : événements `cat_mouse_catch` (`count` = points du chat), `cat_mouse_swap` et `cat_mouse_finish` ; objet `game` avec `mode` = `cat_mouse`, `cat_id`, `mouse_id` (numéros des objets suivis), `scores` (liste de `{id, points}`), `contact`, `mouse_safe`, `remaining_s`, `next_swap_s` et `finished`.
+
 ---
 
 ## 9. Lire les résultats

@@ -50,6 +50,8 @@ add_executable(RobotDetectionByWebcam
     src/wiregame.cpp
     src/curlinggame.h
     src/curlinggame.cpp
+    src/catmousegame.h
+    src/catmousegame.cpp
     src/objecttracker.h
     src/objecttracker.cpp
     src/motionfilter.h

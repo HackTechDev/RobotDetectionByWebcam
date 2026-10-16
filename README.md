@@ -180,6 +180,8 @@ Les jeux suivants reposent sur un cadre commun (`src/gameframework.cpp`) : chaqu
 
 - **Curling** (`src/curlinggame.cpp`) : 1 à 4 joueurs lancent le robot à tour de rôle vers une cible (une zone) à trois anneaux, 10, 5 et 2 points selon la distance au centre (tiers, deux tiers et totalité du rayon). Le lancer est détecté au premier déplacement après 1 s d'immobilité, et jugé quand le robot est de nouveau immobile depuis 1 s ; un robot perdu pendant le lancer vaut 0. Sur 1, 3 ou 5 manches, avec le classement à la fin.
 
+- **Chat et souris** (`src/catmousegame.cpp`) : deux objets suivis ; le chat marque un point quand les cadres se touchent (marge de 5 %), sauf si le centre de la souris est dans le refuge (zone facultative). Après une prise, il faut se séparer et attendre 3 s ; les rôles s'inversent toutes les 20, 30 ou 60 s, sans prise possible avant séparation. Partie de 1 à 5 minutes.
+
 ### Suivi d'objets encadrés
 
 Dans l'onglet « Suivi », cliquer sur « Ajouter des objets », puis tracer un rectangle autour de chaque objet, ou cliquer dessus : un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Valider l'objet », touche Entrée ou double-clic. On reste en mode ajout pour l'objet suivant ; Échap ou « Terminer l'ajout » termine. Chaque objet a un numéro, un nom modifiable (double-clic dans la liste des objets) et une couleur. « Retirer » arrête le suivi de l'objet sélectionné dans la liste, « Tout retirer » celui de tous les objets. Chaque objet est suivi d'image en image par son propre tracker OpenCV :
