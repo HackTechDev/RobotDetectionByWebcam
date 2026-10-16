@@ -169,6 +169,7 @@ private:
         QComboBox *combo = nullptr;
         QSpinBox *spin = nullptr;
         QListWidget *list = nullptr;
+        bool userChose = false;  // choix fait à la main : conservé ; sinon choix par défaut
     };
     std::vector<ParamWidget> m_widgets;
     QLabel *m_stateLabel = nullptr;

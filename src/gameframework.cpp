@@ -143,6 +143,10 @@ GameDialog::GameDialog(Game *game, QWidget *parent)
         widget->setToolTip(p.tooltip);
         form->addRow(p.label, widget);
         m_widgets.push_back(w);
+        if (p.kind == GameParam::Tracked) {
+            const size_t index = m_widgets.size() - 1;
+            connect(w.combo, &QComboBox::activated, this, [this, index] { m_widgets[index].userChose = true; });
+        }
     }
     layout->addLayout(form);
 
@@ -190,7 +194,8 @@ void GameDialog::setChoices(const std::vector<std::pair<int, QString>> &objects,
             w.combo->clear();
             for (const auto &[id, name] : objects)
                 w.combo->addItem(name, id);
-            int index = w.combo->findData(current);
+            // Tant que l'utilisateur n'a rien choisi : choix par défaut (1er objet, 2e objet...).
+            int index = w.userChose ? w.combo->findData(current) : -1;
             if (index < 0)
                 index = std::min(w.param.defaultValue, w.combo->count() - 1);
             w.combo->setCurrentIndex(std::max(0, index));
