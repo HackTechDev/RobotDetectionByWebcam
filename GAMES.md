@@ -82,6 +82,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 
 ### 6. Football de table
 
+**Dans l'application** : menu **Jeu**, « Football de table » (voir la [section 8.15 du guide](USER_GUIDE.md#815-jeu--football-de-table)).
+
 **Principe.** Le robot pousse une balle, suivie comme objet encadré, vers des buts virtuels. Le but est compté quand la balle franchit la ligne. Une balle qui sort par un bord de l'image est détectée « hors du champ » : c'est une touche.
 
 **Données.** Position de la balle, état `out_of_view`, position du robot.

@@ -143,7 +143,7 @@ GameDialog::GameDialog(Game *game, QWidget *parent)
         widget->setToolTip(p.tooltip);
         form->addRow(p.label, widget);
         m_widgets.push_back(w);
-        if (p.kind == GameParam::Tracked) {
+        if (p.kind == GameParam::Tracked || p.kind == GameParam::Zone || p.kind == GameParam::ZoneOptional) {
             const size_t index = m_widgets.size() - 1;
             connect(w.combo, &QComboBox::activated, this, [this, index] { m_widgets[index].userChose = true; });
         }
@@ -209,7 +209,11 @@ void GameDialog::setChoices(const std::vector<std::pair<int, QString>> &objects,
                 w.combo->addItem(w.param.noneLabel, 0);
             for (const auto &[id, name] : zones)
                 w.combo->addItem(name, id);
-            w.combo->setCurrentIndex(std::max(0, w.combo->findData(current)));
+            // Tant que l'utilisateur n'a rien choisi : choix par défaut (1re zone, 2e zone...).
+            int index = w.userChose ? w.combo->findData(current) : -1;
+            if (index < 0)
+                index = w.param.kind == GameParam::ZoneOptional ? 0 : std::min(w.param.defaultValue, w.combo->count() - 1);
+            w.combo->setCurrentIndex(std::max(0, index));
             break;
         }
         case GameParam::ZoneList: {

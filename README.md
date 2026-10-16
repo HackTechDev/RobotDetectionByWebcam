@@ -182,6 +182,8 @@ Les jeux suivants reposent sur un cadre commun (`src/gameframework.cpp`) : chaqu
 
 - **Chat et souris** (`src/catmousegame.cpp`) : deux objets suivis ; le chat marque un point quand les cadres se touchent (marge de 5 %), sauf si le centre de la souris est dans le refuge (zone facultative). Après une prise, il faut se séparer et attendre 3 s ; les rôles s'inversent toutes les 20, 30 ou 60 s, sans prise possible avant séparation. Partie de 1 à 5 minutes.
 
+- **Football de table** (`src/footballgame.cpp`) : le robot pousse une balle (objet suivi) vers deux buts (zones). Un but est compté quand le centre de la balle reste 0,2 s dans un but, pour l'équipe adverse ; une balle « hors du champ » du suivi est une touche. Le jeu reprend quand la balle replacée est hors des buts et immobile depuis 1 s. Match de 2 à 10 minutes.
+
 ### Suivi d'objets encadrés
 
 Dans l'onglet « Suivi », cliquer sur « Ajouter des objets », puis tracer un rectangle autour de chaque objet, ou cliquer dessus : un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Valider l'objet », touche Entrée ou double-clic. On reste en mode ajout pour l'objet suivant ; Échap ou « Terminer l'ajout » termine. Chaque objet a un numéro, un nom modifiable (double-clic dans la liste des objets) et une couleur. « Retirer » arrête le suivi de l'objet sélectionné dans la liste, « Tout retirer » celui de tous les objets. Chaque objet est suivi d'image en image par son propre tracker OpenCV :

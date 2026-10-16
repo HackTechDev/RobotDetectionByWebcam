@@ -76,7 +76,7 @@ struct GameParam
     QString label;
     Kind kind = Choice;
     QStringList choices;  // Choice
-    int defaultValue = 0; // Choice : index ; Tracked : rang dans la liste ; Marker : numéro
+    int defaultValue = 0; // Choice : index ; Tracked, Zone : rang dans la liste ; Marker : numéro
     QString noneLabel;    // ZoneOptional
     QString tooltip;
 };

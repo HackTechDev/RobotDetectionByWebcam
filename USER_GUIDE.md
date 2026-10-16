@@ -829,6 +829,24 @@ Le menu **Jeu**, **Chat et souris...** : deux objets suivis jouent l'un contre l
 
 **UDP** : événements `cat_mouse_catch` (`count` = points du chat), `cat_mouse_swap` et `cat_mouse_finish` ; objet `game` avec `mode` = `cat_mouse`, `cat_id`, `mouse_id` (numéros des objets suivis), `scores` (liste de `{id, points}`), `contact`, `mouse_safe`, `remaining_s`, `next_swap_s` et `finished`.
 
+### 8.15 Jeu : football de table
+
+Le menu **Jeu**, **Football de table...** : le robot pousse une **balle** vers les buts. Deux équipes : rouge et bleue.
+
+**Préparer**
+1. Ajoutez le robot, puis la **balle**, comme objets suivis (une balle colorée ou texturée se suit mieux).
+2. Tracez les **deux buts** dans l'onglet **Zones**, aux deux bouts du terrain.
+
+**Jouer**
+1. Choisissez la **Balle** (le deuxième objet suivi est proposé), le **But de l'équipe 1** (rouge), le **But de l'équipe 2** (bleue) et la **Durée** (2 à 10 minutes), puis **Démarrer**.
+2. Les buts sont teintés de la couleur de leur équipe, et la balle est entourée de blanc. Le bandeau donne le score et le temps restant.
+3. Quand le **centre de la balle** entre dans un but (pendant 0,2 s), c'est **but** pour l'équipe **adverse** : une balle dans le but rouge marque pour l'équipe bleue. « BUT pour l'équipe 2 ! 1 — 1 — replacez la balle ».
+4. Une balle qui **sort de l'image** (« hors du champ » du suivi, voir [6.2](#62-ce-qui-saffiche)) est une **touche** : « TOUCHE ! — replacez la balle ».
+5. Après un but ou une touche, **replacez la balle** sur le terrain : le jeu reprend quand elle est hors des buts et **immobile depuis 1 s**. Une balle sortie de l'image n'est cherchée que le long des bords : ramenez-la sur le terrain **par un bord** pour qu'elle soit retrouvée.
+6. À la fin du temps : « FIN DU MATCH ! L'équipe 1 gagne 3 — 2 », ou « Égalité ».
+
+**UDP** : événements `football_goal` (`count` = numéro de l'équipe qui marque), `football_out`, `football_kickoff` et `football_finish` ; objet `game` avec `mode` = `football`, `ball_id`, `goal1_zone_id`, `goal2_zone_id`, `scores` (`[équipe 1, équipe 2]`), `state` (`play`, `goal`, `out` ou `finished`), `outs` et `remaining_s`.
+
 ---
 
 ## 9. Lire les résultats
