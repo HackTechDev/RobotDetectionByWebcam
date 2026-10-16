@@ -56,6 +56,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - **Menu Jeu**, « Ramassage » : pousser les objets suivis dans une zone de collecte avant la fin du temps, compte sur la position des objets.
 - **Menu Jeu**, « Jacques a dit » : ordres à exécuter seulement après « Jacques a dit » (marqueur ArUco pour le cap), jugés sur la position et le cap au début et à la fin du temps imparti ; ordres pièges.
 - **Menu Jeu**, « Dessin au sol » : reproduire une forme avec la trajectoire du robot, pourcentage de ressemblance (précision et couverture), meilleur dessin par forme.
+- **Menu Jeu**, « Champ de mines » : mines invisibles tirées au hasard entre le départ et l'arrivée, explosions mémorisées, détecteur facultatif, mines et trajectoires dévoilées à la fin.
 
 ### Intégration
 

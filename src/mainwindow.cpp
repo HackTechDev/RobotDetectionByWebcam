@@ -9,6 +9,7 @@
 #include "collectgame.h"
 #include "simonsaysgame.h"
 #include "drawinggame.h"
+#include "minefieldgame.h"
 #include "trackermodels.h"
 #include "videowidget.h"
 
@@ -2006,6 +2007,7 @@ void MainWindow::registerFrameworkGames()
     m_frameworkGames.push_back({std::make_unique<CollectGame>(), nullptr});
     m_frameworkGames.push_back({std::make_unique<SimonSaysGame>(), nullptr});
     m_frameworkGames.push_back({std::make_unique<DrawingGame>(), nullptr});
+    m_frameworkGames.push_back({std::make_unique<MinefieldGame>(), nullptr});
 }
 
 GameContext MainWindow::gameContext(const std::vector<DetectedMarker> &markers, const QSize &imageSize) const

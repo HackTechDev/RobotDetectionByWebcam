@@ -60,6 +60,8 @@ add_executable(RobotDetectionByWebcam
     src/simonsaysgame.cpp
     src/drawinggame.h
     src/drawinggame.cpp
+    src/minefieldgame.h
+    src/minefieldgame.cpp
     src/objecttracker.h
     src/objecttracker.cpp
     src/motionfilter.h

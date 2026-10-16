@@ -2,7 +2,7 @@
 
 Ces jeux s'appuient sur ce que RobotDetectionByWebcam mesure déjà et envoie en UDP (voir le [format des messages](USER_GUIDE.md#103-format-des-messages)). Un petit programme à côté, par exemple en Python à partir de [`tools/udp_receiver.py`](tools/udp_receiver.py), peut tenir le score et arbitrer.
 
-Les jeux marqués « **Dans l'application** » sont aussi intégrés au menu **Jeu** de l'application, qui arbitre la partie et affiche l'état en bandeau sur l'image (voir la [section 8 du guide](USER_GUIDE.md#86-jeu--détecter-le-robot-dans-une-zone)).
+Tous les jeux ci-dessous sont aussi intégrés au menu **Jeu** de l'application (mention « **Dans l'application** »), qui arbitre la partie et affiche l'état en bandeau sur l'image (voir la [section 8 du guide](USER_GUIDE.md#86-jeu--détecter-le-robot-dans-une-zone)).
 
 ## Sommaire
 
@@ -145,6 +145,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 **Pistes.** Plusieurs trésors ; nombre limité d'indices.
 
 ### 12. Champ de mines
+
+**Dans l'application** : menu **Jeu**, « Champ de mines » (voir la [section 8.19 du guide](USER_GUIDE.md#819-jeu--champ-de-mines)).
 
 **Principe.** Des zones interdites invisibles sont placées sur le sol. Le robot doit traverser la zone en mémorisant les « explosions » des essais précédents. Les trajectoires sont affichées à la fin.
 

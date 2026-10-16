@@ -909,6 +909,23 @@ Le **meilleur dessin** de chaque forme est conservé pendant la session et réaf
 
 **UDP** : événements `drawing_start` et `drawing_done` (`count` = ressemblance en %) ; objet `game` avec `mode` = `drawing`, `robot_id`, `shape` (`square`, `circle`, `triangle` ou `zigzag`), `phase` (`waiting`, `drawing` ou `done`), `trace_points`, `similarity` (à la fin) et `best`.
 
+### 8.19 Jeu : champ de mines
+
+Le menu **Jeu**, **Champ de mines...** : des **mines invisibles** séparent le départ de l'arrivée. Il faut traverser sans en toucher, en se souvenant des explosions des essais précédents.
+
+**Préparer** : ajoutez le robot comme objet suivi, et tracez dans l'onglet **Zones** un **départ** et une **arrivée** aux deux bouts de la zone de jeu (et, si vous voulez, un **terrain** qui délimite l'endroit où les mines sont posées).
+
+**Jouer**
+1. Choisissez le **Robot**, le **Départ**, l'**Arrivée** (la deuxième zone est proposée), le **Terrain** (ou « Toute l'image »), le nombre de **Mines** (5, 8 ou 12) et le **Détecteur**, puis **Démarrer**. Les mines sont placées au hasard à **chaque partie**, sur le terrain, hors du départ et de l'arrivée, espacées les unes des autres. Leur rayon est de 4 % du petit côté de l'image.
+2. Placez le robot dans le **départ** (vert) : « Prêt : essai 1, partez quand vous voulez ». L'essai commence quand le robot quitte le départ.
+3. Si le **centre** du robot passe sur une mine : « **BOUM !** ». L'explosion reste **marquée en rouge** sur l'image pendant toute la partie. **Retournez au départ** pour l'essai suivant.
+4. Avec le **détecteur**, le bandeau « bipe » à l'approche d'une mine : « Bip... bip... » (doré), puis « BIP BIP BIP ! » (orange) tout près.
+5. La partie est gagnée quand le centre du robot atteint l'**arrivée** (jaune) : « TRAVERSÉE RÉUSSIE en 4 essai(s) ! ». Toutes les **mines** et les **trajectoires** de chaque essai sont alors dévoilées. Le moins d'essais gagne.
+
+Revenir au départ sans avoir sauté recommence aussi un essai.
+
+**UDP** : événements `minefield_boom` (`count` = numéro de l'essai) et `minefield_win` (`count` = nombre d'essais) ; objet `game` avec `mode` = `minefield`, `robot_id`, `phase` (`waiting`, `ready`, `crossing`, `boom` ou `won`), `mines` (nombre), `attempts`, `explosions_px` (mines déjà explosées ; les autres restent secrètes) et `beep` (0, 1 ou 2).
+
 ---
 
 ## 9. Lire les résultats

@@ -14,7 +14,7 @@ Pour chacun, l'application donne la position dans l'image, ainsi que la taille e
 - signaler ce qui entre dans des **zones** nommées de l'image et en sort ;
 - **capturer une image** ou **enregistrer une vidéo** de la webcam ;
 - afficher la vidéo seule dans une **fenêtre pour le joueur**, en plein écran sur un second écran ;
-- proposer des **jeux** (menu **Jeu**) : détecter quand le robot est entièrement dans une zone, arbitrer une partie de « 1, 2, 3 Soleil », et une chasse au trésor guidée par « chaud / froid ».
+- proposer **treize jeux** (menu **Jeu**), qui arbitrent la partie et l'affichent en bandeau : robot dans une zone, « 1, 2, 3 Soleil », chasse au trésor, course contre la montre, parking, fil électrique, curling, chat et souris, football de table, ramassage, « Jacques a dit », dessin au sol et champ de mines.
 
 Les objets encadrés peuvent être suivis par les trackers classiques d'OpenCV (CSRT, KCF) ou par des **réseaux de neurones** (Nano, Vit), plus robustes. Les réglages de la webcam (exposition, balance des blancs, luminosité, gain, fréquence du secteur...) se font depuis l'application.
 
@@ -189,6 +189,8 @@ Les jeux suivants reposent sur un cadre commun (`src/gameframework.cpp`) : chaqu
 - **Jacques a dit** (`src/simonsaysgame.cpp`) : ordres tirés au hasard (avance, recule, tourne à gauche, tourne à droite), dont 70 % commencent par « Jacques a dit ». Le robot, repéré par un marqueur ArUco, est jugé à la fin du temps imparti (6, 4 ou 3 s) en comparant sa pose : avancer ou reculer d'au moins 1,5 côté de marqueur le long de son cap, tourner de 60° à 120° ; un ordre piège est réussi si le robot a bougé de moins d'un demi-côté et de moins de 20°. 5, 10 ou 15 ordres.
 
 - **Dessin au sol** (`src/drawinggame.cpp`) : reproduire une forme (carré, cercle, triangle, zigzag) dessinée dans une zone. Le tracé commence au premier mouvement et se termine après 2 s d'immobilité ou par un bouton. Tracé et modèle sont rééchantillonnés en 120 points ; l'écart dans chaque sens (précision et couverture) est la moyenne de l'écart moyen au point le plus proche et du 90e centile, et 10 % de la diagonale du cadre donne 0 % de ressemblance. Le meilleur dessin de chaque forme est conservé pendant la session.
+
+- **Champ de mines** (`src/minefieldgame.cpp`) : mines invisibles placées au hasard à chaque partie (5, 8 ou 12, rayon de 4 % du petit côté de l'image, espacées, hors du départ et de l'arrivée). Le robot doit aller du départ à l'arrivée sans que son centre passe sur une mine ; une explosion reste marquée et renvoie au départ. Détecteur facultatif qui « bipe » à 2,5 puis 1,6 rayon d'une mine. Mines et trajectoires dévoilées à la fin ; le score est le nombre d'essais.
 
 ### Suivi d'objets encadrés
 

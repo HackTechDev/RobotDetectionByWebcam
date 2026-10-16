@@ -15,7 +15,7 @@ Les parties s'enchaînent, mais vous pouvez vous arrêter après n'importe laque
 | [6. Mesurer sur le sol en millimètres](#6-mesurer-sur-le-sol-en-millimètres) | Tracer un rectangle au ruban adhésif, lire des positions en mm, définir des zones nommées, essayer le jeu | 25 min |
 | [7. Lisser les positions et mesurer la vitesse](#7-lisser-les-positions-et-mesurer-la-vitesse) | Mesurer une vitesse, voir une position prédite | 10 min |
 | [8. Envoyer les positions à un programme](#8-envoyer-les-positions-à-un-programme) | Recevoir les positions en Python, calculer un cap vers une cible | 20 min |
-| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot, jouer au « robot au garage », à « 1, 2, 3 Soleil » et à la chasse au trésor sur un second écran | 45 min |
+| [9. Mise en situation : suivre un robot](#9-mise-en-situation--suivre-un-robot) | Installer le tout pour un vrai robot, jouer au « robot au garage », à « 1, 2, 3 Soleil », à la chasse au trésor et aux autres jeux sur un second écran | 1 h |
 
 ---
 
@@ -55,7 +55,7 @@ cmake --build build -j
 
 ### 1.1 Faire le tour de l'écran
 
-- En **haut**, la barre de menus, avec le menu **Jeu** et ses trois jeux (parties 6.4 et 9.5 à 9.7).
+- En **haut**, la barre de menus, avec le menu **Jeu** et ses treize jeux (parties 6.4 et 9.5 à 9.8).
 - À **gauche**, l'image de la caméra, sur laquelle les détections sont dessinées. Au lancement, **aucune détection automatique n'est active** : l'image est nue tant que vous n'activez pas le carré coloré ou les marqueurs, ou que vous n'encadrez pas un objet.
 - En **haut à droite**, le groupe **Webcam** : **Caméra**, **Résolution**, **Effet miroir** et les boutons **Capture**, **Vidéo**, **Joueur** et **Réglages de l'image...**.
 - Au **milieu à droite**, sept onglets : **Carré coloré**, **ArUco**, **Calibration**, **Sol**, **Zones**, **Suivi** et **Envoi UDP**.
@@ -515,7 +515,21 @@ C'est le **centre** du robot qui doit passer sur le trésor : près du but, bala
 
 ✅ **Vérification** : les indices se réchauffent quand le robot s'approche du trésor, et chaque trésor trouvé laisse une étoile dorée sur l'image.
 
-### 9.8 Montrer le jeu au joueur
+### 9.8 Les autres jeux
+
+Le menu **Jeu** propose encore dix jeux, qui fonctionnent tous de la même façon : une fenêtre rappelle la règle et propose les réglages (objets suivis, zones, choix), **Démarrer** vérifie qu'il ne manque rien, et l'état s'affiche en bandeau sur l'image. Tracez d'abord les zones demandées, puis essayez par exemple :
+
+- **Course contre la montre** : tracez trois ou quatre **portes** dans l'ordre du parcours, cochez-les, et franchissez-les dans l'ordre le plus vite possible ;
+- **Le fil électrique** : tracez un **couloir** de zones qui se touchent, et suivez-le sans que le robot en dépasse ;
+- **Curling** à deux joueurs : une **cible**, et chacun lance le robot à son tour ;
+- **Chat et souris** ou **Football de table** : ajoutez un **second objet suivi** (un second robot, ou une balle) ;
+- **Le parking** et **Jacques a dit** : ils utilisent le **marqueur ArUco** du robot pour connaître son cap ;
+- **Dessin au sol** : reproduisez un carré ou un cercle avec la trajectoire du robot ;
+- **Champ de mines** : traversez sans toucher les mines invisibles, en mémorisant les explosions.
+
+Chaque jeu est décrit dans le [guide](USER_GUIDE.md#89-les-autres-jeux--fonctionnement-commun), et les idées d'origine dans [GAMES.md](GAMES.md).
+
+### 9.9 Montrer le jeu au joueur
 
 Si un second écran est branché, le joueur peut suivre la partie sans voir les réglages :
 
@@ -527,7 +541,7 @@ Si un second écran est branché, le joueur peut suivre la partie sans voir les 
 
 La fenêtre du joueur et ses réglages sont mémorisés : elle se rouvre au lancement suivant si elle était ouverte. Des idées de jeux sont réunies dans [GAMES.md](GAMES.md).
 
-### 9.9 Quitter proprement
+### 9.10 Quitter proprement
 
 Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, une vidéo en cours est terminée proprement, et la webcam retrouve son exposition automatique et ses réglages d'origine pour les autres logiciels.
 
@@ -564,6 +578,7 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, u
 | Jouer au football de table | Menu **Jeu** | **Football de table...**, balle et deux buts, **Démarrer** |
 | Jouer au ramassage | Menu **Jeu** | **Ramassage...**, robot et zone de collecte, **Démarrer** |
 | Jouer à « Jacques a dit » | Menu **Jeu** | **Jacques a dit...**, numéro du marqueur, **Démarrer** |
+| Traverser un champ de mines | Menu **Jeu** | **Champ de mines...**, départ et arrivée, **Démarrer** |
 | Dessiner au sol avec le robot | Menu **Jeu** | **Dessin au sol...**, cadre et forme, **Démarrer** |
 | Faire une course contre la montre | Menu **Jeu** | **Course contre la montre...**, cocher les portes, **Démarrer** |
 
