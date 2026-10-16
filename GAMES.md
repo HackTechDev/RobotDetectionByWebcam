@@ -92,6 +92,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 
 ### 7. Ramassage
 
+**Dans l'application** : menu **Jeu**, « Ramassage » (voir la [section 8.16 du guide](USER_GUIDE.md#816-jeu--ramassage)).
+
 **Principe.** Des objets sont posés au sol et suivis. Le robot doit en pousser le plus possible dans une zone en un temps donné. Le compte se fait sur la position des objets, pas sur celle du robot.
 
 **Données.** Positions des objets suivis, position du robot.

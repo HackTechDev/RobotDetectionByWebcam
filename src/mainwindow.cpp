@@ -6,6 +6,7 @@
 #include "curlinggame.h"
 #include "catmousegame.h"
 #include "footballgame.h"
+#include "collectgame.h"
 #include "trackermodels.h"
 #include "videowidget.h"
 
@@ -2000,6 +2001,7 @@ void MainWindow::registerFrameworkGames()
     m_frameworkGames.push_back({std::make_unique<CurlingGame>(), nullptr});
     m_frameworkGames.push_back({std::make_unique<CatMouseGame>(), nullptr});
     m_frameworkGames.push_back({std::make_unique<FootballGame>(), nullptr});
+    m_frameworkGames.push_back({std::make_unique<CollectGame>(), nullptr});
 }
 
 GameContext MainWindow::gameContext(const std::vector<DetectedMarker> &markers, const QSize &imageSize) const

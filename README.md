@@ -184,6 +184,8 @@ Les jeux suivants reposent sur un cadre commun (`src/gameframework.cpp`) : chaqu
 
 - **Football de table** (`src/footballgame.cpp`) : le robot pousse une balle (objet suivi) vers deux buts (zones). Un but est compté quand le centre de la balle reste 0,2 s dans un but, pour l'équipe adverse ; une balle « hors du champ » du suivi est une touche. Le jeu reprend quand la balle replacée est hors des buts et immobile depuis 1 s. Match de 2 à 10 minutes.
 
+- **Ramassage** (`src/collectgame.cpp`) : tous les objets suivis autres que le robot sont à pousser dans une zone de collecte ; un objet est ramassé quand son centre est dans la zone depuis 0,3 s (sortie confirmée de la même façon), un objet caché garde son état. Le score est le nombre d'objets dans la zone à la fin du temps (1 à 5 minutes).
+
 ### Suivi d'objets encadrés
 
 Dans l'onglet « Suivi », cliquer sur « Ajouter des objets », puis tracer un rectangle autour de chaque objet, ou cliquer dessus : un simple clic délimite l'objet automatiquement (`cv::grabCut` sur une zone autour du clic). Le cadre reste ajustable, avec ses poignées ou en le faisant glisser, jusqu'à sa validation : bouton « Valider l'objet », touche Entrée ou double-clic. On reste en mode ajout pour l'objet suivant ; Échap ou « Terminer l'ajout » termine. Chaque objet a un numéro, un nom modifiable (double-clic dans la liste des objets) et une couleur. « Retirer » arrête le suivi de l'objet sélectionné dans la liste, « Tout retirer » celui de tous les objets. Chaque objet est suivi d'image en image par son propre tracker OpenCV :

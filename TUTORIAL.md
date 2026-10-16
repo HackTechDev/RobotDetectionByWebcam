@@ -562,6 +562,7 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, u
 | Jouer au curling | Menu **Jeu** | **Curling...**, cible, joueurs et manches, **Démarrer** |
 | Jouer au chat et à la souris | Menu **Jeu** | **Chat et souris...**, deux objets suivis, **Démarrer** |
 | Jouer au football de table | Menu **Jeu** | **Football de table...**, balle et deux buts, **Démarrer** |
+| Jouer au ramassage | Menu **Jeu** | **Ramassage...**, robot et zone de collecte, **Démarrer** |
 | Faire une course contre la montre | Menu **Jeu** | **Course contre la montre...**, cocher les portes, **Démarrer** |
 
 ## Pour aller plus loin

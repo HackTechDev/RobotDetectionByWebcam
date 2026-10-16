@@ -847,6 +847,25 @@ Le menu **Jeu**, **Football de table...** : le robot pousse une **balle** vers l
 
 **UDP** : événements `football_goal` (`count` = numéro de l'équipe qui marque), `football_out`, `football_kickoff` et `football_finish` ; objet `game` avec `mode` = `football`, `ball_id`, `goal1_zone_id`, `goal2_zone_id`, `scores` (`[équipe 1, équipe 2]`), `state` (`play`, `goal`, `out` ou `finished`), `outs` et `remaining_s`.
 
+### 8.16 Jeu : ramassage
+
+Le menu **Jeu**, **Ramassage...** : le robot pousse le plus d'objets possible dans une **zone de collecte** avant la fin du temps. Le compte se fait sur la position des **objets**, pas sur celle du robot.
+
+**Préparer**
+1. Ajoutez le **robot**, puis chaque **objet à ramasser** (cubes, balles, bouchons...), comme objets suivis : tous les objets suivis autres que le robot sont à ramasser.
+2. Tracez la **zone de collecte** dans l'onglet **Zones**.
+
+**Jouer**
+1. Choisissez le **Robot**, la **Zone de collecte** et la **Durée** (1 à 5 minutes), puis **Démarrer**.
+2. La zone de collecte est teintée de jaune, avec le compte « Collecte : 2/5 ». Chaque objet à ramasser est entouré d'**orange** tant qu'il est dehors, de **vert** une fois dans la zone.
+3. Un objet est **ramassé** quand son **centre** est dans la zone depuis 0,3 s : « Objet « Cube » ramassé ! ». S'il en ressort, il n'est plus compté : « Objet « Balle » ressorti ».
+4. Le robot lui-même dans la zone ne compte pas. Un objet caché un instant (par le robot qui le pousse) garde son état.
+5. À la fin du temps : « TERMINÉ ! 4 objet(s) ramassé(s) sur 5 ».
+
+Des objets ajoutés au suivi pendant la partie sont aussi à ramasser ; un objet retiré du suivi n'est plus compté.
+
+**UDP** : événements `collect_in`, `collect_out` (`count` = objets dans la zone) et `collect_finish` ; objet `game` avec `mode` = `collect`, `robot_id`, `zone_id`, `in_zone` (numéros des objets dans la zone), `collected`, `total`, `remaining_s` et `finished`.
+
 ---
 
 ## 9. Lire les résultats
