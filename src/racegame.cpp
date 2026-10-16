@@ -65,7 +65,7 @@ double RaceGame::elapsed(qint64 timeMs) const
     return ((m_finished ? m_finishMs : timeMs) - m_startMs) / 1000.0 + m_penalties * kPenaltySeconds;
 }
 
-std::vector<MotionEvent> RaceGame::update(const GameContext &context)
+std::vector<MotionEvent> RaceGame::onUpdate(const GameContext &context)
 {
     std::vector<MotionEvent> events;
     if (!isRunning())

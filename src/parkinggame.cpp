@@ -75,7 +75,7 @@ QRectF ParkingGame::target(const GameContext &context) const
     return r;
 }
 
-std::vector<MotionEvent> ParkingGame::update(const GameContext &context)
+std::vector<MotionEvent> ParkingGame::onUpdate(const GameContext &context)
 {
     std::vector<MotionEvent> events;
     const qint64 t = context.timeMs;

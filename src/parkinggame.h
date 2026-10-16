@@ -13,7 +13,6 @@ public:
     QString key() const override { return QStringLiteral("parking"); }
     QString rules() const override;
     std::vector<GameParam> params() const override;
-    std::vector<MotionEvent> update(const GameContext &context) override;
     void draw(const GameDrawContext &draw, const GameContext &context) const override;
     QString bannerText(const GameContext &context) const override;
     QColor bannerColor(const GameContext &context) const override;
@@ -24,6 +23,7 @@ public:
 
 protected:
     void onStart(const GameContext &context) override;
+    std::vector<MotionEvent> onUpdate(const GameContext &context) override;
 
 private:
     QRectF target(const GameContext &context) const;  // case cible du niveau en cours

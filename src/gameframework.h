@@ -107,8 +107,11 @@ public:
     bool isActive() const { return m_active; }    // en cours, ou terminée avec le résultat affiché
     bool isRunning() const { return m_running; }  // en cours
 
-    // Appelée à chaque image tant que la partie est en cours.
-    virtual std::vector<MotionEvent> update(const GameContext &context) = 0;
+    // À chaque image : met la partie à jour si elle est en cours (sinon ne fait rien).
+    std::vector<MotionEvent> update(const GameContext &context)
+    {
+        return m_running ? onUpdate(context) : std::vector<MotionEvent>();
+    }
     virtual void draw(const GameDrawContext &, const GameContext &) const {}
     virtual QString bannerText(const GameContext &context) const = 0;
     virtual QColor bannerColor(const GameContext &context) const = 0;
@@ -123,6 +126,8 @@ public:
 
 protected:
     virtual void onStart(const GameContext &context) = 0;
+    // Appelée à chaque image tant que la partie est en cours.
+    virtual std::vector<MotionEvent> onUpdate(const GameContext &context) = 0;
     void finish() { m_running = false; }  // partie terminée, résultat encore affiché
     // Événement du jeu, pour le journal et l'UDP.
     MotionEvent event(const GameContext &context, const QString &code, const QString &text, int objectId = 0,

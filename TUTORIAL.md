@@ -558,6 +558,7 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, u
 | Jouer à « 1, 2, 3 Soleil » | Menu **Jeu** | **1, 2, 3 Soleil...**, choisir le robot, l'arrivée et la difficulté, **Démarrer** |
 | Jouer à la chasse au trésor | Menu **Jeu** | **Chasse au trésor...**, choisir le robot, le terrain, la durée et la difficulté, **Démarrer** |
 | Jouer au parking | Menu **Jeu** | **Le parking...**, numéro du marqueur, place et cap, **Démarrer** |
+| Jouer au fil électrique | Menu **Jeu** | **Le fil électrique...**, cocher les zones du couloir, **Démarrer** |
 | Faire une course contre la montre | Menu **Jeu** | **Course contre la montre...**, cocher les portes, **Démarrer** |
 
 ## Pour aller plus loin

@@ -50,6 +50,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 
 ### 3. Le fil électrique
 
+**Dans l'application** : menu **Jeu**, « Le fil électrique » (voir la [section 8.12 du guide](USER_GUIDE.md#812-jeu--le-fil-électrique)).
+
 **Principe.** Suivre un parcours sinueux sans sortir du couloir. Chaque sortie coûte une pénalité. Variante « main tremblante » : une vitesse maximale à ne pas dépasser.
 
 **Données.** Position sur le sol, vitesse en mm/s.

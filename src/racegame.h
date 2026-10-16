@@ -15,7 +15,6 @@ public:
     QString rules() const override;
     std::vector<GameParam> params() const override;
     QString checkReady(const GameSettings &settings, const GameContext &context) const override;
-    std::vector<MotionEvent> update(const GameContext &context) override;
     void draw(const GameDrawContext &draw, const GameContext &context) const override;
     QString bannerText(const GameContext &context) const override;
     QColor bannerColor(const GameContext &context) const override;
@@ -26,6 +25,7 @@ public:
 
 protected:
     void onStart(const GameContext &context) override;
+    std::vector<MotionEvent> onUpdate(const GameContext &context) override;
 
 private:
     double elapsed(qint64 timeMs) const;  // chrono, pénalités comprises

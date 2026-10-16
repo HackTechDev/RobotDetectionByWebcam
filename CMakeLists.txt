@@ -46,6 +46,8 @@ add_executable(RobotDetectionByWebcam
     src/racegame.cpp
     src/parkinggame.h
     src/parkinggame.cpp
+    src/wiregame.h
+    src/wiregame.cpp
     src/objecttracker.h
     src/objecttracker.cpp
     src/motionfilter.h

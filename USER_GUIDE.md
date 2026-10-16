@@ -780,6 +780,23 @@ Si le marqueur n'est pas vu (détection ArUco désactivée, marqueur caché ou t
 
 **UDP** : événements `parking_success` (`count` = points), `parking_miss` (`count` = essais ratés) et `parking_finish` (`count` = score) ; objet `game` avec `mode` = `parking`, `marker_id`, `zone_id`, `level`, `levels`, `score`, `misses`, `target_heading_deg` (angle du marqueur demandé : 0 vers le haut, 90 vers la droite), `tolerance_deg`, `seen`, `heading_error_deg`, `inside` et `finished`.
 
+### 8.12 Jeu : le fil électrique
+
+Le menu **Jeu**, **Le fil électrique...** : suivre un **couloir** sinueux sans en sortir, comme le jeu d'adresse où l'anneau ne doit pas toucher le fil.
+
+**Préparer**
+1. Ajoutez le robot comme objet suivi, encadré au plus près.
+2. Tracez le couloir dans l'onglet **Zones** avec plusieurs rectangles qui **se touchent ou se chevauchent** (par exemple un départ, deux tronçons, un coude et une arrivée), **dans l'ordre du parcours** : la **première** zone cochée est le **départ**, la **dernière** l'**arrivée**.
+
+**Jouer**
+1. Choisissez le **Robot**, cochez les zones du **Couloir** et la **Vitesse maximale** (pas de limite, moyenne ou lente), puis **Démarrer**.
+2. Placez le robot **entièrement dans le départ** : le bandeau passe à « Prêt : partez quand vous voulez ». Le **chrono démarre** quand le robot quitte le départ.
+3. Le couloir est teinté de bleu sur l'image. Si le **cadre du robot dépasse** du couloir pendant plus de 0,2 s, c'est une **touche** : le couloir passe au rouge, « TOUCHÉ ! Revenez dans le couloir », et **3 s** s'ajoutent au score. Une nouvelle touche ne compte qu'après être revenu dans le couloir.
+4. Variante « **main tremblante** » : avec une vitesse maximale (12 % ou 6 % de la largeur de l'image par seconde), chaque **excès** coûte **2 s** (« TROP VITE ! »), et compte une fois jusqu'à ce que le robot ralentisse.
+5. La partie se termine quand le robot est **entièrement dans l'arrivée** : « ARRIVÉE ! 14,1 s — 1 touche(s) — score 19,1 s ». Le score est le temps plus les pénalités : le plus petit gagne.
+
+**UDP** : événements `wire_start`, `wire_touch` (`count` = numéro de la touche), `wire_speed` et `wire_finish` ; objet `game` avec `mode` = `wire`, `robot_id`, `phase` (`waiting`, `ready`, `running` ou `finished`), `inside`, `touches`, `overspeeds`, `speed_limit_px_s` (0 sans limite), `elapsed_s` et `score_s`.
+
 ---
 
 ## 9. Lire les résultats
