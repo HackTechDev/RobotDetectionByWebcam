@@ -1,6 +1,8 @@
 # Idées de jeux avec un petit robot
 
-Ces jeux s'appuient sur ce que RobotDetectionByWebcam mesure déjà et envoie en UDP (voir le [format des messages](USER_GUIDE.md#103-format-des-messages)). Un petit programme à côté, par exemple en Python à partir de [`tools/udp_receiver.py`](tools/udp_receiver.py), tient le score et arbitre : l'application elle-même n'a pas à être modifiée.
+Ces jeux s'appuient sur ce que RobotDetectionByWebcam mesure déjà et envoie en UDP (voir le [format des messages](USER_GUIDE.md#103-format-des-messages)). Un petit programme à côté, par exemple en Python à partir de [`tools/udp_receiver.py`](tools/udp_receiver.py), peut tenir le score et arbitrer.
+
+Les jeux marqués « **Dans l'application** » sont aussi intégrés au menu **Jeu** de l'application, qui arbitre la partie et affiche l'état en bandeau sur l'image (voir la [section 8 du guide](USER_GUIDE.md#86-jeu--détecter-le-robot-dans-une-zone)).
 
 ## Sommaire
 
@@ -27,6 +29,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 ## Adresse et pilotage
 
 ### 1. Course contre la montre
+
+**Dans l'application** : menu **Jeu**, « Course contre la montre » (voir la [section 8.10 du guide](USER_GUIDE.md#810-jeu--course-contre-la-montre)).
 
 **Principe.** Des portes virtuelles, définies en mm dans le repère du sol, sont à franchir dans l'ordre. Le chrono démarre au premier mouvement et s'arrête à la dernière porte.
 
@@ -96,6 +100,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 
 ### 9. 1, 2, 3, soleil
 
+**Dans l'application** : menu **Jeu**, « 1, 2, 3 Soleil » (voir la [section 8.7 du guide](USER_GUIDE.md#87-jeu--1-2-3-soleil)).
+
 **Principe.** Le robot ne doit pas bouger quand le programme dit « soleil ». L'événement de début de mouvement sert d'arbitre, et le seuil de mouvement réglable fixe la sévérité. Le but est d'atteindre une ligne d'arrivée.
 
 **Données.** Début de mouvement, position sur le sol.
@@ -113,6 +119,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 ## Exploration
 
 ### 11. Chasse au trésor
+
+**Dans l'application** : menu **Jeu**, « Chasse au trésor » (voir la [section 8.8 du guide](USER_GUIDE.md#88-jeu--chasse-au-trésor)).
 
 **Principe.** Un trésor est caché à une position secrète. Le programme guide le robot par « chaud / froid » selon la distance, à la voix ou par la couleur d'un affichage.
 

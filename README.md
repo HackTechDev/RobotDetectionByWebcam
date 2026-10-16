@@ -154,7 +154,7 @@ L'onglet « Zones » définit des rectangles fixes de l'image, chacun avec un no
 
 ### Jeux
 
-Le menu « Jeu » propose trois jeux, construits sur le suivi d'objets et les zones : « Détection robot dans zone », « 1, 2, 3 Soleil » et « Chasse au trésor ». Dans chacun, le robot est un objet suivi (onglet « Suivi ») ; l'état de la partie s'affiche dans une petite fenêtre propre au jeu et en bandeau en haut de l'image, donc aussi dans la fenêtre du joueur ; les événements vont dans le journal et en UDP, et l'objet `game` décrit la partie en cours. Un seul jeu tourne à la fois : en démarrer un arrête les autres.
+Le menu « Jeu » propose des jeux construits sur le suivi d'objets, les marqueurs et les zones : « Détection robot dans zone », « 1, 2, 3 Soleil », « Chasse au trésor », puis les jeux du cadre commun décrits plus bas. Dans chacun, le robot est un objet suivi (onglet « Suivi ») ; l'état de la partie s'affiche dans une petite fenêtre propre au jeu et en bandeau en haut de l'image, donc aussi dans la fenêtre du joueur ; les événements vont dans le journal et en UDP, et l'objet `game` décrit la partie en cours. Un seul jeu tourne à la fois : en démarrer un arrête les autres.
 
 ### Jeu : détection du robot dans une zone
 
@@ -167,6 +167,12 @@ Le menu « Jeu », « 1, 2, 3 Soleil... », arbitre une course vers une zone d'a
 ### Jeu : chasse au trésor
 
 Le menu « Jeu », « Chasse au trésor... », cache un trésor invisible à un endroit tiré au hasard (`QRandomGenerator`), dans une zone choisie comme terrain ou dans toute l'image, à au moins 8 % du bord. Le bandeau donne un indice selon la distance du centre du robot au trésor, rapportée à la diagonale du terrain (Glacial au-delà de 60 %, Froid, Tiède, Chaud, BRÛLANT sous 12 %), et la tendance (« plus chaud » ou « plus froid »), mesurée sur 0,7 s. Quand le centre du robot passe à moins du rayon du trésor (12, 8 ou 5 % du petit côté du terrain selon la difficulté), le trésor est trouvé, marqué d'une étoile dorée, et un nouveau est caché à au moins 30 % de la diagonale du robot. La partie dure 1 à 5 minutes. Les trésors trouvés et la fin vont dans le journal et en UDP (`game_treasure`, `game_over`, objet `game` avec `mode` = `treasure`, qui donne aussi la position du trésor pour un robot autonome). Le code est dans `src/treasuregame.cpp`.
+
+### Jeux du cadre commun
+
+Les jeux suivants reposent sur un cadre commun (`src/gameframework.cpp`) : chaque jeu (classe `Game`) déclare ses réglages (objets suivis, marqueur, zones, choix), et la fenêtre du jeu (`GameDialog`) est construite à partir de cette déclaration. À chaque image, le jeu reçoit les objets suivis, les marqueurs et les zones (`GameContext`), et fournit son bandeau, son dessin sur l'image, ses événements (type `game_event`, avec un `code` et un texte) et son objet `game` pour l'UDP. « Démarrer » vérifie d'abord que les réglages sont utilisables.
+
+- **Course contre la montre** (`src/racegame.cpp`) : portes (zones cochées, dans l'ordre de l'onglet Zones) à franchir dans l'ordre, sur 1 à 3 tours. Une porte est franchie quand le centre du robot y entre ; le chrono démarre au premier mouvement (seuil de mouvement du suivi) ; une mauvaise porte coûte 5 s. Le record est conservé par parcours (portes et tours) pendant la session.
 
 ### Suivi d'objets encadrés
 

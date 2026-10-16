@@ -47,6 +47,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - **Menu Jeu**, « Détection robot dans zone » : le robot (objet suivi) est signalé quand son cadre est entièrement dans une zone, avec bandeau sur l'image, temps passé dans la zone, nombre d'entrées, journal et UDP.
 - **Menu Jeu**, « 1, 2, 3 Soleil » : phases « Avancez ! » et « Soleil ! » aux durées aléatoires (trois difficultés), faute si le robot bouge pendant « Soleil ! » après le temps de réaction (+5 s), arrivée dans une zone, chrono et score.
 - **Menu Jeu**, « Chasse au trésor » : trésor invisible caché au hasard sur un terrain, indices « chaud / froid » avec tendance, étoile à chaque trésor trouvé, durée de 1 à 5 minutes, trois difficultés.
+- **Menu Jeu**, « Course contre la montre » : portes à franchir dans l'ordre sur 1 à 3 tours, chrono au premier mouvement, pénalité pour une mauvaise porte, record par parcours ; premier jeu du cadre commun (`gameframework`), qui construit la fenêtre de chaque jeu à partir de ses réglages.
 
 ### Intégration
 

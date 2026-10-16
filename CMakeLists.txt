@@ -40,6 +40,10 @@ add_executable(RobotDetectionByWebcam
     src/soleilgame.cpp
     src/treasuregame.h
     src/treasuregame.cpp
+    src/gameframework.h
+    src/gameframework.cpp
+    src/racegame.h
+    src/racegame.cpp
     src/objecttracker.h
     src/objecttracker.cpp
     src/motionfilter.h

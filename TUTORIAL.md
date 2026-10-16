@@ -557,6 +557,7 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, u
 | Savoir si le robot est entièrement dans une zone | Menu **Jeu** | **Détection robot dans zone...**, choisir le robot et la zone, **Démarrer** |
 | Jouer à « 1, 2, 3 Soleil » | Menu **Jeu** | **1, 2, 3 Soleil...**, choisir le robot, l'arrivée et la difficulté, **Démarrer** |
 | Jouer à la chasse au trésor | Menu **Jeu** | **Chasse au trésor...**, choisir le robot, le terrain, la durée et la difficulté, **Démarrer** |
+| Faire une course contre la montre | Menu **Jeu** | **Course contre la montre...**, cocher les portes, **Démarrer** |
 
 ## Pour aller plus loin
 

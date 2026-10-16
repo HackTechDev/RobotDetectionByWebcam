@@ -53,7 +53,8 @@ struct MotionEvent
     // GameEnter et GameExit : jeu « Détection robot dans zone » (robot entièrement dans la zone).
     // GameGreen à GameWin : jeu « 1, 2, 3 Soleil » (feu vert, « Soleil ! », faute, arrivée).
     enum Type { MotionStart, MotionStop, Lost, Found, ZoneEnter, ZoneExit, GameEnter, GameExit, GameGreen, GameRed,
-                GameFault, GameWin, GameTreasure, GameOver };  // GameTreasure, GameOver : chasse au trésor
+                GameFault, GameWin, GameTreasure, GameOver,  // GameTreasure, GameOver : chasse au trésor
+                GameInfo };  // GameInfo : événement d'un jeu du cadre commun (gameCode, gameText)
     Type type = MotionStart;
     qint64 timeMs = 0;      // horloge du suivi
     qint64 wallTimeMs = 0;  // heure réelle (ms depuis 1970), renseignée par l'application
@@ -67,6 +68,8 @@ struct MotionEvent
     int zoneId = 0;         // entrée et sortie de zone : zone concernée
     QString zoneName;
     int count = 0;          // jeu : numéro de la faute, ou nombre de fautes à l'arrivée
+    QString gameCode;       // GameInfo : code de l'événement (« race_gate »...)
+    QString gameText;       // GameInfo : texte affiché dans le journal
 };
 
 // Suivi d'un objet encadré à la main (trackers CSRT, KCF, NanoTrack ou VitTrack d'OpenCV), avec sa

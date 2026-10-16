@@ -12,6 +12,7 @@
 #include "robotzonegame.h"
 #include "soleilgame.h"
 #include "treasuregame.h"
+#include "gameframework.h"
 
 #include <QCameraFormat>
 #include <QElapsedTimer>
@@ -164,8 +165,12 @@ private:
     void openSoleilGame();
     void openTreasureGame();
     // Un seul jeu à la fois : arrête les autres jeux que « keep ».
-    enum class GameKind { RobotZone, Soleil, Treasure };
-    void stopOtherGames(GameKind keep);
+    enum class GameKind { RobotZone, Soleil, Treasure, Framework };
+    void stopOtherGames(GameKind keep, int frameworkIndex = -1);
+    // Jeux du cadre commun (gameframework.h).
+    void registerFrameworkGames();
+    void openFrameworkGame(int index);
+    GameContext gameContext(const std::vector<DetectedMarker> &markers, const QSize &imageSize) const;
     void refreshGameChoices();
     void applySmoothingToTracker();
     void configureTracker(ObjectTracker &tracker) const;
@@ -280,6 +285,12 @@ private:
     SoleilGameDialog *m_soleilDialog = nullptr;
     TreasureGame m_treasure;  // jeu « Chasse au trésor »
     TreasureGameDialog *m_treasureDialog = nullptr;
+    struct FrameworkGame
+    {
+        std::unique_ptr<Game> game;
+        GameDialog *dialog = nullptr;
+    };
+    std::vector<FrameworkGame> m_frameworkGames;
     QPushButton *m_zoneAddButton = nullptr;
     QPushButton *m_zoneConfirmButton = nullptr;
     QPushButton *m_zoneRemoveButton = nullptr;

@@ -58,7 +58,13 @@ def describe(msg):
              "game_green": "SOLEIL : FEU VERT", "game_red": "SOLEIL : « SOLEIL ! »",
              "game_fault": "SOLEIL : FAUTE", "game_win": "SOLEIL : ARRIVÉE",
              "game_treasure": "TRÉSOR TROUVÉ", "game_over": "CHASSE AU TRÉSOR TERMINÉE"}
+    # Événements des autres jeux (type « game_event ») : leur texte suffit.
     for e in msg.get("events", []):
+        if e["type"] == "game_event":
+            parts.append(f"*** {e['text']}")
+    for e in msg.get("events", []):
+        if e["type"] == "game_event":
+            continue
         unit = "mm" if "position_mm" in e else "px"
         x, y = e.get("position_mm") or e.get("position_px")
         text = f"*** {e.get('name', 'objet')} : {names.get(e['type'], e['type'])}"
@@ -76,7 +82,10 @@ def describe(msg):
     # Jeu « Détection robot dans zone » en cours (objet « game »).
     game = msg.get("game")
     if game:
-        if game["mode"] == "treasure":
+        if game["mode"] not in ("treasure", "soleil", "robot_in_zone"):
+            details = ", ".join(f"{k} {v}" for k, v in game.items() if k not in ("mode", "running"))
+            parts.append(f"jeu {game['mode']} : {details}")
+        elif game["mode"] == "treasure":
             parts.append(f"jeu chasse au trésor : {game['hint']}, {game['found']} trésor(s), "
                          f"{game['remaining_s']:.0f} s restantes")
         elif game["mode"] == "soleil":

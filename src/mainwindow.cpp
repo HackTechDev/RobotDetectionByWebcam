@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "playerwindow.h"
+#include "racegame.h"
 #include "trackermodels.h"
 #include "videowidget.h"
 
@@ -616,6 +617,10 @@ MainWindow::MainWindow(QWidget *parent)
     gameMenu->addAction(tr("Détection robot dans zone..."), this, &MainWindow::openRobotZoneGame);
     gameMenu->addAction(tr("1, 2, 3 Soleil..."), this, &MainWindow::openSoleilGame);
     gameMenu->addAction(tr("Chasse au trésor..."), this, &MainWindow::openTreasureGame);
+    registerFrameworkGames();
+    for (int i = 0; i < int(m_frameworkGames.size()); ++i)
+        gameMenu->addAction(m_frameworkGames[i].game->title() + QStringLiteral("..."), this,
+                            [this, i] { openFrameworkGame(i); });
     resize(1100, 650);
 
     connect(m_colorButton, &QPushButton::clicked, this, &MainWindow::chooseColor);
@@ -1981,8 +1986,72 @@ void MainWindow::openSoleilGame()
     m_soleilDialog->activateWindow();
 }
 
-void MainWindow::stopOtherGames(GameKind keep)
+void MainWindow::registerFrameworkGames()
 {
+    // Ordre du menu Jeu.
+    m_frameworkGames.push_back({std::make_unique<RaceGame>(), nullptr});
+}
+
+GameContext MainWindow::gameContext(const std::vector<DetectedMarker> &markers, const QSize &imageSize) const
+{
+    GameContext context;
+    for (const TrackedItem &item : m_tracked)
+        context.tracked.push_back({item.id, item.name, &item.tracker->state()});
+    context.markers = &markers;
+    context.zones = &m_zones.zones();
+    context.imageSize = imageSize;
+    context.timeMs = m_clock.elapsed();
+    context.motionPx = m_motionPxSpin->value();
+    context.motionMm = m_motionMmSpin->value();
+    return context;
+}
+
+void MainWindow::openFrameworkGame(int index)
+{
+    FrameworkGame &fg = m_frameworkGames[index];
+    if (!fg.dialog) {
+        fg.dialog = new GameDialog(fg.game.get(), this);
+        connect(fg.dialog, &GameDialog::startRequested, this, [this, index] {
+            FrameworkGame &g = m_frameworkGames[index];
+            const std::vector<DetectedMarker> noMarkers;
+            const GameContext context = gameContext(noMarkers, m_lastFrame.size());
+            const GameSettings settings = g.dialog->settings();
+            const QString problem = g.game->checkReady(settings, context);
+            if (!problem.isEmpty()) {
+                QMessageBox::information(g.dialog, g.game->title(), problem);
+                return;
+            }
+            stopOtherGames(GameKind::Framework, index);
+            g.game->start(settings, context);
+            g.dialog->setRunning(true);
+        });
+        connect(fg.dialog, &GameDialog::stopRequested, this, [this, index] {
+            FrameworkGame &g = m_frameworkGames[index];
+            g.game->stop();
+            g.dialog->showStopped();
+            refreshGameChoices();
+        });
+        connect(fg.dialog, &GameDialog::actionRequested, this, [this, index] {
+            const std::vector<DetectedMarker> noMarkers;
+            m_frameworkGames[index].game->action(gameContext(noMarkers, m_lastFrame.size()));
+        });
+    }
+    refreshGameChoices();
+    fg.dialog->show();
+    fg.dialog->raise();
+    fg.dialog->activateWindow();
+}
+
+void MainWindow::stopOtherGames(GameKind keep, int frameworkIndex)
+{
+    for (int i = 0; i < int(m_frameworkGames.size()); ++i) {
+        FrameworkGame &g = m_frameworkGames[i];
+        if ((keep != GameKind::Framework || i != frameworkIndex) && g.game->isActive()) {
+            g.game->stop();
+            if (g.dialog)
+                g.dialog->showStopped();
+        }
+    }
     if (keep != GameKind::RobotZone && m_game.isRunning()) {
         m_game.stop();
         if (m_gameDialog)
@@ -2027,7 +2096,10 @@ void MainWindow::openTreasureGame()
 
 void MainWindow::refreshGameChoices()
 {
-    if (!m_gameDialog && !m_soleilDialog && !m_treasureDialog)
+    bool anyDialog = m_gameDialog || m_soleilDialog || m_treasureDialog;
+    for (const FrameworkGame &g : m_frameworkGames)
+        anyDialog = anyDialog || g.dialog;
+    if (!anyDialog)
         return;
     std::vector<std::pair<int, QString>> robots, zones;
     for (const TrackedItem &item : m_tracked)
@@ -2041,6 +2113,10 @@ void MainWindow::refreshGameChoices()
         m_soleilDialog->setChoices(robots, zones);
     if (m_treasureDialog && !m_treasure.isRunning())
         m_treasureDialog->setChoices(robots, zones);
+    for (FrameworkGame &g : m_frameworkGames) {
+        if (g.dialog)
+            g.dialog->setChoices(robots, zones);
+    }
 }
 
 void MainWindow::saveZones() const
@@ -2350,6 +2426,8 @@ QString eventText(const MotionEvent &e)
             .arg(e.duration + e.count * SoleilGame::kPenaltySeconds, 0, 'f', 1);
     case MotionEvent::GameTreasure:
         return QObject::tr("Chasse au trésor : trésor n° %1 trouvé en %2").arg(e.count).arg(where);
+    case MotionEvent::GameInfo:
+        return e.gameText;
     case MotionEvent::GameOver:
         return QObject::tr("Chasse au trésor : terminé, %1 trésor(s) trouvé(s) en %2 s")
             .arg(e.count)
@@ -2375,6 +2453,7 @@ QString eventTypeKey(MotionEvent::Type type)
     case MotionEvent::GameWin: return QStringLiteral("game_win");
     case MotionEvent::GameTreasure: return QStringLiteral("game_treasure");
     case MotionEvent::GameOver: return QStringLiteral("game_over");
+    case MotionEvent::GameInfo: return QStringLiteral("game_event");
     }
     return {};
 }
@@ -2652,6 +2731,21 @@ void MainWindow::presentFrame(const FrameResult &result)
                 m_soleilDialog->setRunning(false);  // résultat affiché, nouvelle partie possible
         }
     }
+    // Jeux du cadre commun.
+    const Game *frameworkGame = nullptr;
+    GameContext frameworkContext;
+    for (FrameworkGame &g : m_frameworkGames) {
+        if (!g.game->isActive())
+            continue;
+        frameworkContext = gameContext(result.markers, image.size());
+        if (g.game->isRunning()) {
+            const std::vector<MotionEvent> events = g.game->update(frameworkContext);
+            frameEvents.insert(frameEvents.end(), events.begin(), events.end());
+        }
+        if (g.dialog)
+            g.dialog->showState(frameworkContext);
+        frameworkGame = g.game.get();
+    }
     // Jeu « Chasse au trésor ».
     QString treasureRobotName;
     if (m_treasure.isActive()) {
@@ -2727,6 +2821,9 @@ void MainWindow::presentFrame(const FrameResult &result)
             gamePtr = &gameJson;
         } else if (m_treasure.isActive()) {
             gameJson = m_treasure.toJson(treasureRobotName, m_clock.elapsed());
+            gamePtr = &gameJson;
+        } else if (frameworkGame) {
+            gameJson = frameworkGame->toJson(frameworkContext);
             gamePtr = &gameJson;
         }
         std::vector<ZoneEntry> zoneEntries;
@@ -2911,6 +3008,23 @@ void MainWindow::presentFrame(const FrameResult &result)
         painter.setBrush(Qt::NoBrush);
         banner = m_treasure.bannerText(treasureRobotName, m_clock.elapsed());
         bannerColor = m_treasure.bannerColor(m_clock.elapsed());
+    } else if (frameworkGame) {
+        GameDrawContext drawContext;
+        drawContext.painter = &painter;
+        drawContext.toDisplay = toDisplay;
+        drawContext.rectToDisplay = [mirror, width](const QRectF &r) {
+            QRectF out = r;
+            if (mirror)
+                out.moveLeft(width - r.right());
+            return out;
+        };
+        drawContext.penWidth = penWidth;
+        drawContext.font = font;
+        frameworkGame->draw(drawContext, frameworkContext);
+        painter.setBrush(Qt::NoBrush);
+        painter.setFont(font);
+        banner = frameworkGame->bannerText(frameworkContext);
+        bannerColor = frameworkGame->bannerColor(frameworkContext);
     }
     if (!banner.isEmpty()) {
         QFont bannerFont = font;

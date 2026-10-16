@@ -182,7 +182,7 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
     if (events && !events->empty()) {
         static const char *types[] = {"motion_start", "motion_stop", "lost", "found", "zone_enter", "zone_exit", "game_zone_enter", "game_zone_exit",
                                       "game_green", "game_red", "game_fault", "game_win", "game_treasure",
-                                      "game_over"};
+                                      "game_over", "game_event"};
         QJsonArray list;
         for (const MotionEvent &e : *events) {
             QJsonObject o{{QStringLiteral("type"), QString::fromLatin1(types[e.type])},
@@ -197,6 +197,11 @@ QByteArray PositionSender::buildMessage(qint64 frame, qint64 timestampMs, const 
             }
             if (e.type == MotionEvent::GameFault || e.type == MotionEvent::GameWin)
                 o.insert(e.type == MotionEvent::GameFault ? QStringLiteral("fault") : QStringLiteral("faults"), e.count);
+            if (e.type == MotionEvent::GameInfo) {
+                o.insert(QStringLiteral("code"), e.gameCode);
+                o.insert(QStringLiteral("text"), e.gameText);
+                o.insert(QStringLiteral("count"), e.count);
+            }
             if (e.type == MotionEvent::GameTreasure || e.type == MotionEvent::GameOver)
                 o.insert(e.type == MotionEvent::GameTreasure ? QStringLiteral("treasure") : QStringLiteral("treasures"),
                          e.count);
