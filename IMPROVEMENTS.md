@@ -50,6 +50,7 @@ Le mode d'emploi détaillé de chaque fonctionnalité se trouve dans le [guide u
 - **Menu Jeu**, « Course contre la montre » : portes à franchir dans l'ordre sur 1 à 3 tours, chrono au premier mouvement, pénalité pour une mauvaise porte, record par parcours ; premier jeu du cadre commun (`gameframework`), qui construit la fenêtre de chaque jeu à partir de ses réglages.
 - **Menu Jeu**, « Le parking » : garer le robot (marqueur ArUco) dans une case avec le bon cap, jugé à l'arrêt ; 5 niveaux où la case rétrécit et la tolérance de cap se resserre ; points selon la précision.
 - **Menu Jeu**, « Le fil électrique » : couloir de zones à suivre sans en sortir, touche (+3 s) quand le cadre du robot dépasse, variante « main tremblante » avec vitesse maximale (+2 s par excès).
+- **Menu Jeu**, « Curling » : 1 à 4 joueurs lancent le robot vers une cible à anneaux (10, 5, 2 points), jugée à l'arrêt ; manches et classement.
 
 ### Intégration
 

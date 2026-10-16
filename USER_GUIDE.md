@@ -797,6 +797,22 @@ Le menu **Jeu**, **Le fil électrique...** : suivre un **couloir** sinueux sans 
 
 **UDP** : événements `wire_start`, `wire_touch` (`count` = numéro de la touche), `wire_speed` et `wire_finish` ; objet `game` avec `mode` = `wire`, `robot_id`, `phase` (`waiting`, `ready`, `running` ou `finished`), `inside`, `touches`, `overspeeds`, `speed_limit_px_s` (0 sans limite), `elapsed_s` et `score_s`.
 
+### 8.13 Jeu : curling
+
+Le menu **Jeu**, **Curling...** : chacun son tour, lancer le robot vers une **cible** et le laisser s'arrêter au plus près du centre. Seule la **position à l'arrêt** compte.
+
+**Préparer** : ajoutez le robot comme objet suivi, et tracez la **cible** dans l'onglet **Zones** : son centre est le centre de la cible, et son petit côté donne le diamètre des anneaux. Prévoyez une ligne de départ assez loin.
+
+**Jouer**
+1. Choisissez le **Robot**, la **Cible**, le nombre de **Joueurs** (1 à 4) et de **Manches** (1, 3 ou 5 ; un lancer par joueur et par manche), puis **Démarrer**.
+2. La cible est dessinée avec trois anneaux : **10 points** au centre (tiers du rayon), **5 points** (deux tiers), **2 points** (anneau extérieur) ; **0** en dehors.
+3. « Joueur 1 : placez le robot au départ » : posez le robot ; après **1 s d'immobilité**, le bandeau affiche « Joueur 1 : lancez ! » (couleur du joueur).
+4. Lancez le robot (télécommande, ou poussée à la main). Le lancer est détecté au premier déplacement, puis jugé quand le robot est **immobile depuis 1 s** : « Joueur 1 : 10 point(s) ». Une pastille de la couleur du joueur marque la position d'arrêt jusqu'à la fin de la manche. Si le robot n'est plus suivi pendant le lancer (sorti de l'image), le lancer vaut 0.
+5. C'est au joueur suivant : replacez le robot au départ. Le déplacement pendant le replacement n'est pas compté comme un lancer, car le lancer suivant n'est accepté qu'après 1 s d'immobilité.
+6. Après le dernier lancer : « Joueur 1 GAGNE ! » avec le classement (« TERMINÉ ! 25 points » pour un joueur seul).
+
+**UDP** : événements `curling_throw` (`count` = points du lancer) et `curling_finish` ; objet `game` avec `mode` = `curling`, `robot_id`, `state` (`placing`, `ready`, `moving`, `result` ou `finished`), `players`, `rounds`, `round`, `player` (joueur dont c'est le tour), `scores` (liste des totaux) et `last_points`.
+
 ---
 
 ## 9. Lire les résultats

@@ -60,6 +60,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 
 ### 4. Curling
 
+**Dans l'application** : menu **Jeu**, « Curling » (voir la [section 8.13 du guide](USER_GUIDE.md#813-jeu--curling)).
+
 **Principe.** Lancer le robot vers une cible et le laisser s'arrêter au plus près du centre. Seule la position à l'arrêt compte. On joue à plusieurs, chacun son tour.
 
 **Données.** Position sur le sol, fin de mouvement.
