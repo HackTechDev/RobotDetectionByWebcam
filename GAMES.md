@@ -124,6 +124,8 @@ Les événements de mouvement ne concernent que les **objets suivis** (onglet **
 
 ### 10. Dessin au sol
 
+**Dans l'application** : menu **Jeu**, « Dessin au sol » (voir la [section 8.18 du guide](USER_GUIDE.md#818-jeu--dessin-au-sol)).
+
 **Principe.** Reproduire une forme (carré, cercle, lettre) avec la trajectoire du robot. Le programme compare le tracé au modèle et donne un pourcentage de ressemblance.
 
 **Données.** Suite des positions sur le sol.

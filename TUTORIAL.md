@@ -564,6 +564,7 @@ Cliquez sur **Quitter**, puis confirmez. Tous les réglages sont enregistrés, u
 | Jouer au football de table | Menu **Jeu** | **Football de table...**, balle et deux buts, **Démarrer** |
 | Jouer au ramassage | Menu **Jeu** | **Ramassage...**, robot et zone de collecte, **Démarrer** |
 | Jouer à « Jacques a dit » | Menu **Jeu** | **Jacques a dit...**, numéro du marqueur, **Démarrer** |
+| Dessiner au sol avec le robot | Menu **Jeu** | **Dessin au sol...**, cadre et forme, **Démarrer** |
 | Faire une course contre la montre | Menu **Jeu** | **Course contre la montre...**, cocher les portes, **Démarrer** |
 
 ## Pour aller plus loin

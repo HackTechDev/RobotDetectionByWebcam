@@ -890,6 +890,25 @@ Environ 7 ordres sur 10 commencent par « Jacques a dit ». Gauche et droite s'e
 
 **UDP** : événements `simon_good`, `simon_miss` (`count` = ordres réussis) et `simon_finish` ; objet `game` avec `mode` = `simon_says`, `marker_id`, `phase` (`pause`, `announce`, `result` ou `finished`), `order` (`forward`, `backward`, `turn_left` ou `turn_right`) et `simon` (vrai si « Jacques a dit ») pendant l'annonce et le résultat, `remaining_s` pendant l'annonce, `score`, `orders_done` et `orders_total`. Un programme qui pilote le robot peut donc jouer tout seul.
 
+### 8.18 Jeu : dessin au sol
+
+Le menu **Jeu**, **Dessin au sol...** : reproduire une **forme** avec la trajectoire du robot, comme un crayon. L'application donne un **pourcentage de ressemblance**.
+
+**Préparer** : ajoutez le robot comme objet suivi, et tracez dans l'onglet **Zones** le **cadre du dessin**, une zone à peu près carrée, assez grande pour que le robot y manœuvre.
+
+**Jouer**
+1. Choisissez le **Robot**, le **Cadre du dessin** et la **Forme** (carré, cercle, triangle ou zigzag), puis **Démarrer**.
+2. Le **modèle** est dessiné en **pointillés jaunes** au centre du cadre (70 % du petit côté). Amenez le robot au point de départ de votre choix : le **tracé commence au premier mouvement**.
+3. Suivez le modèle : votre tracé apparaît en **bleu clair**.
+4. Le dessin se termine quand le robot reste **immobile 2 s** (une fois au moins 30 % de la forme parcourue), ou avec le bouton **Terminer le dessin** de la fenêtre du jeu.
+5. Le bandeau donne la **ressemblance** : « Carré : ressemblance 88 % — MEILLEUR DESSIN » (vert à partir de 70 %, doré de 40 à 70 %, rouge en dessous). **Démarrer** relance un dessin.
+
+La ressemblance combine deux écarts, mesurés sur 120 points régulièrement répartis le long du tracé et du modèle : le tracé suit-il le modèle, et le modèle est-il entièrement parcouru ? Pour chacun, l'écart retenu est la moyenne de l'écart moyen et du 90e centile, ce qui pénalise les coins manqués. Un écart de 10 % de la diagonale du cadre donne 0 %. À titre indicatif, sur un carré : tracé tremblé de ±8 px, environ 88 % ; décalé de 25 px, environ 42 % ; cercle à la place du carré, environ 47 % ; moitié du carré, 0 %.
+
+Le **meilleur dessin** de chaque forme est conservé pendant la session et réaffiché en blanc léger pendant les essais suivants. Pour garder une image de votre dessin, utilisez **Capture**, image avec les détections (**Maj+F12**).
+
+**UDP** : événements `drawing_start` et `drawing_done` (`count` = ressemblance en %) ; objet `game` avec `mode` = `drawing`, `robot_id`, `shape` (`square`, `circle`, `triangle` ou `zigzag`), `phase` (`waiting`, `drawing` ou `done`), `trace_points`, `similarity` (à la fin) et `best`.
+
 ---
 
 ## 9. Lire les résultats
