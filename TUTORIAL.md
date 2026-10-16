@@ -177,7 +177,7 @@ ID 1 : (320, 241) px, côté 82 px, 0.0°
 
 ✅ **Vérification** : les marqueurs 1 et 2 sont détectés ensemble, avec leur numéro et leur angle.
 
-**À retenir** : collez le marqueur sur un robot avec son bord supérieur vers l'avant du robot. L'angle du marqueur sera alors la direction du robot.
+**À retenir** : collez le marqueur sur un robot avec son bord supérieur vers l'avant du robot. L'angle du marqueur sera alors la direction du robot. C'est aussi grâce à lui que les jeux « Le parking » et « Jacques a dit » (partie 9.8) connaissent le cap du robot.
 
 ---
 
@@ -371,7 +371,7 @@ Une ligne s'affiche par image :
 image 812 | carré (310, 242) px 12° | sol X 288 Y 196 mm | ArUco 1 (402, 250) px 0° | sol X 412 Y 198 mm cap 90° | carré vitesse 0 mm/s | ArUco 1 vitesse 85 mm/s
 ```
 
-Si des objets sont suivis (partie 4), leurs débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Les zones (partie 6.4) aussi : `zone Garage : ArUco 1`, et `*** ArUco 1 : ENTRE DANS LA ZONE « Garage » (152, 210) mm` à chaque entrée. Pendant une partie d'un jeu, son état s'ajoute à chaque ligne, par exemple `jeu : Tasse dans « Garage », 3.4 s, 2 entrée(s)`, `jeu 1, 2, 3 Soleil : green, 12.4 s, 1 faute(s), score 17.4 s` ou `jeu chasse au trésor : hot, 2 trésor(s), 54 s restantes`. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
+Si des objets sont suivis (partie 4), leurs débuts et fins de mouvement s'affichent aussi, par exemple `*** FIN DE MOUVEMENT (342, 299) px, déplacement 92 px en 2.4 s`. Les zones (partie 6.4) aussi : `zone Garage : ArUco 1`, et `*** ArUco 1 : ENTRE DANS LA ZONE « Garage » (152, 210) mm` à chaque entrée. Pendant une partie d'un jeu, son état s'ajoute à chaque ligne, par exemple `jeu : Tasse dans « Garage », 3.4 s, 2 entrée(s)`, `jeu 1, 2, 3 Soleil : green, 12.4 s, 1 faute(s), score 17.4 s` ou `jeu chasse au trésor : hot, 2 trésor(s), 54 s restantes`. Pour les autres jeux de la partie 9.8, leurs événements s'affichent avec leur texte (`*** Course : porte 2/3 « Porte 2 », tour 1/1`) et leur état sous la forme `jeu race : next_gate 3, elapsed_s 12.4...`. Avec `--raw`, le script affiche le message **JSON** brut. Le format complet est décrit dans le [guide](USER_GUIDE.md#103-format-des-messages).
 
 ### 8.3 Écrire son propre programme : aller vers une cible
 
@@ -517,17 +517,41 @@ C'est le **centre** du robot qui doit passer sur le trésor : près du but, bala
 
 ### 9.8 Les autres jeux
 
-Le menu **Jeu** propose encore dix jeux, qui fonctionnent tous de la même façon : une fenêtre rappelle la règle et propose les réglages (objets suivis, zones, choix), **Démarrer** vérifie qu'il ne manque rien, et l'état s'affiche en bandeau sur l'image. Tracez d'abord les zones demandées, puis essayez par exemple :
+Le menu **Jeu** propose encore dix jeux, qui fonctionnent tous de la même façon : une fenêtre rappelle la règle et propose les réglages (objets suivis, numéro de marqueur, zones, choix), **Démarrer** vérifie qu'il ne manque rien (sinon, un message dit quoi ajouter), et l'état s'affiche en bandeau sur l'image. Les zones tracées après l'ouverture de la fenêtre du jeu y apparaissent toutes seules.
 
-- **Course contre la montre** : tracez trois ou quatre **portes** dans l'ordre du parcours, cochez-les, et franchissez-les dans l'ordre le plus vite possible ;
-- **Le fil électrique** : tracez un **couloir** de zones qui se touchent, et suivez-le sans que le robot en dépasse ;
-- **Curling** à deux joueurs : une **cible**, et chacun lance le robot à son tour ;
-- **Chat et souris** ou **Football de table** : ajoutez un **second objet suivi** (un second robot, ou une balle) ;
-- **Le parking** et **Jacques a dit** : ils utilisent le **marqueur ArUco** du robot pour connaître son cap ;
-- **Dessin au sol** : reproduisez un carré ou un cercle avec la trajectoire du robot ;
-- **Champ de mines** : traversez sans toucher les mines invisibles, en mémorisant les explosions.
+**Une course contre la montre**
 
-Chaque jeu est décrit dans le [guide](USER_GUIDE.md#89-les-autres-jeux--fonctionnement-commun), et les idées d'origine dans [GAMES.md](GAMES.md).
+1. Onglet **Zones** : tracez **trois portes** autour de la zone de jeu, **dans l'ordre du parcours** (Porte 1, Porte 2, Porte 3), chacune un peu plus grande que le robot.
+2. Menu **Jeu**, **Course contre la montre...** : choisissez le **Robot**, vérifiez que les trois portes sont cochées, laissez **1 tour**, puis **Démarrer**.
+3. Le bandeau affiche « Course : partez quand vous voulez » et la **porte 1 est entourée de jaune**. Le chrono démarre au premier mouvement du robot.
+4. Passez les portes dans l'ordre : la porte franchie devient verte et la suivante jaune. Entrez exprès dans la porte 3 avant la 2 : « MAUVAISE PORTE ! +5 s ».
+5. À la dernière porte : « ARRIVÉE ! 18,4 s — NOUVEAU RECORD ». **Démarrer** relance une course pour tenter de battre le record.
+
+✅ **Vérification** : le chrono démarre au premier mouvement, la mauvaise porte ajoute 5 s, et le temps final s'affiche avec le record.
+
+**Une partie de « Jacques a dit »** (avec le marqueur ArUco du robot)
+
+1. Onglet **ArUco** : cochez **Activer la détection**, et vérifiez que le marqueur du robot est détecté (partie 3).
+2. Menu **Jeu**, **Jacques a dit...** : saisissez le **numéro du marqueur**, choisissez **5 ordres** et la difficulté **Facile** (6 s par ordre), puis **Démarrer**.
+3. Lisez l'ordre en violet : « JACQUES A DIT : TOURNE À DROITE ! (6) » → faites tourner le robot d'un quart de tour vers la droite (à l'écran). « AVANCE ! (6) », sans « Jacques a dit » → ne bougez pas !
+4. Après chaque ordre : « Bravo ! » ou « Piège ! Jacques n'avait rien dit ». À la fin : « TERMINÉ ! 4 ordre(s) réussi(s) sur 5 ».
+
+✅ **Vérification** : un ordre exécuté sans « Jacques a dit » est compté comme raté, et un quart de tour bien fait comme réussi.
+
+**Les autres**
+
+| Jeu | À préparer | Astuce |
+|---|---|---|
+| **Le parking** | Marqueur ArUco, une **place** (zone) nettement plus grande que le robot | Arrêtez-vous dans la place, tourné comme la flèche jaune ; le jugement a lieu après 1 s d'immobilité |
+| **Le fil électrique** | Un **couloir** de zones qui se touchent, dans l'ordre (départ en premier, arrivée en dernier) | Encadrez le robot au plus près : c'est son cadre entier qui doit rester dans le couloir |
+| **Curling** | Une **cible** (zone carrée), 2 joueurs | Replacez le robot au départ entre deux lancers : le lancer suivant n'est accepté qu'à l'arrêt |
+| **Chat et souris** | **Deux objets suivis**, éventuellement un **refuge** | Il faut se séparer après chaque prise ; les rôles s'inversent régulièrement |
+| **Football de table** | Une **balle** suivie et **deux buts** | Après un but, replacez la balle au centre : le jeu reprend quand elle est immobile |
+| **Ramassage** | Le robot et des **objets** suivis, une **zone de collecte** | C'est la position des objets qui compte, pas celle du robot |
+| **Dessin au sol** | Un **cadre** (zone carrée) | Restez immobile 2 s pour terminer le dessin, ou cliquez sur **Terminer le dessin** |
+| **Champ de mines** | Un **départ** et une **arrivée** | Les explosions restent marquées : contournez-les à l'essai suivant |
+
+Chaque jeu est décrit en détail dans le [guide](USER_GUIDE.md#89-les-autres-jeux--fonctionnement-commun), et les idées d'origine dans [GAMES.md](GAMES.md).
 
 ### 9.9 Montrer le jeu au joueur
 
